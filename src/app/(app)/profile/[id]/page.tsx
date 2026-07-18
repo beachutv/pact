@@ -128,25 +128,46 @@ export default function ProfilePage() {
   async function uploadAvatar(file: File) {
     setUploading(true)
     try {
-      const ext = file.name.split('.').pop() || 'jpg'
-      const path = `${user.id}.${ext}`
+      // Always use consistent path to avoid stale files from different extensions
+      const path = `${user.id}/avatar`
+
+      // Remove old file first (ignore errors if it doesn't exist)
+      await supabase.storage.from('avatars').remove([path])
 
       // Upload directly via client-side Supabase (proper auth context)
       const { error: upErr } = await supabase.storage
         .from('avatars')
         .upload(path, file, { contentType: file.type, upsert: true })
 
-      if (upErr) { console.error('Upload error:', upErr); setUploading(false); return }
+      if (upErr) {
+        console.error('Upload error:', upErr)
+        alert('Photo upload failed. Please try again.')
+        setUploading(false)
+        return
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(path)
 
-      const avatarUrl = `${publicUrl}?t=${Date.now()}`
-      await supabase.from('users').update({ avatar_url: avatarUrl }).eq('id', user.id)
+      // Cache-bust to force browsers to reload the image
+      const avatarUrl = `${publicUrl}?v=${Date.now()}`
+
+      // Update DB and verify it succeeded
+      const { error: dbErr } = await supabase.from('users').update({ avatar_url: avatarUrl }).eq('id', user.id)
+      if (dbErr) {
+        console.error('DB update error:', dbErr)
+        alert('Failed to save photo. Please try again.')
+        setUploading(false)
+        return
+      }
+
       setProfile(prev => prev ? { ...prev, avatar_url: avatarUrl } : prev)
       updateUser({ avatar_url: avatarUrl })
-    } catch (e) { console.error('Avatar upload failed:', e) }
+    } catch (e) {
+      console.error('Avatar upload failed:', e)
+      alert('Photo upload failed. Please try again.')
+    }
     setUploading(false)
   }
 

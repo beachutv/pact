@@ -16,7 +16,7 @@ type Spark = {
   window: { s: number; e: number }
   area: string
 }
-type PactEntry = { id: string; date: string; occasion: string | null; spot_name: string }
+type PactEntry = { id: string; date: string; occasion: string | null; spot_name: string; spot_area: string | null; spot_emoji: string | null; win_start: number | null; win_end: number | null }
 
 export default function CalendarPage() {
   const { user, activeCircle, circleMembers } = useCircle()
@@ -111,7 +111,7 @@ export default function CalendarPage() {
     async function fetchPacts() {
       const { data } = await supabase
         .from('pacts')
-        .select('id, date, occasion, spot_name')
+        .select('id, date, occasion, spot_name, spot_area, spot_emoji, win_start, win_end')
         .eq('circle_id', activeCircle!.id)
         .gte('date', todayStr)
       if (data) setPacts(data)
@@ -399,6 +399,16 @@ export default function CalendarPage() {
         winColor = 'var(--text2)'
       }
 
+      // Pact border colors: red=special events, gold=confirmed, orange=pending
+      if (datePacts.length > 0) {
+        const hasSpecial = datePacts.some(p => p.occasion)
+        if (hasSpecial) {
+          borderColor = '#ef4444' // red for special events (birthdays, anniversaries)
+        } else {
+          borderColor = '#f59e0b' // orange for pending pacts
+        }
+      }
+
       if (isToday) borderColor = 'var(--accent)'
       if (isSelected) borderColor = 'var(--text)'
 
@@ -430,20 +440,6 @@ export default function CalendarPage() {
             <span style={{ fontSize: 7.5, fontWeight: 800, color: winColor, letterSpacing: -0.2, lineHeight: 1 }}>
               {sum.allDay ? 'all day' : winText}
             </span>
-          )}
-          {/* Pact indicator dots */}
-          {datePacts.length > 0 && (
-            <div style={{
-              position: 'absolute', bottom: 2,
-              display: 'flex', gap: 2, justifyContent: 'center',
-            }}>
-              {datePacts.slice(0, 3).map((_, i) => (
-                <div key={i} style={{
-                  width: 4, height: 4, borderRadius: '50%',
-                  background: 'var(--accent)',
-                }} />
-              ))}
-            </div>
           )}
         </div>
       )
@@ -646,7 +642,10 @@ export default function CalendarPage() {
             <i style={{ width: 9, height: 9, border: '1.5px solid var(--accent)', borderRadius: 3, display: 'inline-block' }} /> today
           </span>
           <span style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <i style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} /> pact
+            <i style={{ width: 9, height: 9, border: '1.5px solid #f59e0b', borderRadius: 3, display: 'inline-block' }} /> pending
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <i style={{ width: 9, height: 9, border: '1.5px solid #ef4444', borderRadius: 3, display: 'inline-block' }} /> special
           </span>
         </div>
 
@@ -754,12 +753,25 @@ export default function CalendarPage() {
                       key={p.id}
                       onClick={() => window.location.href = '/plans'}
                       style={{
-                        padding: '8px 12px', borderRadius: 12, marginBottom: 4,
-                        background: 'var(--accent-soft)', border: '1px solid var(--accent)',
-                        cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+                        padding: '10px 12px', borderRadius: 12, marginBottom: 6,
+                        background: 'var(--accent-soft)',
+                        border: `1px solid ${p.occasion ? '#ef4444' : '#f59e0b'}`,
+                        cursor: 'pointer',
                       }}
                     >
-                      {p.occasion || p.spot_name || 'Pact'}
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>
+                        {p.spot_emoji ? `${p.spot_emoji} ` : ''}{p.occasion || p.spot_name || 'Pact'}
+                      </div>
+                      {(p.win_start !== null && p.win_end !== null) && (
+                        <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 3 }}>
+                          🕐 {fmtHour(p.win_start)} – {fmtHour(p.win_end)}
+                        </div>
+                      )}
+                      {p.spot_area && (
+                        <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
+                          📍 {p.spot_area}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
