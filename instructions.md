@@ -44,7 +44,8 @@
 | `pact_members` | Who's in each pact (pact_id, user_id) |
 | `threads` | Chat threads (name, circle_id, color) |
 | `thread_members` | Thread membership |
-| `messages` | Chat messages (text, date_card proposals, spots, RSVP tracking) |
+| `messages` | Chat messages (text, date_card proposals, spots, RSVP tracking, reply_to for threaded replies) |
+| `message_reactions` | Emoji reactions on messages (message_id, user_id, emoji, unique per combo) |
 | `rsvps` | Date card responses (message_id, user_id, response: in/out) |
 | `thread_reads` | Unread tracking (thread_id, user_id, last_read_at) |
 | `notifications` | App-wide notifications (type: message/pact_new/pact_change/pact_upcoming/spark, title, body, link, read) |
@@ -96,7 +97,7 @@
 - [x] Onboarding flow (name, home area, birthday)
 - [x] Circle creation and invite code join
 - [x] Circle settings (rename, emoji, admin management, member removal)
-- [x] Dark/light theme toggle (persisted per user)
+- [x] Dark/light/system theme selector (expanding dropdown, persisted per user)
 
 ### Calendar
 
@@ -107,20 +108,28 @@
 - [x] Manual busy/free toggle on own row
 - [x] Friend filter chips
 - [x] Sparks: detect nearby friends with shared free windows
-- [x] Pact date indicators on calendar (dots on dates with pacts)
-- [x] Calendar settings gear icon (replaces old My Calendars / Sync buttons)
+- [x] Pact date indicators on calendar: mini emoji icons for special events (🎂💍), red border for pending, orange fill for confirmed
+- [x] Color-coded hourly blocks for pact schedules (accent color bands on member rows)
+- [x] 6 AM – midnight time range (DAY_START=6, DAY_END=24)
 - [x] Realtime refresh when busy_blocks or pacts change
+- [x] Pact status column (pending/confirmed) for calendar indicator distinction
 
 ### Plans
 
 - [x] Create plan from calendar free window (date/time prefilled)
 - [x] Google Places autocomplete for location
 - [x] Plan list with RSVP (I'm in / I'm out)
-- [x] Edit plan (creator only): date, time, title, spot
+- [x] Edit plan (creator only): date, time, title, spot (with Google Places autocomplete in edit mode)
 - [x] Delete plan (creator or admin)
-- [x] Push pact events to Google Calendar (Proposed/Confirmed prefix)
+- [x] Default title: "Pact with (other user names)" when no occasion set
+- [x] Default location: "📍 To be set" when spot_name is 'TBD'
+- [x] Push pact events to Google Calendar with smart titles:
+  - Unfinalized: "‼️ Finalize Proposed Pact with (names)"
+  - Confirmed: "(occasion) with (names)" or "Pact with (names)"
+  - Circle name used ONLY if all members (3+) are in the pact
 - [x] Remove Google Calendar event on leave/delete
-- [x] Swipe-to-delete on pact cards
+- [x] Long press quick actions on pact cards (edit, discuss, send to chat, delete)
+- [x] Send pact to chat (share as date card to any thread)
 
 ### Chat
 
@@ -131,9 +140,16 @@
 - [x] Realtime messages via Supabase Realtime
 - [x] Unread tracking with thread_reads table
 - [x] Multi-select mode (bulk delete, mark read/unread)
-- [x] Swipe-to-delete on thread items
-- [x] Thread preview (last message text)
+- [x] Swipe to reveal read/unread + delete on thread items
+- [x] Thread preview (last message text) with realtime updates
 - [x] Message deduplication
+- [x] Message status indicators: ✓ (sent, gray) and ✓✓ (read, accent/blue)
+- [x] Long press emoji reactions (❤️ 😂 👍 😮 😢 🔥) with realtime sync
+- [x] Slide left to reply gesture (swipe-to-reply)
+- [x] Tap for quick actions bottom sheet (Reply, React, Delete, Select multiple)
+- [x] Reply context bar (shows quoted message above input)
+- [x] Reaction groups displayed below messages
+- [x] Parallelized thread loading (Promise.all for threads + reads + members)
 
 ### Profile
 
@@ -158,8 +174,24 @@
 - [x] Pull-to-refresh on all tabs (home, plans, chat, calendar)
 - [x] Persistent live location tracking (watchPosition in AppShell)
 - [x] Profile photo context propagation (updateUser in CircleContext)
-- [x] Bottom navigation (Home, Calendar, Chat, Plans, Spots)
+- [x] Bottom navigation (Home, Calendar, Chat, Plans, Spots) — sticky, never scrolls away
 - [x] Viewport zoom prevention on mobile input focus
+- [x] Route prefetching for instant tab switching
+- [x] Parallelized Supabase queries (Promise.all) for faster loads
+
+### Spots
+
+- [x] Best upcoming hangouts: shared free windows with spot recommendations
+- [x] Google Places search to discover spots (correct field mapping: main_text)
+- [x] Save favorite spots (from search or custom)
+- [x] Search-based area picker for favorites (autocomplete, replaces dropdown)
+- [x] Friend filter chips (same as calendar)
+- [x] Spot recommendations based on travel time from each member's home area
+- [x] "Open day & pick a spot" navigates to calendar day sheet
+- [x] Add custom favorite spot modal (emoji, name, area picker)
+- [x] Remove favorites
+- [x] Pull-to-refresh
+- [x] Realtime updates via Supabase subscriptions
 
 ### API Routes
 
@@ -178,20 +210,14 @@
 
 ## 4. Current Active Task
 
-Working on batch 2 bug fixes:
-- Calendar indicators: changing from dots to border colors (orange=pending, gold=confirmed, red=special events)
-- Pact details in day sheet (time + address)
-- Fix swipe-to-delete conflicting with pull-to-refresh in chat
-- Fix profile photo not persisting / not showing globally
-- Replace emoji icons (bell, sun/moon) with clean minimal SVG icons
+No active task — Batch 5 deployed (commit b0a8abe).
 
 ---
 
 ## 5. Next Steps
 
-1. **Fix current batch** — Complete all bug fixes listed in section 4
-2. **Deploy and verify** — Type-check, push to GitHub, verify Vercel build
-3. **Spots tab** — Build the Spots page (favorite locations, discover nearby spots)
+1. **Pact confirmation flow UI** — Add UI for confirming pacts (status column added, calendar indicators ready)
+2. **Spots enhancements** — Spot type tags, Google Places detail fetch, venue discovery beyond search
 
 ---
 
