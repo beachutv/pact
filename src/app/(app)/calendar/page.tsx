@@ -423,7 +423,8 @@ export default function CalendarPage() {
         bg = 'rgba(245, 158, 11, 0.18)' // orange/yellow fill for confirmed
       }
       if (hasPending) {
-        borderColor = '#ef4444' // red border for pending pacts
+        bg = 'rgba(59,130,246,0.15)' // blue fill for pending pacts
+        borderColor = '#3b82f6'
       }
 
       // Special event mini icons (occasion-based like birthdays, anniversaries)
@@ -436,7 +437,7 @@ export default function CalendarPage() {
           else if (occ.includes('wedding')) occasionIcons.push('💒')
           else if (occ.includes('graduation')) occasionIcons.push('🎓')
           else if (occ.includes('holiday') || occ.includes('christmas') || occ.includes('new year')) occasionIcons.push('🎄')
-          else occasionIcons.push('⭐')
+          // no fallback icon — only special occasions get icons
         }
       }
 
@@ -459,7 +460,7 @@ export default function CalendarPage() {
           }}
         >
           {sum.allDay && (
-            <span style={{ position: 'absolute', top: 2, right: 3, fontSize: 7, color: 'var(--green)' }}>★</span>
+            <span style={{ position: 'absolute', top: 3, right: 3, width: 5, height: 5, borderRadius: '50%', background: 'var(--green)' }} />
           )}
           {occasionIcons.length > 0 && (
             <span style={{ position: 'absolute', top: 1, left: 2, fontSize: 8, lineHeight: 1 }}>
@@ -657,7 +658,7 @@ export default function CalendarPage() {
         {/* Legend */}
         <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <i style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--green)', display: 'inline-block' }} /> ★ free all day
+            <i style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', display: 'inline-block' }} /> free all day
           </span>
           <span style={{ fontSize: 10, color: 'var(--green)', fontWeight: 700 }}>2–6p</span>
           <span style={{ fontSize: 10, color: 'var(--text2)', marginLeft: -6 }}>= window</span>
@@ -668,7 +669,7 @@ export default function CalendarPage() {
             <i style={{ width: 9, height: 9, border: '1.5px solid var(--accent)', borderRadius: 3, display: 'inline-block' }} /> today
           </span>
           <span style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <i style={{ width: 9, height: 9, border: '1.5px solid #ef4444', borderRadius: 3, display: 'inline-block' }} /> pending
+            <i style={{ width: 9, height: 9, border: '1.5px solid #3b82f6', borderRadius: 3, display: 'inline-block' }} /> pending
           </span>
           <span style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
             <i style={{ width: 9, height: 9, background: 'rgba(245,158,11,0.3)', borderRadius: 3, display: 'inline-block' }} /> confirmed
@@ -761,9 +762,9 @@ export default function CalendarPage() {
                           style={{
                             height: 17, borderRadius: 4,
                             background: isPast ? 'rgba(100,100,100,0.15)'
-                              : isPactHour ? (isPactConfirmed ? 'rgba(245,158,11,0.35)' : 'rgba(239,68,68,0.22)')
+                              : isPactHour ? (isPactConfirmed ? 'rgba(245,158,11,0.35)' : 'rgba(59,130,246,0.22)')
                               : busy ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.14)',
-                            border: isPactHour && !isPast ? `1.5px solid ${isPactConfirmed ? '#f59e0b' : '#ef4444'}` : busy && !isPast ? '1px solid rgba(248,113,113,0.35)' : 'none',
+                            border: isPactHour && !isPast ? `1.5px solid ${isPactConfirmed ? '#f59e0b' : '#3b82f6'}` : busy && !isPast ? '1px solid rgba(248,113,113,0.35)' : 'none',
                             cursor: isMe && !isPast ? 'pointer' : 'default',
                             opacity: isPast ? 0.4 : 1,
                           }}
@@ -774,7 +775,7 @@ export default function CalendarPage() {
                 ))}
               </div>
               <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 5 }}>
-                🟩 free · 🟥 busy · 🟧 pact · ✏️ tap your row to toggle
+                🟩 free · 🟥 busy · 🟦 pending · 🟧 confirmed · tap your row to toggle
               </div>
 
               {/* Pacts on this day */}
@@ -792,7 +793,7 @@ export default function CalendarPage() {
                       style={{
                         padding: '10px 12px', borderRadius: 12, marginBottom: 6,
                         background: isConfirmed ? 'rgba(245, 158, 11, 0.15)' : 'var(--surface)',
-                        border: `1.5px solid ${isConfirmed ? '#f59e0b' : '#ef4444'}`,
+                        border: `1.5px solid ${isConfirmed ? '#f59e0b' : '#3b82f6'}`,
                         cursor: 'pointer',
                       }}
                     >

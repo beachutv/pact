@@ -6,6 +6,7 @@ import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { fmtDate, fmtHour, fmtWin, txtOn } from '@/lib/utils'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
+import LocationPicker from '@/components/LocationPicker'
 
 type Pact = {
   id: string
@@ -18,6 +19,7 @@ type Pact = {
   occasion: string | null
   circle_id: string
   created_by: string | null
+  status: string
   members: { user_id: string }[]
 }
 
@@ -40,11 +42,6 @@ export default function PlansPage() {
   const [editArea, setEditArea] = useState('')
   const [saving, setSaving] = useState(false)
 
-  // Edit mode Places autocomplete
-  const [editPlaceQuery, setEditPlaceQuery] = useState('')
-  const [editPredictions, setEditPredictions] = useState<{ place_id: string; description: string; main_text: string; secondary_text: string }[]>([])
-  const [showEditPredictions, setShowEditPredictions] = useState(false)
-  const editSearchTimer = useRef<NodeJS.Timeout | null>(null)
 
   // Long press for quick actions
   const [longPressPactId, setLongPressPactId] = useState<string | null>(null)
@@ -190,45 +187,49 @@ export default function PlansPage() {
   }
 
   async function deletePact(pactId: string) {
-    if (!confirm('Delete this plan? Everyone will be removed.')) return
-    // Remove from Google Calendar for all members who have it
-    // (each member's events are tied to their own calendar, but we can at least remove our own)
+    const pact = pacts.find(p => p.id === pactId)
+    const isConfirmed = pact?.status === 'confirmed'
+    const msg = isConfirmed
+      ? 'Cancel this confirmed pact? All members will be notified.'
+      : 'Delete this plan? Everyone will be removed.'
+    if (!confirm(msg)) return
+
+    // Remove from Google Calendar
     fetch('/api/calendar/delete-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pactId }),
     }).catch(() => {})
-    // Delete all pact busy blocks
+
+    // If confirmed, notify all members about cancellation
+    if (isConfirmed && pact) {
+      const otherMembers = pact.members.filter(m => m.user_id !== user.id)
+      const cancelTitle = pact.occasion || 'Pact'
+      for (const m of otherMembers) {
+        await supabase.from('notifications').insert({
+          user_id: m.user_id,
+          type: 'pact_change',
+          title: `${cancelTitle} cancelled`,
+          body: `${user.name?.split(' ')[0] || 'Someone'} cancelled the pact on ${fmtDate(pact.date)}`,
+          link: '/plans',
+        })
+      }
+      // Update status to 'cancelled' instead of deleting
+      await supabase.from('pacts').update({ status: 'cancelled' }).eq('id', pactId)
+    }
+
+    // Delete busy blocks and pact data
     await supabase.from('busy_blocks').delete().eq('pact_id', pactId)
-    // Delete pact members first (cascade should handle this, but be safe)
     await supabase.from('pact_members').delete().eq('pact_id', pactId)
     await supabase.from('pacts').delete().eq('id', pactId)
     setEditingId(null)
+    setLongPressPactId(null)
     await loadPacts()
   }
 
-  function handleEditPlaceInput(val: string) {
-    setEditPlaceQuery(val)
-    setEditSpot(val)
-    setEditArea('')
-    if (editSearchTimer.current) clearTimeout(editSearchTimer.current)
-    if (val.length < 2) { setEditPredictions([]); setShowEditPredictions(false); return }
-    editSearchTimer.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/places/autocomplete?q=${encodeURIComponent(val)}`)
-        const data = await res.json()
-        setEditPredictions(data.predictions || [])
-        setShowEditPredictions(data.predictions?.length > 0)
-      } catch { setEditPredictions([]) }
-    }, 300)
-  }
-
-  function selectEditPlace(p: { main_text: string; secondary_text: string }) {
-    setEditSpot(p.main_text)
-    setEditArea(p.secondary_text)
-    setEditPlaceQuery(p.main_text)
-    setShowEditPredictions(false)
-    setEditPredictions([])
+  function handleEditLocationSelect(name: string, area: string) {
+    setEditSpot(name)
+    setEditArea(area)
   }
 
   function startEditing(pact: Pact) {
@@ -239,9 +240,6 @@ export default function PlansPage() {
     setEditTitle(pact.occasion || '')
     setEditSpot(pact.spot_name === 'TBD' ? '' : pact.spot_name)
     setEditArea(pact.spot_area)
-    setEditPlaceQuery(pact.spot_name === 'TBD' ? '' : pact.spot_name)
-    setEditPredictions([])
-    setShowEditPredictions(false)
   }
 
   async function saveEdit(pactId: string) {
@@ -408,40 +406,11 @@ export default function PlansPage() {
                   />
 
                   {/* Spot with autocomplete */}
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text" placeholder="Search for a place..."
-                      value={editPlaceQuery}
-                      onChange={e => handleEditPlaceInput(e.target.value)}
-                      onFocus={() => editPredictions.length > 0 && setShowEditPredictions(true)}
-                      onBlur={() => setTimeout(() => setShowEditPredictions(false), 200)}
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: 10, background: 'var(--surface2)', border: 'none', color: 'var(--text)', fontSize: 13 }}
-                    />
-                    {showEditPredictions && editPredictions.length > 0 && (
-                      <div style={{
-                        position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 20,
-                        background: 'var(--surface)', border: '1px solid var(--border)',
-                        borderRadius: 12, marginTop: 4, maxHeight: 180, overflowY: 'auto',
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
-                      }}>
-                        {editPredictions.map(ep => (
-                          <div
-                            key={ep.place_id}
-                            onMouseDown={() => selectEditPlace(ep)}
-                            style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
-                          >
-                            <div style={{ fontSize: 13, fontWeight: 600 }}>{ep.main_text}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text2)' }}>{ep.secondary_text}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {editArea && (
-                      <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>
-                        📍 {editArea}
-                      </div>
-                    )}
-                  </div>
+                  <LocationPicker
+                    onSelect={handleEditLocationSelect}
+                    initialValue={editSpot}
+                    placeholder="Add location"
+                  />
 
                   {/* Action buttons */}
                   <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
@@ -459,7 +428,7 @@ export default function PlansPage() {
                         background: 'var(--red-soft)', color: 'var(--red)',
                         fontSize: 13, fontWeight: 700, cursor: 'pointer',
                       }}>
-                      Delete
+                      {p.status === 'confirmed' ? 'Cancel Pact' : 'Delete'}
                     </button>
                   </div>
                 </>
@@ -565,7 +534,7 @@ export default function PlansPage() {
                     display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                     background: 'transparent', fontSize: 13, fontWeight: 600,
                     color: 'var(--red)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                  }}>🗑 Delete</button>
+                  }}>{p.status === 'confirmed' ? '🚫 Cancel Pact' : '🗑 Delete'}</button>
                   <button onClick={() => setLongPressPactId(null)} style={{
                     display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                     background: 'transparent', fontSize: 13, fontWeight: 600,

@@ -1,10 +1,11 @@
 'use client'
 
-import { Suspense, useState, useEffect, useRef } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
-import { fmtDate, fmtHour, AREAS } from '@/lib/utils'
+import { fmtDate, fmtHour } from '@/lib/utils'
+import LocationPicker from '@/components/LocationPicker'
 
 function NewPlanContent() {
   const { user, activeCircle, circleMembers } = useCircle()
@@ -56,35 +57,9 @@ function NewPlanContent() {
     loadCals()
   }, [])
 
-  // Places autocomplete
-  const [placeQuery, setPlaceQuery] = useState('')
-  const [predictions, setPredictions] = useState<{ place_id: string; description: string; main_text: string; secondary_text: string }[]>([])
-  const [showPredictions, setShowPredictions] = useState(false)
-  const searchTimer = useRef<NodeJS.Timeout | null>(null)
-
-  const areaNames = Object.keys(AREAS)
-
-  function handlePlaceInput(val: string) {
-    setPlaceQuery(val)
-    setSpotName(val)
-    if (searchTimer.current) clearTimeout(searchTimer.current)
-    if (val.length < 2) { setPredictions([]); setShowPredictions(false); return }
-    searchTimer.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/places/autocomplete?q=${encodeURIComponent(val)}`)
-        const data = await res.json()
-        setPredictions(data.predictions || [])
-        setShowPredictions(data.predictions?.length > 0)
-      } catch { setPredictions([]) }
-    }, 300)
-  }
-
-  function selectPlace(p: { main_text: string; secondary_text: string }) {
-    setSpotName(p.main_text)
-    setSpotArea(p.secondary_text)
-    setPlaceQuery(p.main_text)
-    setShowPredictions(false)
-    setPredictions([])
+  function handleLocationSelect(name: string, area: string) {
+    setSpotName(name)
+    setSpotArea(area)
   }
 
   async function createPlan() {
@@ -243,83 +218,21 @@ function NewPlanContent() {
         )}
       </div>
 
-      {/* Spot name with autocomplete */}
-      <div style={{ position: 'relative' }}>
-        <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>Where? (optional)</label>
-        <input
-          type="text"
-          placeholder="Search for a place..."
-          value={placeQuery}
-          onChange={e => handlePlaceInput(e.target.value)}
-          onFocus={() => predictions.length > 0 && setShowPredictions(true)}
-          onBlur={() => setTimeout(() => setShowPredictions(false), 200)}
-          style={{
-            width: '100%', padding: '10px 14px', borderRadius: 12, marginTop: 6,
-            background: 'var(--surface2)', border: 'none',
-            color: 'var(--text)', fontSize: 14,
-          }}
-        />
-        {showPredictions && predictions.length > 0 && (
-          <div style={{
-            position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 20,
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 12, marginTop: 4, maxHeight: 200, overflowY: 'auto',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
-          }}>
-            {predictions.map(p => (
-              <div
-                key={p.place_id}
-                onMouseDown={() => selectPlace(p)}
-                style={{
-                  padding: '10px 14px', cursor: 'pointer',
-                  borderBottom: '1px solid var(--border)',
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{p.main_text}</div>
-                <div style={{ fontSize: 11, color: 'var(--text2)' }}>{p.secondary_text}</div>
-              </div>
-            ))}
+      {/* Location picker */}
+      <div>
+        <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 6, display: 'block' }}>Where? (optional)</label>
+        <LocationPicker onSelect={handleLocationSelect} placeholder="Add location" />
+        {spotName && spotArea && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 13 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round">
+              <path d="M12 21c-4-4-8-7.5-8-12a8 8 0 1 1 16 0c0 4.5-4 8-8 12z" />
+              <circle cx="12" cy="10" r="2.5" />
+            </svg>
+            <span style={{ fontWeight: 600 }}>{spotName}</span>
+            <span style={{ color: 'var(--text2)' }}>· {spotArea}</span>
           </div>
         )}
       </div>
-
-      {/* Area — show manual selection if no autocomplete result was picked */}
-      {spotName && !spotArea && (
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>Area</label>
-          <div style={{
-            display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6,
-            maxHeight: 140, overflowY: 'auto',
-          }}>
-            {areaNames.map(a => (
-              <button
-                key={a}
-                onClick={() => setSpotArea(a === spotArea ? '' : a)}
-                style={{
-                  padding: '5px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                  border: 'none', cursor: 'pointer',
-                  background: a === spotArea ? 'var(--accent)' : 'var(--surface2)',
-                  color: a === spotArea ? '#fff' : 'var(--text)',
-                }}
-              >
-                {a}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Show selected area if picked */}
-      {spotArea && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--text2)' }}>📍</span>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>{spotArea}</span>
-          <button onClick={() => setSpotArea('')} style={{
-            background: 'none', border: 'none', color: 'var(--text2)',
-            fontSize: 12, cursor: 'pointer',
-          }}>✕</button>
-        </div>
-      )}
 
       {/* Who's free */}
       <div className="card">
