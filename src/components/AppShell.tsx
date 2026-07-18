@@ -74,6 +74,11 @@ export default function AppShell({
   // Persistent location tracking across all tabs
   useLocationUpdate(user.id, 'app-shell')
 
+  // Prefetch all tab routes for instant navigation
+  useEffect(() => {
+    TABS.forEach(t => router.prefetch(t.key))
+  }, [])
+
   const [currentUser, setCurrentUser] = useState<UserProfile>(user)
   const [activeCircle, setActiveCircle] = useState<Circle | null>(circles[0] || null)
   const [circleMembers, setCircleMembers] = useState<UserProfile[]>([user])
@@ -85,6 +90,7 @@ export default function AppShell({
   }
   const [showCirclePicker, setShowCirclePicker] = useState(false)
   const [theme, setTheme] = useState(user.theme || 'dark')
+  const [showThemePicker, setShowThemePicker] = useState(false)
   const [showNotifs, setShowNotifs] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
@@ -170,11 +176,13 @@ export default function AppShell({
     document.documentElement.setAttribute('data-theme', applied)
   }, [theme])
 
-  function toggleTheme() {
-    const next = theme === 'dark' ? 'light' : 'dark'
-    setTheme(next)
-    supabase.from('users').update({ theme: next }).eq('id', user.id)
+  function selectTheme(t: string) {
+    setTheme(t)
+    setShowThemePicker(false)
+    supabase.from('users').update({ theme: t }).eq('id', user.id)
   }
+
+  const themeIcon = theme === 'light' ? 'sun' : theme === 'dark' ? 'moon' : 'system'
 
   return (
     <CircleContext.Provider value={{ user: currentUser, updateUser, circles, activeCircle, setActiveCircle, circleMembers, setCircleMembers }}>
@@ -195,32 +203,88 @@ export default function AppShell({
               </p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button
-                onClick={toggleTheme}
-                style={{
-                  background: 'none', border: 'none',
-                  cursor: 'pointer', padding: 4,
-                  display: 'flex', alignItems: 'center',
-                }}
-              >
-                {theme === 'dark' ? (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="5"/>
-                    <line x1="12" y1="1" x2="12" y2="3"/>
-                    <line x1="12" y1="21" x2="12" y2="23"/>
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                    <line x1="1" y1="12" x2="3" y2="12"/>
-                    <line x1="21" y1="12" x2="23" y2="12"/>
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-                  </svg>
-                ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                  </svg>
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowThemePicker(!showThemePicker)}
+                  style={{
+                    background: 'none', border: 'none',
+                    cursor: 'pointer', padding: 4,
+                    display: 'flex', alignItems: 'center',
+                  }}
+                >
+                  {themeIcon === 'sun' ? (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="5"/>
+                      <line x1="12" y1="1" x2="12" y2="3"/>
+                      <line x1="12" y1="21" x2="12" y2="23"/>
+                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                      <line x1="1" y1="12" x2="3" y2="12"/>
+                      <line x1="21" y1="12" x2="23" y2="12"/>
+                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                    </svg>
+                  ) : themeIcon === 'moon' ? (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M12 2a10 10 0 0 1 0 20V2z" fill="var(--text)"/>
+                    </svg>
+                  )}
+                </button>
+                {showThemePicker && (
+                  <>
+                    <div onClick={() => setShowThemePicker(false)} style={{ position: 'fixed', inset: 0, zIndex: 59 }} />
+                    <div style={{
+                      position: 'absolute', right: 0, top: 32, zIndex: 60,
+                      background: 'var(--surface)', border: '1px solid var(--border)',
+                      borderRadius: 14, boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
+                      padding: 6, minWidth: 150,
+                    }}>
+                      {[
+                        { key: 'light', label: 'Light', icon: (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="5"/>
+                            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                          </svg>
+                        )},
+                        { key: 'dark', label: 'Dark', icon: (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                          </svg>
+                        )},
+                        { key: 'system', label: 'System', icon: (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 2a10 10 0 0 1 0 20V2z" fill="currentColor"/>
+                          </svg>
+                        )},
+                      ].map(opt => (
+                        <button
+                          key={opt.key}
+                          onClick={() => selectTheme(opt.key)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 10,
+                            width: '100%', padding: '9px 12px', border: 'none',
+                            borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                            background: theme === opt.key ? 'var(--accent-soft)' : 'transparent',
+                            color: theme === opt.key ? 'var(--accent)' : 'var(--text)',
+                          }}
+                        >
+                          {opt.icon}
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
                 )}
-              </button>
+              </div>
               <button
                 onClick={() => setShowNotifs(!showNotifs)}
                 style={{
@@ -412,7 +476,7 @@ export default function AppShell({
         </header>
 
         {/* Main content */}
-        <main style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column' }}>
+        <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column' }}>
           {children}
         </main>
 

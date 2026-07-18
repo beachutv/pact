@@ -32,39 +32,37 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
-  const { pactId, occasion, spotName, otherNames, circleName, title, date, startHour, endHour, location, calendarId, confirmed } = await request.json()
+  const { pactId, occasion, spotName, otherNames, circleName, title, date, startHour, endHour, location, calendarId, confirmed, totalCircleMembers, pactMemberCount } = await request.json()
   if (!pactId || !date || startHour == null || endHour == null) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   }
 
-  // Smart calendar title with Proposed/Confirmed prefix
-  let smartTitle: string
-  const desc = occasion || spotName || ''
-  const namesPart = otherNames?.length === 1
-    ? otherNames[0]
-    : otherNames?.length > 1
+  // Determine the "with" part: use circle name ONLY if ALL members (3+) in circle are in the pact
+  const allCircleInPact = totalCircleMembers && pactMemberCount && totalCircleMembers >= 3 && pactMemberCount >= totalCircleMembers
+  const namesPart = allCircleInPact && circleName
+    ? circleName
+    : otherNames?.length > 0
       ? otherNames.join(', ')
       : circleName || ''
 
+  let smartTitle: string
   if (confirmed) {
-    // Accepted: "Pact with (name): (description)" or "Pact with (name)"
-    if (namesPart && desc) {
-      smartTitle = `Pact with ${namesPart}: ${desc}`
+    // Confirmed: "(occasion)" if set, otherwise "Pact with (other user)"
+    if (occasion && namesPart) {
+      smartTitle = `${occasion} with ${namesPart}`
+    } else if (occasion) {
+      smartTitle = occasion
     } else if (namesPart) {
       smartTitle = `Pact with ${namesPart}`
     } else {
-      smartTitle = desc || title || 'Pact plan'
+      smartTitle = title || 'Pact'
     }
   } else {
-    // Proposed: "Proposed Pact: (description)" or "Proposed Pact with (name)"
-    if (desc && namesPart) {
-      smartTitle = `Proposed Pact: ${desc} with ${namesPart}`
-    } else if (desc) {
-      smartTitle = `Proposed Pact: ${desc}`
-    } else if (namesPart) {
-      smartTitle = `Proposed Pact with ${namesPart}`
+    // Unfinalized: "‼️ Finalize Proposed Pact with (other user)"
+    if (namesPart) {
+      smartTitle = `‼️ Finalize Proposed Pact with ${namesPart}`
     } else {
-      smartTitle = title || 'Proposed Pact'
+      smartTitle = `‼️ Finalize Proposed Pact`
     }
   }
 

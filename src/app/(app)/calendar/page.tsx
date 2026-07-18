@@ -579,16 +579,6 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {/* Calendar settings gear */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-          <button onClick={loadCalendars} style={{
-            background: 'none', border: 'none', fontSize: 16,
-            color: 'var(--text2)', cursor: 'pointer', padding: 4,
-          }} title="Calendar settings">
-            ⚙️
-          </button>
-        </div>
-
         {/* Friend filter */}
         {circleMembers.length > 1 && (
           <div style={{ marginBottom: 12 }}>
@@ -758,6 +748,11 @@ export default function CalendarPage() {
                       const busy = isBusy(m.id, sheetDate!, h)
                       const isMe = m.id === user.id
                       const isPast = sheetDate === todayStr && h < nowHour
+                      // Check if this hour falls within any pact's time window
+                      const datePacts = sheetDate ? (pactsByDate[sheetDate] || []) : []
+                      const pactAtHour = datePacts.find(p => p.win_start !== null && p.win_end !== null && h >= p.win_start! && h < p.win_end!)
+                      const isPactHour = !!pactAtHour
+                      const isPactConfirmed = pactAtHour?.status === 'confirmed'
                       return (
                         <div
                           key={h}
@@ -766,8 +761,9 @@ export default function CalendarPage() {
                           style={{
                             height: 17, borderRadius: 4,
                             background: isPast ? 'rgba(100,100,100,0.15)'
+                              : isPactHour ? (isPactConfirmed ? 'rgba(245,158,11,0.35)' : 'rgba(239,68,68,0.22)')
                               : busy ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.14)',
-                            border: busy && !isPast ? '1px solid rgba(248,113,113,0.35)' : 'none',
+                            border: isPactHour && !isPast ? `1.5px solid ${isPactConfirmed ? '#f59e0b' : '#ef4444'}` : busy && !isPast ? '1px solid rgba(248,113,113,0.35)' : 'none',
                             cursor: isMe && !isPast ? 'pointer' : 'default',
                             opacity: isPast ? 0.4 : 1,
                           }}
@@ -778,7 +774,7 @@ export default function CalendarPage() {
                 ))}
               </div>
               <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 5 }}>
-                🟩 free · 🟥 busy · ✏️ tap your row to toggle hours
+                🟩 free · 🟥 busy · 🟧 pact · ✏️ tap your row to toggle
               </div>
 
               {/* Pacts on this day */}

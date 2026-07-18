@@ -16,6 +16,8 @@ type Thread = {
   last_message_preview: string | null
 }
 
+type Reaction = { emoji: string; user_id: string }
+
 type Message = {
   id: string
   thread_id: string
@@ -33,7 +35,9 @@ type Message = {
   free_n: number | null
   confirmed: boolean
   created_at: string
+  reply_to: string | null
   rsvps: { user_id: string; response: string }[]
+  reactions: Reaction[]
 }
 
 export default function ChatPage() {
@@ -66,9 +70,28 @@ export default function ChatPage() {
   const swipeCurrentX = useRef(0)
   const swipingRef = useRef(false)
 
-  // Long-press preview
-  const [previewMsg, setPreviewMsg] = useState<Message | null>(null)
+  // Long press → emoji reaction picker
+  const [reactionMsg, setReactionMsg] = useState<Message | null>(null)
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const QUICK_EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🔥']
+
+  // Tap → quick actions menu
+  const [quickActionMsg, setQuickActionMsg] = useState<Message | null>(null)
+
+  // Reply to message
+  const [replyTo, setReplyTo] = useState<Message | null>(null)
+
+  // Message swipe (slide to reply)
+  const msgSwipeRef = useRef<{ id: string; startX: number; dx: number } | null>(null)
+  const [msgSwipeId, setMsgSwipeId] = useState<string | null>(null)
+  const [msgSwipeDx, setMsgSwipeDx] = useState(0)
+
+  // Multi-select messages
+  const [msgSelectMode, setMsgSelectMode] = useState(false)
+  const [selectedMsgs, setSelectedMsgs] = useState<Set<string>>(new Set())
+
+  // Message status: track all members' read timestamps for the active thread
+  const [memberReads, setMemberReads] = useState<Record<string, string>>({})
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -108,23 +131,32 @@ export default function ChatPage() {
     if (!tms || tms.length === 0) { setThreads([]); setLoading(false); return }
 
     const threadIds = tms.map(t => t.thread_id)
-    const { data: threadData } = await supabase
-      .from('threads').select('*').in('id', threadIds)
-    if (!threadData) { setLoading(false); return }
 
-    const { data: reads } = await supabase
-      .from('thread_reads').select('thread_id, last_read_at').eq('user_id', user.id)
+    // Parallelize: fetch threads, reads, and all member lists at once
+    const [threadsRes, readsRes, allMembersRes] = await Promise.all([
+      supabase.from('threads').select('*').in('id', threadIds),
+      supabase.from('thread_reads').select('thread_id, last_read_at').eq('user_id', user.id),
+      supabase.from('thread_members').select('thread_id, user_id').in('thread_id', threadIds),
+    ])
+
+    if (!threadsRes.data) { setLoading(false); return }
+
     const readMap: Record<string, string> = {}
-    if (reads) reads.forEach(r => { readMap[r.thread_id] = r.last_read_at })
+    if (readsRes.data) readsRes.data.forEach(r => { readMap[r.thread_id] = r.last_read_at })
     setThreadReads(readMap)
 
-    const result: Thread[] = []
-    for (const t of threadData) {
-      if (t.circle_id && t.circle_id !== activeCircle?.id) continue
-      const { data: members } = await supabase
-        .from('thread_members').select('user_id').eq('thread_id', t.id)
-      result.push({ ...t, member_ids: members?.map(m => m.user_id) || [] })
+    // Build member map from bulk query
+    const memberMap: Record<string, string[]> = {}
+    if (allMembersRes.data) {
+      for (const m of allMembersRes.data) {
+        if (!memberMap[m.thread_id]) memberMap[m.thread_id] = []
+        memberMap[m.thread_id].push(m.user_id)
+      }
     }
+
+    const result: Thread[] = threadsRes.data
+      .filter(t => !t.circle_id || t.circle_id === activeCircle?.id)
+      .map(t => ({ ...t, member_ids: memberMap[t.id] || [] }))
 
     result.sort((a, b) => {
       const aT = a.last_message_at ? new Date(a.last_message_at).getTime() : 0
@@ -140,6 +172,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!activeThreadId) return
     loadMessages(activeThreadId)
+    loadMemberReads(activeThreadId)
     markAsRead(activeThreadId)
 
     const channel = supabase
@@ -151,7 +184,7 @@ export default function ChatPage() {
         const newMsg = payload.new as any
         setMessages(prev => {
           if (prev.some(m => m.id === newMsg.id)) return prev
-          return [...prev, { ...newMsg, rsvps: [] }]
+          return [...prev, { ...newMsg, rsvps: [], reactions: [] }]
         })
         scrollToBottom()
         markAsRead(activeThreadId)
@@ -159,10 +192,39 @@ export default function ChatPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rsvps' }, () => {
         loadMessages(activeThreadId)
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => {
+        loadMessages(activeThreadId)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'thread_reads' }, () => {
+        loadMemberReads(activeThreadId)
+      })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
   }, [activeThreadId])
+
+  async function loadMemberReads(threadId: string) {
+    const { data } = await supabase
+      .from('thread_reads').select('user_id, last_read_at').eq('thread_id', threadId)
+    const map: Record<string, string> = {}
+    if (data) data.forEach(r => { map[r.user_id] = r.last_read_at })
+    setMemberReads(map)
+  }
+
+  /** Get message status: 'sent' | 'delivered' | 'read' */
+  function getMessageStatus(msg: Message): 'sent' | 'read' {
+    if (msg.from_user !== user.id) return 'sent'
+    const thread = threads.find(t => t.id === msg.thread_id)
+    if (!thread) return 'sent'
+    const otherIds = thread.member_ids.filter(id => id !== user.id)
+    if (otherIds.length === 0) return 'sent'
+    const msgTime = new Date(msg.created_at).getTime()
+    const allRead = otherIds.every(id => {
+      const readAt = memberReads[id]
+      return readAt && new Date(readAt).getTime() >= msgTime
+    })
+    return allRead ? 'read' : 'sent'
+  }
 
   async function loadMessages(threadId: string) {
     const { data: msgs } = await supabase
@@ -170,6 +232,9 @@ export default function ChatPage() {
       .order('created_at', { ascending: true })
     if (!msgs) return
 
+    const msgIds = msgs.map(m => m.id)
+
+    // Load RSVPs for date cards
     const dateCardMsgIds = msgs.filter(m => m.date_card).map(m => m.id)
     let rsvpMap: Record<string, { user_id: string; response: string }[]> = {}
     if (dateCardMsgIds.length > 0) {
@@ -181,7 +246,18 @@ export default function ChatPage() {
       }
     }
 
-    setMessages(msgs.map(m => ({ ...m, rsvps: rsvpMap[m.id] || [] })))
+    // Load reactions
+    let rxnMap: Record<string, Reaction[]> = {}
+    if (msgIds.length > 0) {
+      const { data: rxns } = await supabase
+        .from('message_reactions').select('message_id, user_id, emoji').in('message_id', msgIds)
+      if (rxns) for (const r of rxns) {
+        if (!rxnMap[r.message_id]) rxnMap[r.message_id] = []
+        rxnMap[r.message_id].push({ emoji: r.emoji, user_id: r.user_id })
+      }
+    }
+
+    setMessages(msgs.map(m => ({ ...m, rsvps: rsvpMap[m.id] || [], reactions: rxnMap[m.id] || [] })))
     scrollToBottom()
   }
 
@@ -256,9 +332,70 @@ export default function ChatPage() {
     setSending(true)
     const text = inputText.trim()
     setInputText('')
-    await supabase.from('messages').insert({ thread_id: activeThreadId, from_user: user.id, text })
+    const insert: any = { thread_id: activeThreadId, from_user: user.id, text }
+    if (replyTo) { insert.reply_to = replyTo.id; setReplyTo(null) }
+    await supabase.from('messages').insert(insert)
     setSending(false)
     inputRef.current?.focus()
+  }
+
+  async function toggleReaction(msgId: string, emoji: string) {
+    const msg = messages.find(m => m.id === msgId)
+    if (!msg) return
+    const existing = msg.reactions.find(r => r.user_id === user.id && r.emoji === emoji)
+    if (existing) {
+      await supabase.from('message_reactions').delete()
+        .eq('message_id', msgId).eq('user_id', user.id).eq('emoji', emoji)
+    } else {
+      await supabase.from('message_reactions').insert({ message_id: msgId, user_id: user.id, emoji })
+    }
+    setReactionMsg(null)
+  }
+
+  async function deleteMessage(msgId: string) {
+    await supabase.from('messages').delete().eq('id', msgId)
+    setMessages(prev => prev.filter(m => m.id !== msgId))
+    setQuickActionMsg(null)
+  }
+
+  async function bulkDeleteMessages() {
+    if (selectedMsgs.size === 0) return
+    for (const id of selectedMsgs) {
+      await supabase.from('messages').delete().eq('id', id)
+    }
+    setMessages(prev => prev.filter(m => !selectedMsgs.has(m.id)))
+    setSelectedMsgs(new Set())
+    setMsgSelectMode(false)
+  }
+
+  function forwardToReply(msg: Message) {
+    setReplyTo(msg)
+    setQuickActionMsg(null)
+    inputRef.current?.focus()
+  }
+
+  // Message swipe handlers (slide right-to-left to reply)
+  function onMsgSwipeStart(e: React.TouchEvent, msgId: string) {
+    msgSwipeRef.current = { id: msgId, startX: e.touches[0].clientX, dx: 0 }
+  }
+  function onMsgSwipeMove(e: React.TouchEvent) {
+    if (!msgSwipeRef.current) return
+    const dx = e.touches[0].clientX - msgSwipeRef.current.startX
+    if (dx < -10) {
+      msgSwipeRef.current.dx = dx
+      setMsgSwipeId(msgSwipeRef.current.id)
+      setMsgSwipeDx(Math.max(dx, -80))
+    }
+  }
+  function onMsgSwipeEnd() {
+    if (!msgSwipeRef.current) return
+    if (msgSwipeRef.current.dx < -50) {
+      const msg = messages.find(m => m.id === msgSwipeRef.current!.id)
+      if (msg) { setReplyTo(msg); inputRef.current?.focus() }
+    }
+    setMsgSwipeId(null)
+    setMsgSwipeDx(0)
+    msgSwipeRef.current = null
   }
 
   async function handleRsvp(messageId: string) {
@@ -422,12 +559,24 @@ export default function ChatPage() {
     await loadThreads()
   }
 
-  // ─── Long press ───
+  // ─── Long press → emoji reaction picker ───
   function onMsgTouchStart(msg: Message) {
-    longPressTimer.current = setTimeout(() => setPreviewMsg(msg), 500)
+    longPressTimer.current = setTimeout(() => setReactionMsg(msg), 500)
   }
   function onMsgTouchEnd() {
     if (longPressTimer.current) clearTimeout(longPressTimer.current)
+  }
+  // ─── Single tap → quick actions ───
+  function onMsgTap(msg: Message) {
+    if (msgSelectMode) {
+      setSelectedMsgs(prev => {
+        const next = new Set(prev)
+        if (next.has(msg.id)) next.delete(msg.id); else next.add(msg.id)
+        return next
+      })
+      return
+    }
+    setQuickActionMsg(msg)
   }
 
   // ─── Render: no circle ───
@@ -862,32 +1011,116 @@ export default function ChatPage() {
             )
           }
 
+          // Reply context
+          const replyMsg = msg.reply_to ? messages.find(m => m.id === msg.reply_to) : null
+          const replySender = replyMsg ? getMember(replyMsg.from_user) : null
+
+          // Grouped reactions
+          const rxnGroups: { emoji: string; count: number; byMe: boolean }[] = []
+          if (msg.reactions.length > 0) {
+            const map: Record<string, { count: number; byMe: boolean }> = {}
+            for (const r of msg.reactions) {
+              if (!map[r.emoji]) map[r.emoji] = { count: 0, byMe: false }
+              map[r.emoji].count++
+              if (r.user_id === user.id) map[r.emoji].byMe = true
+            }
+            for (const [emoji, v] of Object.entries(map)) rxnGroups.push({ emoji, ...v })
+          }
+
+          const isSwipingThis = msgSwipeId === msg.id
+
           return (
             <div
               key={msg.id}
-              onTouchStart={() => onMsgTouchStart(msg)}
-              onTouchEnd={onMsgTouchEnd}
-              onMouseDown={() => onMsgTouchStart(msg)}
-              onMouseUp={onMsgTouchEnd}
-              onMouseLeave={onMsgTouchEnd}
+              onTouchStart={e => { onMsgTouchStart(msg); onMsgSwipeStart(e, msg.id) }}
+              onTouchMove={onMsgSwipeMove}
+              onTouchEnd={() => { onMsgTouchEnd(); onMsgSwipeEnd() }}
+              onClick={() => onMsgTap(msg)}
               style={{
                 display: 'flex', gap: 8, flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-end',
+                transform: isSwipingThis ? `translateX(${msgSwipeDx}px)` : undefined,
+                transition: isSwipingThis ? 'none' : 'transform 0.2s',
+                position: 'relative',
               }}
             >
+              {/* Swipe reply indicator */}
+              {isSwipingThis && msgSwipeDx < -30 && (
+                <div style={{
+                  position: 'absolute', right: -4, top: '50%', transform: 'translateY(-50%)',
+                  fontSize: 16, opacity: Math.min(1, Math.abs(msgSwipeDx) / 60),
+                }}>↩️</div>
+              )}
+
+              {/* Select checkbox */}
+              {msgSelectMode && (
+                <div style={{
+                  width: 22, height: 22, borderRadius: 6, flexShrink: 0, alignSelf: 'center',
+                  border: selectedMsgs.has(msg.id) ? 'none' : '2px solid var(--border)',
+                  background: selectedMsgs.has(msg.id) ? 'var(--accent)' : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontSize: 12, fontWeight: 800,
+                }}>
+                  {selectedMsgs.has(msg.id) && '✓'}
+                </div>
+              )}
+
               <div className="avatar" style={{
                 background: sender?.avatar_url ? `url(${sender.avatar_url}) center/cover` : (sender?.color || 'var(--surface2)'),
                 color: txtOn(sender?.color || '#666'), width: 28, height: 28, fontSize: 10, flexShrink: 0,
               }}>{!sender?.avatar_url && (sender?.name[0] || '?')}</div>
               <div style={{ maxWidth: '75%' }}>
                 {!isMe && <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 3, fontWeight: 600 }}>{sender?.name || 'Unknown'}</div>}
+
+                {/* Reply context */}
+                {replyMsg && (
+                  <div style={{
+                    borderLeft: '3px solid var(--accent)', paddingLeft: 8, marginBottom: 4,
+                    fontSize: 11, color: 'var(--text2)', lineHeight: 1.3,
+                  }}>
+                    <span style={{ fontWeight: 700 }}>{replySender?.name?.split(' ')[0] || 'Unknown'}</span>
+                    <br />
+                    <span style={{ opacity: 0.8 }}>{replyMsg.text?.slice(0, 60) || '📅 Date card'}{(replyMsg.text?.length || 0) > 60 ? '...' : ''}</span>
+                  </div>
+                )}
+
                 <div style={{
                   background: isMe ? 'var(--accent)' : 'var(--surface)',
                   color: isMe ? '#fff' : 'var(--text)',
                   borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                   padding: '9px 13px', fontSize: 14, lineHeight: 1.45,
                 }}>{msg.text}</div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2, textAlign: isMe ? 'right' : 'left' }}>
-                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+
+                {/* Reactions */}
+                {rxnGroups.length > 0 && (
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
+                    {rxnGroups.map(r => (
+                      <button
+                        key={r.emoji}
+                        onClick={e => { e.stopPropagation(); toggleReaction(msg.id, r.emoji) }}
+                        style={{
+                          padding: '2px 6px', borderRadius: 10, fontSize: 12,
+                          border: r.byMe ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                          background: r.byMe ? 'var(--accent-soft)' : 'var(--surface2)',
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3,
+                        }}
+                      >
+                        <span>{r.emoji}</span>
+                        {r.count > 1 && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)' }}>{r.count}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2, textAlign: isMe ? 'right' : 'left', display: 'flex', alignItems: 'center', gap: 3, justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                  <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  {isMe && (() => {
+                    const status = getMessageStatus(msg)
+                    return (
+                      <span style={{ color: status === 'read' ? 'var(--accent)' : 'var(--text2)', fontSize: 11, fontWeight: 700 }}>
+                        {status === 'read' ? '✓✓' : '✓'}
+                      </span>
+                    )
+                  })()}
                 </div>
               </div>
             </div>
@@ -895,47 +1128,151 @@ export default function ChatPage() {
         })}
       </div>
 
-      {/* Input row */}
-      <div style={{
-        display: 'flex', gap: 8, padding: '10px 16px',
-        borderTop: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg)',
-      }}>
-        <input
-          ref={inputRef} type="text" value={inputText}
-          onChange={e => setInputText(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && sendMessage()}
-          placeholder={activeThread?.circle_id ? 'Message the group...' : 'Message...'}
-          style={{
-            flex: 1, padding: '10px 14px', borderRadius: 20,
-            background: 'var(--surface2)', border: 'none',
-            color: 'var(--text)', outline: 'none',
-          }}
-        />
-        <button onClick={sendMessage} disabled={!inputText.trim() || sending} style={{
-          width: 38, height: 38, borderRadius: '50%',
-          background: inputText.trim() ? 'var(--accent)' : 'var(--surface2)',
-          border: 'none', color: inputText.trim() ? '#fff' : 'var(--text2)',
-          fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>➤</button>
-      </div>
+      {/* Multi-select bar */}
+      {msgSelectMode && (
+        <div style={{
+          display: 'flex', gap: 8, padding: '8px 16px',
+          borderTop: '1px solid var(--border)', flexShrink: 0, background: 'var(--surface2)',
+          alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>{selectedMsgs.size} selected</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={bulkDeleteMessages} disabled={selectedMsgs.size === 0} style={{
+              padding: '6px 12px', borderRadius: 10, border: 'none',
+              background: 'var(--red-soft)', color: 'var(--red)',
+              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            }}>Delete</button>
+            <button onClick={() => { setMsgSelectMode(false); setSelectedMsgs(new Set()) }} style={{
+              padding: '6px 12px', borderRadius: 10, border: 'none',
+              background: 'var(--surface)', color: 'var(--text2)',
+              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            }}>Cancel</button>
+          </div>
+        </div>
+      )}
 
-      {/* Long-press preview */}
-      {previewMsg && (
+      {/* Reply-to bar */}
+      {replyTo && !msgSelectMode && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px',
+          borderTop: '1px solid var(--border)', background: 'var(--surface2)', flexShrink: 0,
+        }}>
+          <div style={{ flex: 1, borderLeft: '3px solid var(--accent)', paddingLeft: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>
+              Replying to {getMember(replyTo.from_user)?.name?.split(' ')[0] || 'Unknown'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {replyTo.text?.slice(0, 50) || '📅 Date card'}
+            </div>
+          </div>
+          <button onClick={() => setReplyTo(null)} style={{
+            background: 'none', border: 'none', fontSize: 14, color: 'var(--text2)', cursor: 'pointer',
+          }}>✕</button>
+        </div>
+      )}
+
+      {/* Input row */}
+      {!msgSelectMode && (
+        <div style={{
+          display: 'flex', gap: 8, padding: '10px 16px',
+          borderTop: replyTo ? 'none' : '1px solid var(--border)', flexShrink: 0, background: 'var(--bg)',
+        }}>
+          <input
+            ref={inputRef} type="text" value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && sendMessage()}
+            placeholder={activeThread?.circle_id ? 'Message the group...' : 'Message...'}
+            style={{
+              flex: 1, padding: '10px 14px', borderRadius: 20,
+              background: 'var(--surface2)', border: 'none',
+              color: 'var(--text)', outline: 'none',
+            }}
+          />
+          <button onClick={sendMessage} disabled={!inputText.trim() || sending} style={{
+            width: 38, height: 38, borderRadius: '50%',
+            background: inputText.trim() ? 'var(--accent)' : 'var(--surface2)',
+            border: 'none', color: inputText.trim() ? '#fff' : 'var(--text2)',
+            fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>➤</button>
+        </div>
+      )}
+
+      {/* Long-press emoji reaction picker */}
+      {reactionMsg && (
         <div
-          onClick={() => setPreviewMsg(null)}
+          onClick={() => setReactionMsg(null)}
           style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
             zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <div style={{
-            background: 'var(--surface)', borderRadius: 16, padding: 16,
-            maxWidth: '85%', maxHeight: '60%', overflowY: 'auto',
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--surface)', borderRadius: 20, padding: '12px 16px',
+            display: 'flex', gap: 8,
+            boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
           }}>
-            <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6 }}>
-              {getMember(previewMsg.from_user)?.name || 'Unknown'} · {new Date(previewMsg.created_at).toLocaleString()}
+            {QUICK_EMOJIS.map(emoji => (
+              <button
+                key={emoji}
+                onClick={() => toggleReaction(reactionMsg.id, emoji)}
+                style={{
+                  fontSize: 26, background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '4px 6px', borderRadius: 10,
+                  transition: 'transform 0.15s',
+                }}
+                onMouseDown={e => (e.currentTarget.style.transform = 'scale(1.3)')}
+                onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Quick actions menu */}
+      {quickActionMsg && (
+        <div
+          onClick={() => setQuickActionMsg(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--surface)', borderRadius: '20px 20px 0 0', padding: '16px 20px 28px',
+            width: '100%', maxWidth: 440,
+          }}>
+            <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 14px' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <button onClick={() => forwardToReply(quickActionMsg)} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12,
+                border: 'none', background: 'transparent', color: 'var(--text)',
+                fontSize: 14, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
+              }}>↩️ Reply</button>
+              <button onClick={() => { setReactionMsg(quickActionMsg); setQuickActionMsg(null) }} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12,
+                border: 'none', background: 'transparent', color: 'var(--text)',
+                fontSize: 14, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
+              }}>😀 React</button>
+              {quickActionMsg.from_user === user.id && (
+                <button onClick={() => deleteMessage(quickActionMsg.id)} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12,
+                  border: 'none', background: 'transparent', color: 'var(--red)',
+                  fontSize: 14, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
+                }}>🗑 Delete</button>
+              )}
+              <button onClick={() => { setMsgSelectMode(true); setSelectedMsgs(new Set([quickActionMsg.id])); setQuickActionMsg(null) }} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12,
+                border: 'none', background: 'transparent', color: 'var(--text)',
+                fontSize: 14, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
+              }}>☑️ Select multiple</button>
+              <button onClick={() => setQuickActionMsg(null)} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12,
+                border: 'none', background: 'transparent', color: 'var(--text2)',
+                fontSize: 14, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
+              }}>✕ Cancel</button>
             </div>
-            <p style={{ fontSize: 14 }}>{previewMsg.text || (previewMsg.date_card ? `📅 Proposed hangout on ${fmtDate(previewMsg.date_card)}` : '')}</p>
           </div>
         </div>
       )}

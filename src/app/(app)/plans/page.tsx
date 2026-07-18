@@ -40,6 +40,12 @@ export default function PlansPage() {
   const [editArea, setEditArea] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Edit mode Places autocomplete
+  const [editPlaceQuery, setEditPlaceQuery] = useState('')
+  const [editPredictions, setEditPredictions] = useState<{ place_id: string; description: string; main_text: string; secondary_text: string }[]>([])
+  const [showEditPredictions, setShowEditPredictions] = useState(false)
+  const editSearchTimer = useRef<NodeJS.Timeout | null>(null)
+
   // Long press for quick actions
   const [longPressPactId, setLongPressPactId] = useState<string | null>(null)
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -145,6 +151,7 @@ export default function PlansPage() {
         .filter(m => m.user_id !== user.id)
         .map(m => getMember(m.user_id)?.name.split(' ')[0])
         .filter(Boolean)
+      const newMemberCount = pact.members.length + 1
       fetch('/api/calendar/push-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -160,6 +167,9 @@ export default function PlansPage() {
           location: pact.spot_name !== 'TBD' && pact.spot_area
             ? `${pact.spot_name}, ${pact.spot_area}`
             : pact.spot_name !== 'TBD' ? pact.spot_name : undefined,
+          confirmed: false,
+          totalCircleMembers: circleMembers.length,
+          pactMemberCount: newMemberCount,
         }),
       }).catch(() => {})
     }
@@ -197,6 +207,30 @@ export default function PlansPage() {
     await loadPacts()
   }
 
+  function handleEditPlaceInput(val: string) {
+    setEditPlaceQuery(val)
+    setEditSpot(val)
+    setEditArea('')
+    if (editSearchTimer.current) clearTimeout(editSearchTimer.current)
+    if (val.length < 2) { setEditPredictions([]); setShowEditPredictions(false); return }
+    editSearchTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/places/autocomplete?q=${encodeURIComponent(val)}`)
+        const data = await res.json()
+        setEditPredictions(data.predictions || [])
+        setShowEditPredictions(data.predictions?.length > 0)
+      } catch { setEditPredictions([]) }
+    }, 300)
+  }
+
+  function selectEditPlace(p: { main_text: string; secondary_text: string }) {
+    setEditSpot(p.main_text)
+    setEditArea(p.secondary_text)
+    setEditPlaceQuery(p.main_text)
+    setShowEditPredictions(false)
+    setEditPredictions([])
+  }
+
   function startEditing(pact: Pact) {
     setEditingId(pact.id)
     setEditDate(pact.date)
@@ -205,6 +239,9 @@ export default function PlansPage() {
     setEditTitle(pact.occasion || '')
     setEditSpot(pact.spot_name === 'TBD' ? '' : pact.spot_name)
     setEditArea(pact.spot_area)
+    setEditPlaceQuery(pact.spot_name === 'TBD' ? '' : pact.spot_name)
+    setEditPredictions([])
+    setShowEditPredictions(false)
   }
 
   async function saveEdit(pactId: string) {
@@ -249,6 +286,9 @@ export default function PlansPage() {
             startHour: editStart,
             endHour: editEnd,
             location: editSpot && editArea ? `${editSpot}, ${editArea}` : editSpot || undefined,
+            confirmed: false,
+            totalCircleMembers: circleMembers.length,
+            pactMemberCount: pact.members.length,
           }),
         }).catch(() => {})
       }
@@ -367,12 +407,41 @@ export default function PlansPage() {
                     style={{ padding: '8px 12px', borderRadius: 10, background: 'var(--surface2)', border: 'none', color: 'var(--text)', fontSize: 13 }}
                   />
 
-                  {/* Spot */}
-                  <input
-                    type="text" placeholder="Where? (optional)"
-                    value={editSpot} onChange={e => setEditSpot(e.target.value)}
-                    style={{ padding: '8px 12px', borderRadius: 10, background: 'var(--surface2)', border: 'none', color: 'var(--text)', fontSize: 13 }}
-                  />
+                  {/* Spot with autocomplete */}
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text" placeholder="Search for a place..."
+                      value={editPlaceQuery}
+                      onChange={e => handleEditPlaceInput(e.target.value)}
+                      onFocus={() => editPredictions.length > 0 && setShowEditPredictions(true)}
+                      onBlur={() => setTimeout(() => setShowEditPredictions(false), 200)}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 10, background: 'var(--surface2)', border: 'none', color: 'var(--text)', fontSize: 13 }}
+                    />
+                    {showEditPredictions && editPredictions.length > 0 && (
+                      <div style={{
+                        position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 20,
+                        background: 'var(--surface)', border: '1px solid var(--border)',
+                        borderRadius: 12, marginTop: 4, maxHeight: 180, overflowY: 'auto',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                      }}>
+                        {editPredictions.map(ep => (
+                          <div
+                            key={ep.place_id}
+                            onMouseDown={() => selectEditPlace(ep)}
+                            style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{ep.main_text}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text2)' }}>{ep.secondary_text}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {editArea && (
+                      <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>
+                        📍 {editArea}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Action buttons */}
                   <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
@@ -400,16 +469,22 @@ export default function PlansPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
                       <p style={{ fontSize: 14, fontWeight: 800 }}>
-                        {p.occasion || p.spot_name}
+                        {p.occasion || (() => {
+                          const others = p.members
+                            .filter(m => m.user_id !== user.id)
+                            .map(m => getMember(m.user_id)?.name.split(' ')[0])
+                            .filter(Boolean)
+                          return others.length > 0 ? `Pact with ${others.join(', ')}` : 'Pact'
+                        })()}
                       </p>
                       <p style={{ fontSize: 12, color: 'var(--text2)' }}>
                         {fmtDate(p.date)} · {fmtWin(p.win_start, p.win_end)}
                       </p>
-                      {p.spot_name !== 'TBD' && p.occasion && (
-                        <p style={{ fontSize: 12, color: 'var(--text2)' }}>
-                          {p.spot_emoji} {p.spot_name}{p.spot_area ? ` — ${p.spot_area}` : ''}
-                        </p>
-                      )}
+                      <p style={{ fontSize: 12, color: 'var(--text2)' }}>
+                        {p.spot_name !== 'TBD'
+                          ? `${p.spot_emoji || '📍'} ${p.spot_name}${p.spot_area ? ` — ${p.spot_area}` : ''}`
+                          : '📍 To be set'}
+                      </p>
                     </div>
                     {editable && (
                       <button onClick={() => startEditing(p)}

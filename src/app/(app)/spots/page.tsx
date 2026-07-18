@@ -39,6 +39,8 @@ export default function SpotsPage() {
   const [favName, setFavName] = useState('')
   const [favEmoji, setFavEmoji] = useState('📍')
   const [favArea, setFavArea] = useState('')
+  const [favAreaQuery, setFavAreaQuery] = useState('')
+  const [favAreaFocused, setFavAreaFocused] = useState(false)
   const [savingFav, setSavingFav] = useState(false)
 
   const tz = useMemo(() => getBrowserTimezone(), [])
@@ -225,12 +227,12 @@ export default function SpotsPage() {
     const timer = setTimeout(async () => {
       setSearching(true)
       try {
-        const res = await fetch(`/api/places/autocomplete?q=${encodeURIComponent(q.trim() + ' Metro Manila')}`)
+        const res = await fetch(`/api/places/autocomplete?q=${encodeURIComponent(q.trim())}`)
         if (res.ok) {
           const data = await res.json()
           setSearchResults((data.predictions || []).map((p: any) => ({
-            name: p.structured_formatting?.main_text || p.description,
-            area: p.structured_formatting?.secondary_text || '',
+            name: p.main_text || p.description,
+            area: p.secondary_text || '',
             placeId: p.place_id,
           })))
         }
@@ -613,21 +615,61 @@ export default function SpotsPage() {
               />
             </div>
 
-            <select
-              value={favArea}
-              onChange={e => setFavArea(e.target.value)}
-              style={{
-                width: '100%', padding: '10px 12px', borderRadius: 10,
-                border: '1.5px solid var(--border)', background: 'var(--surface2)',
-                color: favArea ? 'var(--text)' : 'var(--text2)', fontSize: 13, outline: 'none',
-                marginBottom: 14,
-              }}
-            >
-              <option value="">Pick an area...</option>
-              {Object.keys(AREAS).map(a => (
-                <option key={a} value={a}>{a}</option>
-              ))}
-            </select>
+            <div style={{ position: 'relative', marginBottom: 14 }}>
+              <input
+                type="text"
+                placeholder="Search area (e.g. BGC, Makati, Katipunan)"
+                value={favArea || favAreaQuery}
+                onChange={e => {
+                  setFavAreaQuery(e.target.value)
+                  setFavArea('')
+                  setFavAreaFocused(true)
+                }}
+                onFocus={() => setFavAreaFocused(true)}
+                onBlur={() => setTimeout(() => setFavAreaFocused(false), 150)}
+                style={{
+                  width: '100%', padding: '10px 12px', borderRadius: 10,
+                  border: `1.5px solid ${favArea ? 'var(--accent)' : 'var(--border)'}`,
+                  background: 'var(--surface2)',
+                  color: favArea ? 'var(--text)' : (favAreaQuery ? 'var(--text)' : 'var(--text2)'),
+                  fontSize: 13, outline: 'none',
+                }}
+              />
+              {favArea && (
+                <span
+                  onClick={() => { setFavArea(''); setFavAreaQuery('') }}
+                  style={{
+                    position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                    cursor: 'pointer', fontSize: 14, color: 'var(--text2)',
+                  }}
+                >✕</span>
+              )}
+              {favAreaFocused && !favArea && (() => {
+                const q = favAreaQuery.toLowerCase()
+                const filtered = Object.keys(AREAS).filter(a => !q || a.toLowerCase().includes(q))
+                return filtered.length > 0 ? (
+                  <div style={{
+                    position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4,
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    borderRadius: 10, maxHeight: 180, overflowY: 'auto', zIndex: 10,
+                  }}>
+                    {filtered.slice(0, 15).map(a => (
+                      <div
+                        key={a}
+                        onMouseDown={e => e.preventDefault()}
+                        onClick={() => { setFavArea(a); setFavAreaQuery(''); setFavAreaFocused(false) }}
+                        style={{
+                          padding: '9px 12px', fontSize: 13, cursor: 'pointer',
+                          borderBottom: '1px solid var(--border)',
+                        }}
+                      >
+                        <span style={{ fontWeight: 600 }}>{a}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null
+              })()}
+            </div>
 
             <div style={{ display: 'flex', gap: 8 }}>
               <button

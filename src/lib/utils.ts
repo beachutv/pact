@@ -1,11 +1,13 @@
 /** Format hour number to "9 AM" / "12 PM" style */
 export function fmtHour(h: number): string {
+  if (h === 0 || h === 24) return '12 MN'
   if (h === 12) return '12 PM'
   return h < 12 ? `${h} AM` : `${h - 12} PM`
 }
 
 /** Short format: "9a" / "12p" */
 export function fmtTiny(h: number): string {
+  if (h === 0 || h === 24) return '12mn'
   if (h === 12) return '12p'
   return h < 12 ? `${h}a` : `${h - 12}p`
 }
@@ -171,8 +173,8 @@ export function currentHourInTz(tz: string): number {
   return parseInt(str)
 }
 
-export const DAY_START = 8
-export const DAY_END = 23
+export const DAY_START = 6
+export const DAY_END = 24
 
 /** Real GPS coordinates for Metro Manila areas (for live location matching) */
 export const AREA_GPS: Record<string, { lat: number; lng: number }> = {

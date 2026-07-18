@@ -145,6 +145,9 @@ function NewPlanContent() {
           endHour,
           location: spotName && spotArea ? `${spotName}, ${spotArea}` : spotName || undefined,
           calendarId: targetCalId,
+          confirmed: false,
+          totalCircleMembers: circleMembers.length,
+          pactMemberCount: 1, // just the creator at this point
         }),
       }).catch(() => {})
 
