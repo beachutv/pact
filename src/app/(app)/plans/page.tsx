@@ -40,23 +40,70 @@ export default function PlansPage() {
   const [editArea, setEditArea] = useState('')
   const [saving, setSaving] = useState(false)
 
-  // Swipe to delete
-  const [swipedPactId, setSwipedPactId] = useState<string | null>(null)
-  const pactSwipeStartX = useRef(0)
-  const pactSwipeCurrentX = useRef(0)
+  // Long press for quick actions
+  const [longPressPactId, setLongPressPactId] = useState<string | null>(null)
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  function onPactSwipeStart(e: React.TouchEvent) {
-    pactSwipeStartX.current = e.touches[0].clientX
-    pactSwipeCurrentX.current = e.touches[0].clientX
+  // Share pact to chat
+  const [sharePactId, setSharePactId] = useState<string | null>(null)
+  const [shareThreads, setShareThreads] = useState<{ id: string; name: string }[]>([])
+  const [sharing, setSharing] = useState(false)
+
+  function onPactLongPressStart(pid: string) {
+    longPressTimerRef.current = setTimeout(() => setLongPressPactId(pid), 500)
   }
-  function onPactSwipeMove(e: React.TouchEvent, pid: string) {
-    pactSwipeCurrentX.current = e.touches[0].clientX
-    const dx = pactSwipeCurrentX.current - pactSwipeStartX.current
-    if (dx < -20) setSwipedPactId(pid)
+  function onPactLongPressEnd() {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
   }
-  function onPactSwipeEnd(pid: string) {
-    const dx = pactSwipeCurrentX.current - pactSwipeStartX.current
-    if (dx > -80) setSwipedPactId(null)
+
+  async function openShareModal(pactId: string) {
+    setLongPressPactId(null)
+    setSharePactId(pactId)
+    // Load user's threads
+    const { data: tms } = await supabase
+      .from('thread_members').select('thread_id').eq('user_id', user.id)
+    if (!tms) return
+    const threadIds = tms.map(t => t.thread_id)
+    const { data: threads } = await supabase
+      .from('threads').select('id, name, circle_id').in('id', threadIds)
+    if (!threads) return
+    const result: { id: string; name: string }[] = []
+    for (const t of threads) {
+      if (t.name) {
+        result.push({ id: t.id, name: t.name })
+      } else {
+        const { data: members } = await supabase
+          .from('thread_members').select('user_id').eq('thread_id', t.id)
+        const others = (members || []).filter(m => m.user_id !== user.id)
+        const names = others.map(o => {
+          const cm = circleMembers.find(cm => cm.id === o.user_id)
+          return cm?.name?.split(' ')[0] || 'Unknown'
+        })
+        result.push({ id: t.id, name: names.join(', ') || 'Chat' })
+      }
+    }
+    setShareThreads(result)
+  }
+
+  async function sharePactToThread(threadId: string) {
+    if (!sharePactId) return
+    setSharing(true)
+    const pact = pacts.find(p => p.id === sharePactId)
+    if (!pact) { setSharing(false); return }
+    await supabase.from('messages').insert({
+      thread_id: threadId,
+      from_user: user.id,
+      date_card: pact.date,
+      win_start: pact.win_start,
+      win_end: pact.win_end,
+      spot_name: pact.spot_name !== 'TBD' ? pact.spot_name : null,
+      spot_emoji: pact.spot_emoji || null,
+      spot_area: pact.spot_area || null,
+      text: null,
+    })
+    setSharing(false)
+    setSharePactId(null)
+    alert('Pact shared to chat!')
   }
 
   const onRefresh = useCallback(async () => {
@@ -264,26 +311,14 @@ export default function PlansPage() {
           const editable = canEdit(p)
 
           return (
-            <div key={p.id} style={{ position: 'relative', overflow: 'hidden', borderRadius: 'var(--radius)' }}>
-              {/* Swipe delete button */}
-              <div style={{
-                position: 'absolute', right: 0, top: 0, bottom: 0,
-                width: 80, background: 'var(--red)', display: 'flex',
-                alignItems: 'center', justifyContent: 'center', borderRadius: '0 var(--radius) var(--radius) 0',
-              }}>
-                <button onClick={() => deletePact(p.id)} style={{
-                  background: 'none', border: 'none', color: '#fff',
-                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                }}>Delete</button>
-              </div>
+            <div key={p.id} style={{ position: 'relative' }}>
               <div
-                onTouchStart={onPactSwipeStart}
-                onTouchMove={e => onPactSwipeMove(e, p.id)}
-                onTouchEnd={() => onPactSwipeEnd(p.id)}
+                onTouchStart={() => onPactLongPressStart(p.id)}
+                onTouchEnd={onPactLongPressEnd}
+                onTouchCancel={onPactLongPressEnd}
                 className="card" style={{
                   display: 'flex', flexDirection: 'column', gap: 8,
-                  transform: swipedPactId === p.id ? 'translateX(-80px)' : 'translateX(0)',
-                  transition: 'transform 0.2s ease', position: 'relative', zIndex: 1,
+                  position: 'relative',
                 }}>
               {isEditing ? (
                 /* ─── Edit mode ─── */
@@ -422,10 +457,93 @@ export default function PlansPage() {
                   </button>
                 </>
               )}
+
+              {/* Long press quick actions */}
+              {longPressPactId === p.id && (
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    position: 'absolute', top: 0, right: 0, zIndex: 20,
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    borderRadius: 14, padding: 6, minWidth: 140,
+                    boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
+                  }}
+                >
+                  {editable && (
+                    <button onClick={() => { setLongPressPactId(null); startEditing(p) }} style={{
+                      display: 'block', width: '100%', padding: '8px 12px', border: 'none',
+                      background: 'transparent', fontSize: 13, fontWeight: 600,
+                      color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
+                    }}>✏️ Edit</button>
+                  )}
+                  <button onClick={() => { setLongPressPactId(null); router.push('/chat') }} style={{
+                    display: 'block', width: '100%', padding: '8px 12px', border: 'none',
+                    background: 'transparent', fontSize: 13, fontWeight: 600,
+                    color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
+                  }}>💬 Discuss</button>
+                  <button onClick={() => openShareModal(p.id)} style={{
+                    display: 'block', width: '100%', padding: '8px 12px', border: 'none',
+                    background: 'transparent', fontSize: 13, fontWeight: 600,
+                    color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
+                  }}>📤 Send to chat</button>
+                  <button onClick={() => { setLongPressPactId(null); deletePact(p.id) }} style={{
+                    display: 'block', width: '100%', padding: '8px 12px', border: 'none',
+                    background: 'transparent', fontSize: 13, fontWeight: 600,
+                    color: 'var(--red)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
+                  }}>🗑 Delete</button>
+                  <button onClick={() => setLongPressPactId(null)} style={{
+                    display: 'block', width: '100%', padding: '8px 12px', border: 'none',
+                    background: 'transparent', fontSize: 13, fontWeight: 600,
+                    color: 'var(--text2)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
+                  }}>✕ Cancel</button>
+                </div>
+              )}
             </div>
             </div>
           )
         })
+      )}
+
+      {/* Share pact to chat modal */}
+      {sharePactId && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) setSharePactId(null) }}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+            zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div style={{ background: 'var(--surface)', borderRadius: 20, padding: 20, width: '90%', maxWidth: 360 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Send pact to chat</h3>
+            <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>
+              Pick a chat to share this pact with.
+            </p>
+            {shareThreads.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text2)', textAlign: 'center', padding: '12px 0' }}>
+                No chats yet. Start a chat first!
+              </p>
+            ) : (
+              shareThreads.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => sharePactToThread(t.id)}
+                  disabled={sharing}
+                  style={{
+                    display: 'block', width: '100%', padding: '10px 14px', marginBottom: 6,
+                    borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)',
+                    fontSize: 13, fontWeight: 600, color: 'var(--text)', cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  💬 {t.name}
+                </button>
+              ))
+            )}
+            <button onClick={() => setSharePactId(null)} style={{
+              marginTop: 8, width: '100%', padding: 10, border: 'none', borderRadius: 12,
+              background: 'transparent', color: 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}>Cancel</button>
+          </div>
+        </div>
       )}
     </div>
   )

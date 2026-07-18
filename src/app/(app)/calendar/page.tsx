@@ -16,7 +16,7 @@ type Spark = {
   window: { s: number; e: number }
   area: string
 }
-type PactEntry = { id: string; date: string; occasion: string | null; spot_name: string; spot_area: string | null; spot_emoji: string | null; win_start: number | null; win_end: number | null }
+type PactEntry = { id: string; date: string; occasion: string | null; spot_name: string; spot_area: string | null; spot_emoji: string | null; win_start: number | null; win_end: number | null; status: string }
 
 export default function CalendarPage() {
   const { user, activeCircle, circleMembers } = useCircle()
@@ -111,7 +111,7 @@ export default function CalendarPage() {
     async function fetchPacts() {
       const { data } = await supabase
         .from('pacts')
-        .select('id, date, occasion, spot_name, spot_area, spot_emoji, win_start, win_end')
+        .select('id, date, occasion, spot_name, spot_area, spot_emoji, win_start, win_end, status')
         .eq('circle_id', activeCircle!.id)
         .gte('date', todayStr)
       if (data) setPacts(data)
@@ -264,7 +264,7 @@ export default function CalendarPage() {
 
   // ================= Sparks =================
   const sparks = useMemo((): Spark[] => {
-    if (!activeCircle || busyBlocks.length === 0) return []
+    if (!activeCircle) return []
     const myLive = (user as any).live_lat && (user as any).live_lng && (user as any).live_updated_at &&
       (Date.now() - new Date((user as any).live_updated_at).getTime()) < 4 * 3600000
       ? { lat: (user as any).live_lat as number, lng: (user as any).live_lng as number } : null
@@ -399,13 +399,27 @@ export default function CalendarPage() {
         winColor = 'var(--text2)'
       }
 
-      // Pact border colors: red=special events, gold=confirmed, orange=pending
-      if (datePacts.length > 0) {
-        const hasSpecial = datePacts.some(p => p.occasion)
-        if (hasSpecial) {
-          borderColor = '#ef4444' // red for special events (birthdays, anniversaries)
-        } else {
-          borderColor = '#f59e0b' // orange for pending pacts
+      // Pact indicators: red border=pending, orange/yellow fill=confirmed
+      const hasConfirmed = datePacts.some(p => p.status === 'confirmed')
+      const hasPending = datePacts.some(p => p.status === 'pending')
+      if (hasConfirmed) {
+        bg = 'rgba(245, 158, 11, 0.18)' // orange/yellow fill for confirmed
+      }
+      if (hasPending) {
+        borderColor = '#ef4444' // red border for pending pacts
+      }
+
+      // Special event mini icons (occasion-based like birthdays, anniversaries)
+      const occasionIcons: string[] = []
+      for (const p of datePacts) {
+        if (p.occasion) {
+          const occ = p.occasion.toLowerCase()
+          if (occ.includes('birthday') || occ.includes('bday')) occasionIcons.push('🎂')
+          else if (occ.includes('anniversary')) occasionIcons.push('💍')
+          else if (occ.includes('wedding')) occasionIcons.push('💒')
+          else if (occ.includes('graduation')) occasionIcons.push('🎓')
+          else if (occ.includes('holiday') || occ.includes('christmas') || occ.includes('new year')) occasionIcons.push('🎄')
+          else occasionIcons.push('⭐')
         }
       }
 
@@ -429,6 +443,11 @@ export default function CalendarPage() {
         >
           {sum.allDay && (
             <span style={{ position: 'absolute', top: 2, right: 3, fontSize: 7, color: 'var(--green)' }}>★</span>
+          )}
+          {occasionIcons.length > 0 && (
+            <span style={{ position: 'absolute', top: 1, left: 2, fontSize: 8, lineHeight: 1 }}>
+              {occasionIcons.slice(0, 2).join('')}
+            </span>
           )}
           <span style={{
             fontSize: 13, fontWeight: 600,
@@ -536,7 +555,7 @@ export default function CalendarPage() {
                     background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer',
                   }}
                 >
-                  Propose a plan with {sp.member.name.split(' ')[0]} →
+                  Propose a plan with {sp.member.name.split(' ')[0]}
                 </button>
               </div>
             ))}
@@ -642,10 +661,13 @@ export default function CalendarPage() {
             <i style={{ width: 9, height: 9, border: '1.5px solid var(--accent)', borderRadius: 3, display: 'inline-block' }} /> today
           </span>
           <span style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <i style={{ width: 9, height: 9, border: '1.5px solid #f59e0b', borderRadius: 3, display: 'inline-block' }} /> pending
+            <i style={{ width: 9, height: 9, border: '1.5px solid #ef4444', borderRadius: 3, display: 'inline-block' }} /> pending
           </span>
           <span style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <i style={{ width: 9, height: 9, border: '1.5px solid #ef4444', borderRadius: 3, display: 'inline-block' }} /> special
+            <i style={{ width: 9, height: 9, background: 'rgba(245,158,11,0.3)', borderRadius: 3, display: 'inline-block' }} /> confirmed
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--text2)' }}>
+            🎂 event
           </span>
         </div>
 
@@ -748,14 +770,16 @@ export default function CalendarPage() {
                   <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text2)', marginBottom: 6 }}>
                     📌 Pacts on this day
                   </div>
-                  {(pactsByDate[sheetDate] || []).map(p => (
+                  {(pactsByDate[sheetDate] || []).map(p => {
+                    const isConfirmed = p.status === 'confirmed'
+                    return (
                     <div
                       key={p.id}
                       onClick={() => window.location.href = '/plans'}
                       style={{
                         padding: '10px 12px', borderRadius: 12, marginBottom: 6,
-                        background: 'var(--accent-soft)',
-                        border: `1px solid ${p.occasion ? '#ef4444' : '#f59e0b'}`,
+                        background: isConfirmed ? 'rgba(245, 158, 11, 0.15)' : 'var(--surface)',
+                        border: `1.5px solid ${isConfirmed ? '#f59e0b' : '#ef4444'}`,
                         cursor: 'pointer',
                       }}
                     >
@@ -773,7 +797,8 @@ export default function CalendarPage() {
                         </div>
                       )}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
 

@@ -388,7 +388,7 @@ export default function HomePage() {
               background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer',
             }}
           >
-            Propose a plan with {sp.member.name.split(' ')[0]} →
+            Propose a plan with {sp.member.name.split(' ')[0]}
           </button>
         </div>
       ))}

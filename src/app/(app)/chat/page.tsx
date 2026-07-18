@@ -82,6 +82,26 @@ export default function ChatPage() {
     loadThreads()
   }, [activeCircle?.id])
 
+  // ─── Realtime: refresh thread list when threads or messages update ───
+  useEffect(() => {
+    if (!activeCircle) return
+    const channel = supabase
+      .channel('thread-list-realtime')
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'threads',
+      }, () => {
+        if (!activeThreadId) loadThreads()
+      })
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'messages',
+      }, () => {
+        if (!activeThreadId) loadThreads()
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [activeCircle?.id, activeThreadId])
+
   async function loadThreads() {
     const { data: tms } = await supabase
       .from('thread_members').select('thread_id').eq('user_id', user.id)
@@ -369,8 +389,7 @@ export default function ChatPage() {
 
   function onSwipeEnd(tid: string) {
     const dx = swipeCurrentX.current - swipeStartX.current
-    if (dx < -80) {
-      // Swiped far enough — keep delete button visible
+    if (dx < -60) {
       setSwipedThreadId(tid)
     } else {
       setSwipedThreadId(null)
@@ -511,15 +530,21 @@ export default function ChatPage() {
 
           return (
             <div key={t.id} style={{ position: 'relative', overflow: 'hidden' }}>
-              {/* Delete button behind */}
+              {/* Swipe actions behind */}
               <div style={{
                 position: 'absolute', right: 0, top: 0, bottom: 0,
-                width: 80, background: 'var(--red)', display: 'flex',
-                alignItems: 'center', justifyContent: 'center',
+                width: 140, display: 'flex',
               }}>
+                <button onClick={() => {
+                  if (unread) { markAsRead(t.id) } else { markAsUnread(t.id) }
+                  setSwipedThreadId(null)
+                }} style={{
+                  flex: 1, background: 'var(--accent)', border: 'none', color: '#fff',
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                }}>{unread ? 'Read' : 'Unread'}</button>
                 <button onClick={() => deleteThread(t.id)} style={{
-                  background: 'none', border: 'none', color: '#fff',
-                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  flex: 1, background: 'var(--red)', border: 'none', color: '#fff',
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
                 }}>Delete</button>
               </div>
 
@@ -538,7 +563,7 @@ export default function ChatPage() {
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '12px 16px', cursor: 'pointer',
                   background: selected.has(t.id) ? 'var(--accent-soft)' : 'var(--bg)',
-                  transform: isSwiped ? 'translateX(-80px)' : 'translateX(0)',
+                  transform: isSwiped ? 'translateX(-140px)' : 'translateX(0)',
                   transition: 'transform 0.2s ease',
                   position: 'relative', zIndex: 1,
                 }}
