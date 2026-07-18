@@ -86,12 +86,20 @@ export async function POST(request: Request) {
 
   // Merge busy periods from all selected calendars
   const allBusy: { start: string; end: string }[] = []
+  const calDetails: Record<string, number> = {}
   for (const calId of calendarIds) {
     const cal = freeBusy.calendars?.[calId]
+    if (cal?.errors) {
+      console.warn(`[CalSync] Calendar ${calId} errors:`, cal.errors)
+    }
     if (cal?.busy) {
+      calDetails[calId] = cal.busy.length
       allBusy.push(...cal.busy)
+    } else {
+      calDetails[calId] = 0
     }
   }
+  console.log(`[CalSync] Calendar busy counts:`, calDetails, `Total: ${allBusy.length}`)
 
   // Sort and merge overlapping periods
   allBusy.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())

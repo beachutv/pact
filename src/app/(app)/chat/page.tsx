@@ -72,7 +72,9 @@ export default function ChatPage() {
 
   // Long press → emoji reaction picker
   const [reactionMsg, setReactionMsg] = useState<Message | null>(null)
+  const [showEmojiInput, setShowEmojiInput] = useState(false)
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const longPressActive = useRef(false)
   const QUICK_EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🔥']
 
   // Tap → quick actions menu
@@ -332,8 +334,24 @@ export default function ChatPage() {
     setSending(true)
     const text = inputText.trim()
     setInputText('')
-    const insert: any = { thread_id: activeThreadId, from_user: user.id, text }
-    if (replyTo) { insert.reply_to = replyTo.id; setReplyTo(null) }
+    const msgId = crypto.randomUUID()
+    const replyId = replyTo?.id || null
+    if (replyTo) setReplyTo(null)
+
+    // Optimistic: show message immediately
+    const optimistic: Message = {
+      id: msgId, thread_id: activeThreadId, from_user: user.id,
+      text, date_card: null, win_start: null, win_end: null,
+      spot_name: null, spot_emoji: null, spot_area: null,
+      spot_avg_travel: null, with_user_ids: null, group_n: null,
+      free_n: null, confirmed: false, created_at: new Date().toISOString(),
+      reply_to: replyId, rsvps: [], reactions: [],
+    }
+    setMessages(prev => [...prev, optimistic])
+    scrollToBottom()
+
+    const insert: any = { id: msgId, thread_id: activeThreadId, from_user: user.id, text }
+    if (replyId) insert.reply_to = replyId
     await supabase.from('messages').insert(insert)
     setSending(false)
     inputRef.current?.focus()
@@ -374,22 +392,26 @@ export default function ChatPage() {
     inputRef.current?.focus()
   }
 
-  // Message swipe handlers (slide right-to-left to reply)
+  // Message swipe handlers (slide to reply — works on ALL messages)
   function onMsgSwipeStart(e: React.TouchEvent, msgId: string) {
     msgSwipeRef.current = { id: msgId, startX: e.touches[0].clientX, dx: 0 }
   }
   function onMsgSwipeMove(e: React.TouchEvent) {
     if (!msgSwipeRef.current) return
     const dx = e.touches[0].clientX - msgSwipeRef.current.startX
-    if (dx < -10) {
+    // Accept swipe in either direction (left or right)
+    if (Math.abs(dx) > 10) {
+      // Cancel long press if swiping
+      if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
+      longPressActive.current = false
       msgSwipeRef.current.dx = dx
       setMsgSwipeId(msgSwipeRef.current.id)
-      setMsgSwipeDx(Math.max(dx, -80))
+      setMsgSwipeDx(Math.max(Math.min(dx, 80), -80))
     }
   }
   function onMsgSwipeEnd() {
     if (!msgSwipeRef.current) return
-    if (msgSwipeRef.current.dx < -50) {
+    if (Math.abs(msgSwipeRef.current.dx) > 50) {
       const msg = messages.find(m => m.id === msgSwipeRef.current!.id)
       if (msg) { setReplyTo(msg); inputRef.current?.focus() }
     }
@@ -559,15 +581,23 @@ export default function ChatPage() {
     await loadThreads()
   }
 
-  // ─── Long press → emoji reaction picker ───
-  function onMsgTouchStart(msg: Message) {
-    longPressTimer.current = setTimeout(() => setReactionMsg(msg), 500)
+  // ─── Long press → emoji reaction picker (with text selection prevention) ───
+  function onMsgTouchStart(e: React.TouchEvent, msg: Message) {
+    e.preventDefault() // prevent text selection on long press
+    longPressActive.current = false
+    longPressTimer.current = setTimeout(() => {
+      longPressActive.current = true
+      setReactionMsg(msg)
+    }, 500)
   }
   function onMsgTouchEnd() {
-    if (longPressTimer.current) clearTimeout(longPressTimer.current)
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
   }
   // ─── Single tap → quick actions ───
   function onMsgTap(msg: Message) {
+    // Don't fire tap if long press just triggered or swipe just happened
+    if (longPressActive.current) { longPressActive.current = false; return }
+    if (msgSwipeRef.current && Math.abs(msgSwipeRef.current.dx) > 10) return
     if (msgSelectMode) {
       setSelectedMsgs(prev => {
         const next = new Set(prev)
@@ -1032,7 +1062,7 @@ export default function ChatPage() {
           return (
             <div
               key={msg.id}
-              onTouchStart={e => { onMsgTouchStart(msg); onMsgSwipeStart(e, msg.id) }}
+              onTouchStart={e => { onMsgTouchStart(e, msg); onMsgSwipeStart(e, msg.id) }}
               onTouchMove={onMsgSwipeMove}
               onTouchEnd={() => { onMsgTouchEnd(); onMsgSwipeEnd() }}
               onClick={() => onMsgTap(msg)}
@@ -1041,6 +1071,7 @@ export default function ChatPage() {
                 transform: isSwipingThis ? `translateX(${msgSwipeDx}px)` : undefined,
                 transition: isSwipingThis ? 'none' : 'transform 0.2s',
                 position: 'relative',
+                WebkitUserSelect: 'none', userSelect: 'none', touchAction: 'pan-y',
               }}
             >
               {/* Swipe reply indicator */}
@@ -1200,7 +1231,7 @@ export default function ChatPage() {
       {/* Long-press emoji reaction picker */}
       {reactionMsg && (
         <div
-          onClick={() => setReactionMsg(null)}
+          onClick={() => { setReactionMsg(null); setShowEmojiInput(false) }}
           style={{
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
             zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1208,24 +1239,60 @@ export default function ChatPage() {
         >
           <div onClick={e => e.stopPropagation()} style={{
             background: 'var(--surface)', borderRadius: 20, padding: '12px 16px',
-            display: 'flex', gap: 8,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
             boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
           }}>
-            {QUICK_EMOJIS.map(emoji => (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {QUICK_EMOJIS.map(emoji => (
+                <button
+                  key={emoji}
+                  onClick={() => toggleReaction(reactionMsg.id, emoji)}
+                  style={{
+                    fontSize: 26, background: 'none', border: 'none', cursor: 'pointer',
+                    padding: '4px 6px', borderRadius: 10,
+                    transition: 'transform 0.15s',
+                  }}
+                  onMouseDown={e => (e.currentTarget.style.transform = 'scale(1.3)')}
+                  onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+                >
+                  {emoji}
+                </button>
+              ))}
+              {/* Custom emoji button */}
               <button
-                key={emoji}
-                onClick={() => toggleReaction(reactionMsg.id, emoji)}
+                onClick={() => setShowEmojiInput(true)}
                 style={{
-                  fontSize: 26, background: 'none', border: 'none', cursor: 'pointer',
-                  padding: '4px 6px', borderRadius: 10,
-                  transition: 'transform 0.15s',
+                  fontSize: 20, background: 'var(--surface2)', border: 'none', cursor: 'pointer',
+                  padding: '4px 8px', borderRadius: 10, color: 'var(--text2)',
                 }}
-                onMouseDown={e => (e.currentTarget.style.transform = 'scale(1.3)')}
-                onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
-              >
-                {emoji}
-              </button>
-            ))}
+              >+</button>
+            </div>
+            {showEmojiInput && (
+              <input
+                autoFocus
+                type="text"
+                placeholder="Type emoji..."
+                style={{
+                  width: 180, padding: '8px 12px', borderRadius: 10,
+                  background: 'var(--surface2)', border: 'none',
+                  color: 'var(--text)', fontSize: 20, textAlign: 'center', outline: 'none',
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const val = (e.target as HTMLInputElement).value.trim()
+                    if (val) { toggleReaction(reactionMsg.id, val); setShowEmojiInput(false) }
+                  }
+                }}
+                onChange={e => {
+                  const val = e.target.value
+                  // Auto-submit single emoji characters
+                  if (val && /\p{Emoji}/u.test(val)) {
+                    toggleReaction(reactionMsg.id, val)
+                    setShowEmojiInput(false)
+                  }
+                }}
+              />
+            )}
           </div>
         </div>
       )}
