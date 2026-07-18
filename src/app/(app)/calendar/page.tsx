@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { toStr, fmtDate, fmtHour, fmtTiny, fmtWin, txtOn, travelMin, travelMinGps, getBrowserTimezone, currentHourInTz, AREAS, DAY_START, DAY_END } from '@/lib/utils'
@@ -21,6 +22,8 @@ type PactEntry = { id: string; date: string; occasion: string | null; spot_name:
 export default function CalendarPage() {
   const { user, activeCircle, circleMembers } = useCircle()
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const dateParam = searchParams.get('date')
 
   const [connected, setConnected] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
@@ -152,6 +155,20 @@ export default function CalendarPage() {
 
     return () => { supabase.removeChannel(channel) }
   }, [activeCircle?.id])
+
+  // Open day sheet from ?date= query param (e.g. from Spots tab)
+  const dateParamHandled = useRef(false)
+  useEffect(() => {
+    if (!dateParam || dateParamHandled.current || loading) return
+    dateParamHandled.current = true
+    const y = parseInt(dateParam.slice(0, 4))
+    const m = parseInt(dateParam.slice(5, 7)) - 1
+    if (!isNaN(y) && !isNaN(m)) {
+      setViewYear(y)
+      setViewMonth(m)
+    }
+    setSheetDate(dateParam)
+  }, [dateParam, loading])
 
   // Sync calendar (manual trigger)
   async function syncCalendar() {
