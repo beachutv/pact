@@ -49,10 +49,9 @@ export function useCircle() {
   return ctx
 }
 
-// ---- Nav tabs ----
+// ---- Nav tabs (4 tabs: Dashboard replaces Home+Calendar) ----
 const TABS = [
-  { key: '/home', icon: '🏠', label: 'Home' },
-  { key: '/calendar', icon: '📅', label: 'Calendar' },
+  { key: '/dashboard', icon: '📅', label: 'Dashboard' },
   { key: '/chat', icon: '💬', label: 'Chat' },
   { key: '/plans', icon: '📌', label: 'Plans' },
   { key: '/spots', icon: '📍', label: 'Spots' },
@@ -85,15 +84,22 @@ export default function AppShell({
 
   function updateUser(partial: Partial<UserProfile>) {
     setCurrentUser(prev => ({ ...prev, ...partial }))
-    // Also update in circleMembers list
     setCircleMembers(prev => prev.map(m => m.id === user.id ? { ...m, ...partial } : m))
   }
-  const [showCirclePicker, setShowCirclePicker] = useState(false)
+
+  // Circle members expanded from circle name
+  const [showMembersList, setShowMembersList] = useState(false)
+  // Your Circles section
+  const [showYourCircles, setShowYourCircles] = useState(false)
+
   const [theme, setTheme] = useState(user.theme || 'dark')
   const [showThemePicker, setShowThemePicker] = useState(false)
   const [showNotifs, setShowNotifs] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
+
+  // Chat unread badge
+  const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
   // Fetch circle members when circle changes
   useEffect(() => {
@@ -115,9 +121,9 @@ export default function AppShell({
   // Notifications
   useEffect(() => {
     async function fetchNotifs() {
-      const { data, count } = await supabase
+      const { data } = await supabase
         .from('notifications')
-        .select('*', { count: 'exact' })
+        .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20)
@@ -137,6 +143,59 @@ export default function AppShell({
         event: 'INSERT', schema: 'public', table: 'notifications',
         filter: `user_id=eq.${user.id}`,
       }, () => { fetchNotifs() })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [user.id])
+
+  // Chat unread count
+  useEffect(() => {
+    async function fetchChatUnread() {
+      // Get user's threads
+      const { data: threadMembers } = await supabase
+        .from('thread_members')
+        .select('thread_id')
+        .eq('user_id', user.id)
+      if (!threadMembers || threadMembers.length === 0) return
+
+      const threadIds = threadMembers.map(tm => tm.thread_id)
+
+      // Get thread reads
+      const { data: reads } = await supabase
+        .from('thread_reads')
+        .select('thread_id, last_read_at')
+        .eq('user_id', user.id)
+        .in('thread_id', threadIds)
+
+      const readMap: Record<string, string> = {}
+      for (const r of (reads || [])) readMap[r.thread_id] = r.last_read_at
+
+      // Get threads with last_message_at
+      const { data: threads } = await supabase
+        .from('threads')
+        .select('id, last_message_at')
+        .in('id', threadIds)
+
+      let count = 0
+      for (const t of (threads || [])) {
+        if (!t.last_message_at) continue
+        const lastRead = readMap[t.id]
+        if (!lastRead || new Date(t.last_message_at) > new Date(lastRead)) count++
+      }
+      setChatUnreadCount(count)
+    }
+    fetchChatUnread()
+
+    // Realtime updates for messages
+    const channel = supabase
+      .channel('chat-unread-badge')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'messages',
+      }, () => { fetchChatUnread() })
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'thread_reads',
+        filter: `user_id=eq.${user.id}`,
+      }, () => { fetchChatUnread() })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
@@ -183,26 +242,66 @@ export default function AppShell({
   }
 
   const themeIcon = theme === 'light' ? 'sun' : theme === 'dark' ? 'moon' : 'system'
+  const firstName = currentUser.name.split(' ')[0]
 
   return (
     <CircleContext.Provider value={{ user: currentUser, updateUser, circles, activeCircle, setActiveCircle, circleMembers, setCircleMembers }}>
       <div id="app-shell">
-        {/* Header */}
+        {/* Header — redesigned per prototype */}
         <header style={{
-          padding: '16px 18px 10px',
+          padding: '14px 18px 10px',
           borderBottom: '1px solid var(--border)',
           flexShrink: 0,
         }}>
+          {/* Top row: avatar + greeting left, icons right */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.5px' }}>
-                <span style={{ color: 'var(--accent)' }}>P</span>act
-              </h1>
-              <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
-                plans that actually happen
-              </p>
+            {/* Left: profile photo + Hi Name */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div
+                onClick={() => router.push(`/profile/${currentUser.id}`)}
+                style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  background: currentUser.avatar_url ? `url(${currentUser.avatar_url}) center/cover` : currentUser.color,
+                  color: txtOn(currentUser.color),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 15, fontWeight: 800, cursor: 'pointer',
+                  border: '2px solid var(--border)',
+                  flexShrink: 0,
+                }}
+              >
+                {!currentUser.avatar_url && currentUser.name[0]}
+              </div>
+              <div>
+                <p style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.2 }}>
+                  Hi, {firstName}
+                </p>
+                <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
+                  plans that actually happen
+                </p>
+              </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
+            {/* Right: roadmap, theme, bell, calendar selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* Roadmap & Requests button */}
+              <button
+                onClick={() => router.push('/roadmap')}
+                title="Roadmap & Requests"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                  display: 'flex', alignItems: 'center',
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <line x1="10" y1="9" x2="8" y2="9"/>
+                </svg>
+              </button>
+
+              {/* Theme picker */}
               <div style={{ position: 'relative' }}>
                 <button
                   onClick={() => setShowThemePicker(!showThemePicker)}
@@ -213,7 +312,7 @@ export default function AppShell({
                   }}
                 >
                   {themeIcon === 'sun' ? (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="5"/>
                       <line x1="12" y1="1" x2="12" y2="3"/>
                       <line x1="12" y1="21" x2="12" y2="23"/>
@@ -225,11 +324,11 @@ export default function AppShell({
                       <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
                     </svg>
                   ) : themeIcon === 'moon' ? (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
                     </svg>
                   ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10"/>
                       <path d="M12 2a10 10 0 0 1 0 20V2z" fill="var(--text)"/>
                     </svg>
@@ -285,6 +384,8 @@ export default function AppShell({
                   </>
                 )}
               </div>
+
+              {/* Notification bell */}
               <button
                 onClick={() => setShowNotifs(!showNotifs)}
                 style={{
@@ -293,7 +394,7 @@ export default function AppShell({
                   display: 'flex', alignItems: 'center',
                 }}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
@@ -307,67 +408,152 @@ export default function AppShell({
                   }}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
                 )}
               </button>
-              <div
-                onClick={() => router.push(`/profile/${currentUser.id}`)}
+
+              {/* Calendar selector button (top right like prototype) */}
+              <button
+                onClick={async () => {
+                  // Load and show calendar selection — dispatch custom event for dashboard
+                  window.dispatchEvent(new CustomEvent('pact-open-cal-selector'))
+                }}
+                title="My Calendars"
                 style={{
-                  width: 34, height: 34, borderRadius: '50%',
-                  background: currentUser.avatar_url ? `url(${currentUser.avatar_url}) center/cover` : currentUser.color,
-                  color: txtOn(currentUser.color),
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 14, fontWeight: 800, cursor: 'pointer',
-                  border: '2px solid var(--border)',
+                  background: 'none', border: 'none',
+                  cursor: 'pointer', padding: 4,
+                  display: 'flex', alignItems: 'center',
                 }}
               >
-                {!currentUser.avatar_url && currentUser.name[0]}
-              </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              </button>
             </div>
           </div>
 
-          {/* Circle switcher + avatars */}
-          <div style={{
-            display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between', marginTop: 11,
-          }}>
+          {/* Circle name — click to expand members list */}
+          <div style={{ marginTop: 10 }}>
+            {activeCircle ? (
+              <button
+                onClick={() => setShowMembersList(!showMembersList)}
+                style={{
+                  fontSize: 13, fontWeight: 600, color: 'var(--text2)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                {activeCircle.emoji} {activeCircle.name} · {circleMembers.length} member{circleMembers.length > 1 ? 's' : ''} {showMembersList ? '▴' : '▾'}
+              </button>
+            ) : (
+              <span style={{ fontSize: 13, color: 'var(--text2)' }}>No circles yet</span>
+            )}
+
+            {/* Expanded members list */}
+            {showMembersList && activeCircle && (
+              <div style={{
+                marginTop: 8, background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 14, padding: '8px 12px',
+              }}>
+                {circleMembers.map(m => {
+                  const isMe = m.id === user.id
+                  return (
+                    <div
+                      key={m.id}
+                      onClick={() => router.push(`/profile/${m.id}`)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '6px 0', cursor: 'pointer',
+                        borderBottom: '1px solid var(--border)',
+                      }}
+                    >
+                      <div
+                        className="avatar"
+                        style={{
+                          width: 28, height: 28, fontSize: 11,
+                          background: m.avatar_url ? `url(${m.avatar_url}) center/cover` : m.color,
+                          color: txtOn(m.color),
+                        }}
+                      >
+                        {!m.avatar_url && m.name[0]}
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600 }}>
+                        {m.name}{isMe ? ' (you)' : ''}
+                      </span>
+                    </div>
+                  )
+                })}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowMembersList(false); router.push(`/circles/${activeCircle.id}/settings`) }}
+                  style={{
+                    marginTop: 6, fontSize: 12, fontWeight: 600,
+                    color: 'var(--accent)', background: 'none', border: 'none',
+                    cursor: 'pointer', padding: '4px 0',
+                  }}
+                >
+                  ⚙️ Circle settings
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Your Circles section */}
+          <div style={{ marginTop: 8 }}>
             <button
-              onClick={() => setShowCirclePicker(!showCirclePicker)}
+              onClick={() => setShowYourCircles(!showYourCircles)}
               style={{
-                fontSize: 13, fontWeight: 600, color: 'var(--text2)',
+                fontSize: 11, fontWeight: 700, color: 'var(--text2)',
                 background: 'none', border: 'none', cursor: 'pointer',
+                padding: 0, textTransform: 'uppercase', letterSpacing: '.5px',
               }}
             >
-              {activeCircle
-                ? `${activeCircle.emoji} ${activeCircle.name} · ${circleMembers.length} member${circleMembers.length > 1 ? 's' : ''}`
-                : 'No circles yet'
-              } ▾
+              Your Circles {showYourCircles ? '▴' : '▾'}
             </button>
-            <div style={{ display: 'flex' }}>
-              {circleMembers.slice(0, 6).map((m, i) => (
-                <div
-                  key={m.id}
-                  className="avatar"
+
+            {showYourCircles && (
+              <div style={{
+                marginTop: 6, background: 'var(--surface)',
+                border: '1px solid var(--border)', borderRadius: 14,
+                padding: 6, display: 'flex', flexDirection: 'column', gap: 2,
+              }}>
+                {circles.map(c => (
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center' }}>
+                    <button
+                      onClick={() => { setActiveCircle(c); setShowYourCircles(false); setShowMembersList(false) }}
+                      style={{
+                        flex: 1,
+                        background: c.id === activeCircle?.id ? 'var(--accent-soft)' : 'transparent',
+                        border: 'none', borderRadius: 10, padding: '8px 12px',
+                        fontSize: 13, fontWeight: 600, color: 'var(--text)',
+                        cursor: 'pointer', textAlign: 'left',
+                      }}
+                    >
+                      {c.emoji} {c.name}
+                    </button>
+                    <button
+                      onClick={() => { setShowYourCircles(false); router.push(`/circles/${c.id}/settings`) }}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        fontSize: 16, padding: '4px 8px', color: 'var(--text2)',
+                      }}
+                    >
+                      ⚙️
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => { setShowYourCircles(false); router.push('/circles/new') }}
                   style={{
-                    background: m.avatar_url ? `url(${m.avatar_url}) center/cover` : m.color,
-                    color: txtOn(m.color),
-                    marginLeft: i > 0 ? -8 : 0,
-                    border: '2px solid var(--bg)',
+                    background: 'transparent', border: 'none',
+                    borderRadius: 10, padding: '8px 12px',
+                    fontSize: 13, fontWeight: 600, color: 'var(--accent)',
+                    cursor: 'pointer', textAlign: 'left',
                   }}
-                  onClick={() => router.push(`/profile/${m.id}`)}
                 >
-                  {!m.avatar_url && m.name[0]}
-                </div>
-              ))}
-              {circleMembers.length > 6 && (
-                <div className="avatar" style={{
-                  background: 'var(--surface3)',
-                  color: 'var(--text2)',
-                  marginLeft: -8,
-                  border: '2px solid var(--bg)',
-                  fontSize: 10,
-                }}>
-                  +{circleMembers.length - 6}
-                </div>
-              )}
-            </div>
+                  ＋ Create or join a circle
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Notifications dropdown */}
@@ -427,52 +613,6 @@ export default function AppShell({
             </div>
             </>
           )}
-
-          {/* Circle picker dropdown */}
-          {showCirclePicker && (
-            <div style={{
-              marginTop: 8, background: 'var(--surface)',
-              border: '1px solid var(--border)', borderRadius: 14,
-              padding: 6, display: 'flex', flexDirection: 'column', gap: 2,
-            }}>
-              {circles.map(c => (
-                <div key={c.id} style={{ display: 'flex', alignItems: 'center' }}>
-                  <button
-                    onClick={() => { setActiveCircle(c); setShowCirclePicker(false) }}
-                    style={{
-                      flex: 1,
-                      background: c.id === activeCircle?.id ? 'var(--accent-soft)' : 'transparent',
-                      border: 'none', borderRadius: 10, padding: '8px 12px',
-                      fontSize: 13, fontWeight: 600, color: 'var(--text)',
-                      cursor: 'pointer', textAlign: 'left',
-                    }}
-                  >
-                    {c.emoji} {c.name}
-                  </button>
-                  <button
-                    onClick={() => { setShowCirclePicker(false); router.push(`/circles/${c.id}/settings`) }}
-                    style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      fontSize: 16, padding: '4px 8px', color: 'var(--text2)',
-                    }}
-                  >
-                    ⚙️
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={() => { setShowCirclePicker(false); router.push('/circles/new') }}
-                style={{
-                  background: 'transparent', border: 'none',
-                  borderRadius: 10, padding: '8px 12px',
-                  fontSize: 13, fontWeight: 600, color: 'var(--accent)',
-                  cursor: 'pointer', textAlign: 'left',
-                }}
-              >
-                ＋ Create or join a circle
-              </button>
-            </div>
-          )}
         </header>
 
         {/* Main content */}
@@ -482,16 +622,32 @@ export default function AppShell({
 
         {/* Bottom nav */}
         <nav className="bottom-nav">
-          {TABS.map(tab => (
-            <button
-              key={tab.key}
-              className={`nav-tab ${pathname === tab.key ? 'active' : ''}`}
-              onClick={() => router.push(tab.key)}
-            >
-              <span className="nav-icon">{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
+          {TABS.map(tab => {
+            const isActive = pathname === tab.key || (tab.key === '/dashboard' && (pathname === '/home' || pathname === '/calendar'))
+            return (
+              <button
+                key={tab.key}
+                className={`nav-tab ${isActive ? 'active' : ''}`}
+                onClick={() => router.push(tab.key)}
+                style={{ position: 'relative' }}
+              >
+                <span className="nav-icon">{tab.icon}</span>
+                {tab.label}
+                {/* Chat unread badge */}
+                {tab.key === '/chat' && chatUnreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: 2, right: '50%', transform: 'translateX(12px)',
+                    width: 16, height: 16, borderRadius: '50%',
+                    background: 'var(--red)', color: '#fff',
+                    fontSize: 9, fontWeight: 800,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </nav>
       </div>
     </CircleContext.Provider>

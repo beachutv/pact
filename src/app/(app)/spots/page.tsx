@@ -304,7 +304,7 @@ export default function SpotsPage() {
   // Navigate to calendar day
   function openDay(dateStr: string) {
     // Use URL params to tell calendar which date to open
-    window.location.href = `/calendar?date=${dateStr}`
+    window.location.href = `/dashboard?date=${dateStr}`
   }
 
   if (!activeCircle) {

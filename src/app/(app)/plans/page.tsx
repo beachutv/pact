@@ -324,7 +324,7 @@ export default function PlansPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <p style={{ fontSize: 15, fontWeight: 800 }}>{activeCircle.emoji} Plans</p>
         <button
-          onClick={() => router.push('/calendar')}
+          onClick={() => router.push('/dashboard')}
           style={{
             background: 'var(--accent)', border: 'none', borderRadius: 20,
             padding: '6px 14px', fontSize: 12, fontWeight: 700,

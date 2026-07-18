@@ -52,7 +52,7 @@ export default function OnboardingPage() {
       }
 
       // Full page load to ensure server components get fresh data
-      window.location.href = '/home'
+      window.location.href = '/dashboard'
     } catch (e: any) {
       setError(e.message || 'Something went wrong')
       setLoading(false)

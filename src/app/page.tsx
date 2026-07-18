@@ -35,13 +35,13 @@ export default function LoginPage() {
 
     // Check for ?next= param (e.g. from invite links)
     const params = new URLSearchParams(window.location.search)
-    window.location.href = params.get('next') || '/home'
+    window.location.href = params.get('next') || '/dashboard'
   }
 
   async function handleGoogleAuth() {
     setLoading(true)
     const params = new URLSearchParams(window.location.search)
-    const next = params.get('next') || '/home'
+    const next = params.get('next') || '/dashboard'
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` }
