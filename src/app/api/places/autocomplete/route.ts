@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
 
   const apiKey = process.env.GOOGLE_PLACES_API_KEY
   if (!apiKey) {
+    console.error('[Places] GOOGLE_PLACES_API_KEY not set')
     return NextResponse.json({ predictions: [] })
   }
 
@@ -15,7 +16,6 @@ export async function GET(req: NextRequest) {
   url.searchParams.set('input', query)
   url.searchParams.set('key', apiKey)
   url.searchParams.set('components', 'country:ph')
-  url.searchParams.set('types', 'establishment|geocode')
   // Bias toward Metro Manila
   url.searchParams.set('location', '14.5995,120.9842')
   url.searchParams.set('radius', '30000')
@@ -23,6 +23,12 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(url.toString())
     const data = await res.json()
+
+    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      console.error('[Places] API error:', data.status, data.error_message)
+      return NextResponse.json({ predictions: [], error: data.status })
+    }
+
     const predictions = (data.predictions || []).map((p: any) => ({
       place_id: p.place_id,
       description: p.description,
@@ -30,7 +36,8 @@ export async function GET(req: NextRequest) {
       secondary_text: p.structured_formatting?.secondary_text || '',
     }))
     return NextResponse.json({ predictions })
-  } catch {
+  } catch (e: any) {
+    console.error('[Places] Fetch error:', e.message)
     return NextResponse.json({ predictions: [] })
   }
 }
