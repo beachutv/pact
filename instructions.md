@@ -163,22 +163,30 @@
 - [x] Birthday display with countdown
 - [x] Calendar settings section (My Calendars, Sync, Disconnect)
 
-### Dashboard (Home)
+### Dashboard (merged Home + Calendar)
 
-- [x] Upcoming pacts cards
-- [x] Long-press pact quick settings (edit, discuss, delete)
-- [x] Spark check button + spark cards
+- [x] Merged Home and Calendar into single Dashboard tab
+- [x] Upcoming pacts cards on top
+- [x] Auto-triggered Sparks (system-computed, no manual button)
 - [x] Birthday reminders
-- [x] Live location display
-- [x] Pull-to-refresh
+- [x] Monthly calendar grid below with availability indicators
+- [x] Day sheet overlay with hourly timeline
+- [x] Long-press pact quick settings (edit, discuss, delete)
+- [x] Pull-to-refresh syncs calendar and members
+- [x] Realtime location updates for circle members (no refresh needed)
 
 ### App-Wide
 
 - [x] Notification bell with dropdown (message, pact, spark notifications)
-- [x] Pull-to-refresh on all tabs (home, plans, chat, calendar)
+- [x] Chat notification badge (unread count on chat tab)
+- [x] Changelog popup (once per version, shows recent updates)
+- [x] Pull-to-refresh on all tabs
 - [x] Persistent live location tracking (watchPosition in AppShell)
 - [x] Profile photo context propagation (updateUser in CircleContext)
-- [x] Bottom navigation (Home, Calendar, Chat, Plans, Spots) — sticky, never scrolls away
+- [x] Bottom navigation (Dashboard, Chat, Plans, Spots) — 4 tabs, sticky
+- [x] Redesigned header: "Hi Name" + avatar left, roadmap/theme/bell/calendar right
+- [x] Circle name expands to show members list
+- [x] "Your Circles" section with create/join option
 - [x] Viewport zoom prevention on mobile input focus
 - [x] Route prefetching for instant tab switching
 - [x] Parallelized Supabase queries (Promise.all) for faster loads
@@ -214,7 +222,7 @@
 
 ## 4. Current Active Task
 
-No active task — Batch 6 deployed (commit a1419f0).
+Batch 7 deployed (commits 6918b18, 8d6fb40). Major layout redesign + bug fixes.
 
 ---
 
@@ -233,8 +241,9 @@ src/
   app/
     (app)/
       layout.tsx          — Auth guard + AppShell wrapper (server component)
-      home/page.tsx       — Dashboard with pacts, sparks, birthdays
-      calendar/page.tsx   — Monthly calendar with availability grid
+      dashboard/page.tsx   — Merged dashboard (pacts, sparks, birthdays + calendar grid)
+      home/page.tsx       — (Legacy, replaced by dashboard)
+      calendar/page.tsx   — (Legacy, replaced by dashboard)
       chat/page.tsx       — Thread list + message view
       plans/page.tsx      — Plan list with RSVP, edit, swipe delete
       plans/new/page.tsx  — Create new plan form
