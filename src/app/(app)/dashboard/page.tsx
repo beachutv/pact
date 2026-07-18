@@ -158,7 +158,7 @@ export default function DashboardPage() {
     fetchPacts()
   }, [activeCircle?.id, blockReloadKey])
 
-  // Realtime: auto-refresh on busy_blocks or pacts changes
+  // Realtime: auto-refresh on busy_blocks, pacts, or user location changes
   useEffect(() => {
     if (!activeCircle) return
     const channel = supabase
@@ -169,9 +169,24 @@ export default function DashboardPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pacts' }, () => {
         setBlockReloadKey(k => k + 1)
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, (payload) => {
+        // Update circle member's live location in realtime
+        const updated = payload.new as any
+        if (updated && circleMembers.some(m => m.id === updated.id)) {
+          setCircleMembers(prev => prev.map(m =>
+            m.id === updated.id ? {
+              ...m,
+              live_lat: updated.live_lat,
+              live_lng: updated.live_lng,
+              live_area: updated.live_area,
+              live_updated_at: updated.live_updated_at,
+            } : m
+          ))
+        }
+      })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [activeCircle?.id])
+  }, [activeCircle?.id, memberIdsKey])
 
   // Listen for calendar selector event from header
   useEffect(() => {

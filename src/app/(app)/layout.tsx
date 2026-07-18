@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AppShell from '@/components/AppShell'
+import Changelog from '@/components/Changelog'
 
 // Prevent Next.js from caching stale user data (avatar, name, etc.)
 export const dynamic = 'force-dynamic'
@@ -31,6 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <AppShell user={profile} circles={circles}>
+      <Changelog />
       {children}
     </AppShell>
   )

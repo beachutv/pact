@@ -45,10 +45,14 @@ function NewPlanContent() {
         const res = await fetch('/api/calendar/list')
         if (res.ok) {
           const data = await res.json()
-          setGcals(data.calendars || [])
+          const cals = data.calendars || []
+          setGcals(cals)
           setCalConnected(true)
-          // Default to primary or first selected
-          if (data.selectedIds?.length > 0) {
+          // Default to primary calendar, fallback to first selected
+          const primary = cals.find((c: any) => c.primary)
+          if (primary) {
+            setTargetCalId(primary.id)
+          } else if (data.selectedIds?.length > 0) {
             setTargetCalId(data.selectedIds[0])
           }
         }
