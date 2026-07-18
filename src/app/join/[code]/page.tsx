@@ -38,5 +38,5 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
     })
   }
 
-  redirect('/dashboard')
+  redirect('/calendar')
 }

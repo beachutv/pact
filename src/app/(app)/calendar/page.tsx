@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
-import { toStr, fmtDate, fmtHour, fmtTiny, fmtWin, txtOn, travelMin, travelMinGps, getBrowserTimezone, currentHourInTz, AREAS, DAY_START, DAY_END } from '@/lib/utils'
+import { toStr, fmtDate, fmtHour, fmtTiny, fmtWin, txtOn, travelMin, travelMinGps, getBrowserTimezone, currentHourInTz, daysUntil, bdaySoon, AREAS, DAY_START, DAY_END } from '@/lib/utils'
+import { useLocationUpdate } from '@/lib/useLocationUpdate'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 
 type BusyBlock = { user_id: string; date: string; start_hour: number; end_hour: number }
@@ -20,8 +21,9 @@ type Spark = {
 type PactEntry = { id: string; date: string; occasion: string | null; spot_name: string; spot_area: string | null; spot_emoji: string | null; win_start: number | null; win_end: number | null; status: string }
 
 export default function CalendarPage() {
-  const { user, activeCircle, circleMembers } = useCircle()
+  const { user, activeCircle, circleMembers, setCircleMembers } = useCircle()
   const supabase = createClient()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const dateParam = searchParams.get('date')
 
@@ -35,6 +37,8 @@ export default function CalendarPage() {
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set())
   const [dismissedSparks, setDismissedSparks] = useState<Set<string>>(new Set())
   const [pacts, setPacts] = useState<PactEntry[]>([])
+  const [longPressPactId, setLongPressPactId] = useState<string | null>(null)
+  const pactLongPressTimer = useRef<NodeJS.Timeout | null>(null)
 
   // Calendar selection modal
   const [showCalModal, setShowCalModal] = useState(false)
@@ -51,6 +55,8 @@ export default function CalendarPage() {
 
   const tz = useMemo(() => getBrowserTimezone(), [])
   const todayStr = useMemo(() => toStr(new Date()), [])
+
+  useLocationUpdate(user.id, 'calendar')
 
   // Track circle member IDs for dependency (stable string key)
   const memberIdsKey = useMemo(() => circleMembers.map(m => m.id).sort().join(','), [circleMembers])
@@ -151,6 +157,20 @@ export default function CalendarPage() {
       }, () => {
         setBlockReloadKey(k => k + 1)
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, (payload: any) => {
+        const updated = payload.new as any
+        if (updated && circleMembers.some(m => m.id === updated.id)) {
+          setCircleMembers(prev => prev.map(m =>
+            m.id === updated.id ? {
+              ...m,
+              live_lat: updated.live_lat,
+              live_lng: updated.live_lng,
+              live_area: updated.live_area,
+              live_updated_at: updated.live_updated_at,
+            } : m
+          ))
+        }
+      })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
@@ -169,6 +189,13 @@ export default function CalendarPage() {
     }
     setSheetDate(dateParam)
   }, [dateParam, loading])
+
+  // Listen for calendar selector event from header
+  useEffect(() => {
+    function onCalSelector() { loadCalendars() }
+    window.addEventListener('pact-open-cal-selector', onCalSelector)
+    return () => window.removeEventListener('pact-open-cal-selector', onCalSelector)
+  }, [])
 
   // Sync calendar (manual trigger)
   async function syncCalendar() {
@@ -332,6 +359,27 @@ export default function CalendarPage() {
   function dismissSpark(memberId: string) {
     setDismissedSparks(prev => new Set(prev).add(memberId))
   }
+
+  // Pact long press handlers
+  function onPactTouchStart(pactId: string) {
+    pactLongPressTimer.current = setTimeout(() => setLongPressPactId(pactId), 500)
+  }
+  function onPactTouchEnd() {
+    if (pactLongPressTimer.current) clearTimeout(pactLongPressTimer.current)
+  }
+  async function deletePact(pactId: string) {
+    if (!confirm('Delete this pact?')) return
+    await supabase.from('pacts').delete().eq('id', pactId)
+    setPacts(prev => prev.filter(p => p.id !== pactId))
+    setLongPressPactId(null)
+  }
+
+  // Birthdays
+  const upcomingBirthdays = circleMembers
+    .filter(m => m.birthday)
+    .map(m => ({ ...m, daysAway: bdaySoon(m.birthday!, 30) }))
+    .filter(m => m.daysAway >= 0)
+    .sort((a, b) => a.daysAway - b.daysAway)
 
   // Toggle manual busy/free for own row
   async function toggleManualHour(date: string, hour: number) {
@@ -537,6 +585,118 @@ export default function CalendarPage() {
             transition: calPullY === 0 ? 'transform 0.2s' : 'none',
           }}>
             {calIndicator}
+          </div>
+        )}
+
+        {/* Upcoming pacts */}
+        {pacts.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+              📌 Upcoming Pacts
+            </p>
+            {pacts.slice(0, 3).map(p => {
+              const du = daysUntil(p.date)
+              const count = du === 0 ? 'today!' : du === 1 ? 'tomorrow' : `in ${du} days`
+              return (
+                <div
+                  key={p.id}
+                  className="card"
+                  onClick={() => { if (!longPressPactId) router.push('/plans') }}
+                  onTouchStart={() => onPactTouchStart(p.id)}
+                  onTouchEnd={onPactTouchEnd}
+                  onTouchCancel={onPactTouchEnd}
+                  style={{ cursor: 'pointer', position: 'relative', marginBottom: 8 }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <p style={{ fontSize: 16, fontWeight: 800 }}>
+                        {p.occasion || fmtDate(p.date)}
+                      </p>
+                      <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>
+                        {p.win_start !== null ? fmtHour(p.win_start) : '?'} – {p.win_end !== null ? fmtHour(p.win_end) : '?'}
+                      </p>
+                      <p style={{ fontSize: 13, marginTop: 4 }}>
+                        {p.spot_emoji} {p.spot_name} {p.spot_area ? `· ${p.spot_area}` : ''}
+                      </p>
+                    </div>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, color: 'var(--green)',
+                      background: 'rgba(52,211,153,0.12)', padding: '3px 10px',
+                      borderRadius: 12, whiteSpace: 'nowrap',
+                    }}>
+                      {count}
+                    </span>
+                  </div>
+
+                  {longPressPactId === p.id && (
+                    <div
+                      onClick={e => e.stopPropagation()}
+                      style={{
+                        position: 'absolute', top: 0, right: 0, zIndex: 20,
+                        background: 'var(--surface)', border: '1px solid var(--border)',
+                        borderRadius: 14, padding: 6, minWidth: 140,
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
+                      }}
+                    >
+                      <button onClick={() => { setLongPressPactId(null); router.push('/plans') }} style={{
+                        display: 'block', width: '100%', padding: '8px 12px', border: 'none',
+                        background: 'transparent', fontSize: 13, fontWeight: 600,
+                        color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
+                      }}>✏️ Edit</button>
+                      <button onClick={() => { setLongPressPactId(null); router.push('/chat') }} style={{
+                        display: 'block', width: '100%', padding: '8px 12px', border: 'none',
+                        background: 'transparent', fontSize: 13, fontWeight: 600,
+                        color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
+                      }}>💬 Discuss</button>
+                      <button onClick={() => deletePact(p.id)} style={{
+                        display: 'block', width: '100%', padding: '8px 12px', border: 'none',
+                        background: 'transparent', fontSize: 13, fontWeight: 600,
+                        color: 'var(--red)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
+                      }}>🗑 Delete</button>
+                      <button onClick={() => setLongPressPactId(null)} style={{
+                        display: 'block', width: '100%', padding: '8px 12px', border: 'none',
+                        background: 'transparent', fontSize: 13, fontWeight: 600,
+                        color: 'var(--text2)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
+                      }}>✕ Cancel</button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {pacts.length > 3 && (
+              <button
+                onClick={() => router.push('/plans')}
+                style={{
+                  width: '100%', padding: '10px', border: '1px solid var(--border)',
+                  borderRadius: 14, background: 'var(--surface)', color: 'var(--text)',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'center',
+                }}
+              >
+                See all plans →
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Birthday reminders */}
+        {upcomingBirthdays.length > 0 && (
+          <div className="card" style={{ marginBottom: 14 }}>
+            <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+              🎂 Birthdays coming up
+            </p>
+            {upcomingBirthdays.map(m => (
+              <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
+                <div className="avatar" style={{ background: m.color, color: txtOn(m.color) }}>
+                  {m.name[0]}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 13, fontWeight: 700 }}>{m.name}</p>
+                  <p style={{ fontSize: 12, color: 'var(--text2)' }}>
+                    {m.daysAway === 0 ? 'Today!' : m.daysAway === 1 ? 'Tomorrow' : `in ${m.daysAway} days`}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

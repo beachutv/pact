@@ -43,7 +43,7 @@ export default function NewCirclePage() {
       role: 'admin',
     })
 
-    router.push('/dashboard')
+    router.push('/calendar')
     router.refresh()
   }
 
@@ -86,7 +86,7 @@ export default function NewCirclePage() {
       role: 'member',
     })
 
-    router.push('/dashboard')
+    router.push('/calendar')
     router.refresh()
   }
 

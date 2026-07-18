@@ -127,14 +127,14 @@ export default function CircleSettingsPage() {
     await supabase.from('circles').delete().eq('id', id)
     const remaining = circles.filter(c => c.id !== id)
     if (remaining.length > 0) setActiveCircle(remaining[0])
-    window.location.href = '/dashboard'
+    window.location.href = '/calendar'
   }
 
   async function handleLeave() {
     await supabase.from('circle_members').delete()
       .eq('circle_id', id)
       .eq('user_id', user.id)
-    window.location.href = '/dashboard'
+    window.location.href = '/calendar'
   }
 
   if (loading) return <div style={{ padding: 20 }}><div className="spinner" /></div>
