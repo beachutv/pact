@@ -84,7 +84,8 @@
 ### Google Places API
 
 - **API Key:** `AIzaSyDKs-EC4-7NLpKM9UuMNomS4hrDxLNHVkE`
-- **Usage:** Autocomplete for plan location input (`/api/places/autocomplete`)
+- **API Version:** Places API (New) — legacy API deprecated, using POST to `places:autocomplete`
+- **Usage:** Autocomplete for LocationPicker component (`/api/places/autocomplete`)
 - **Billing:** Free trial ($300 credit, 90 days)
 
 ---
@@ -108,8 +109,10 @@
 - [x] Manual busy/free toggle on own row
 - [x] Friend filter chips
 - [x] Sparks: detect nearby friends with shared free windows
-- [x] Pact date indicators on calendar: mini emoji icons for special events (🎂💍), red border for pending, orange fill for confirmed
-- [x] Color-coded hourly blocks for pact schedules (accent color bands on member rows)
+- [x] Pact date indicators on calendar: mini emoji icons for special events (🎂💍), blue border+fill for pending, orange fill for confirmed
+- [x] Color-coded hourly blocks for pact schedules (blue for pending, accent for confirmed)
+- [x] Free-all-day indicator: minimal green dot (top-right of date cell)
+- [x] Occasion indicator removed (was ⭐ top-left, too confusing with free-all-day)
 - [x] 6 AM – midnight time range (DAY_START=6, DAY_END=24)
 - [x] Realtime refresh when busy_blocks or pacts change
 - [x] Pact status column (pending/confirmed) for calendar indicator distinction
@@ -117,10 +120,11 @@
 ### Plans
 
 - [x] Create plan from calendar free window (date/time prefilled)
-- [x] Google Places autocomplete for location
+- [x] Instagram-style LocationPicker component (recents from localStorage + search with name/address/pin icon)
 - [x] Plan list with RSVP (I'm in / I'm out)
-- [x] Edit plan (creator only): date, time, title, spot (with Google Places autocomplete in edit mode)
-- [x] Delete plan (creator or admin)
+- [x] Edit plan (creator only): date, time, title, spot (with LocationPicker in edit mode)
+- [x] Delete pending plan (creator or admin)
+- [x] Cancel confirmed pact (sends notifications to all members, shows "Cancel Pact" button)
 - [x] Default title: "Pact with (other user names)" when no occasion set
 - [x] Default location: "📍 To be set" when spot_name is 'TBD'
 - [x] Push pact events to Google Calendar with smart titles:
@@ -210,7 +214,7 @@
 
 ## 4. Current Active Task
 
-No active task — Batch 5 deployed (commit b0a8abe).
+No active task — Batch 6 deployed (commit a1419f0).
 
 ---
 
@@ -218,6 +222,7 @@ No active task — Batch 5 deployed (commit b0a8abe).
 
 1. **Pact confirmation flow UI** — Add UI for confirming pacts (status column added, calendar indicators ready)
 2. **Spots enhancements** — Spot type tags, Google Places detail fetch, venue discovery beyond search
+3. **2-way Google Calendar sync** — Detect deletions in user's Google Calendar (skipped for V1)
 
 ---
 
@@ -245,6 +250,7 @@ src/
     join/[code]/page.tsx — Circle invite link
   components/
     AppShell.tsx         — App shell with header, nav, circle context, notifications
+    LocationPicker.tsx   — Instagram-style location picker (recents + search)
   hooks/
     usePullToRefresh.ts  — Reusable pull-to-refresh hook
   lib/
