@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { txtOn, bdaySoon, AVATAR_COLORS, AREAS } from '@/lib/utils'
 import { useCircle } from '@/components/AppShell'
 import { useLocationUpdate } from '@/lib/useLocationUpdate'
+import LocationPicker from '@/components/LocationPicker'
 
 type FullProfile = {
   id: string
@@ -23,7 +24,7 @@ type FullProfile = {
 
 type GCal = { id: string; summary: string; primary: boolean; backgroundColor: string }
 
-const areaNames = Object.keys(AREAS)
+const areaNames = Object.keys(AREAS) // kept for coordinate lookup fallback
 
 export default function ProfilePage() {
   const { id } = useParams<{ id: string }>()
@@ -54,8 +55,6 @@ export default function ProfilePage() {
   const [editSharePhone, setEditSharePhone] = useState('nobody')
   const [editShareAddress, setEditShareAddress] = useState('nobody')
   const [editHomeArea, setEditHomeArea] = useState('')
-  const [areaSearch, setAreaSearch] = useState('')
-  const [showAreaPicker, setShowAreaPicker] = useState(false)
 
   // Account actions
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false)
@@ -63,10 +62,6 @@ export default function ProfilePage() {
   const [signingOut, setSigningOut] = useState(false)
 
   const isOwn = id === user.id
-
-  const filteredAreas = areaSearch.trim()
-    ? areaNames.filter(a => a.toLowerCase().includes(areaSearch.toLowerCase()))
-    : areaNames
 
   useEffect(() => {
     async function load() {
@@ -188,7 +183,11 @@ export default function ProfilePage() {
 
   async function handleSave() {
     setSaving(true)
-    const coords = AREAS[editHomeArea] || AREAS[profile?.home_area || ''] || { x: 14.55, y: 121.0 }
+    // Try exact match, then fuzzy match on AREAS for coordinate lookup
+    const areaKey = editHomeArea || profile?.home_area || ''
+    const exactMatch = AREAS[areaKey]
+    const fuzzyMatch = !exactMatch && areaNames.find(a => areaKey.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(areaKey.toLowerCase()))
+    const coords = exactMatch || (fuzzyMatch ? AREAS[fuzzyMatch] : { x: 14.55, y: 121.0 })
     await supabase.from('users').update({
       name: editName,
       color: editColor,
@@ -313,50 +312,24 @@ export default function ProfilePage() {
 
         <div>
           <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>Home area</label>
-          <div style={{ position: 'relative', marginTop: 4 }}>
-            <button
-              onClick={() => setShowAreaPicker(!showAreaPicker)}
-              style={{
-                width: '100%', padding: '10px 14px', borderRadius: 12, border: 'none',
-                background: 'var(--surface2)', color: 'var(--text)', fontSize: 14,
-                textAlign: 'left', cursor: 'pointer',
-              }}
-            >
-              📍 {editHomeArea || 'Select area'}
-            </button>
-            {showAreaPicker && (
-              <div style={{
-                position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 20,
-                background: 'var(--surface)', border: '1px solid var(--border)',
-                borderRadius: 14, boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
-                maxHeight: 220, overflowY: 'auto',
-              }}>
-                <input
-                  className="input"
-                  value={areaSearch}
-                  onChange={e => setAreaSearch(e.target.value)}
-                  placeholder="Search areas..."
-                  autoFocus
-                  style={{ margin: 8, width: 'calc(100% - 16px)', fontSize: 13 }}
-                />
-                {filteredAreas.map(a => (
-                  <button key={a} onClick={() => { setEditHomeArea(a); setShowAreaPicker(false); setAreaSearch('') }} style={{
-                    display: 'block', width: '100%', padding: '8px 14px', border: 'none',
-                    background: a === editHomeArea ? 'var(--accent-soft)' : 'transparent',
-                    color: a === editHomeArea ? 'var(--accent)' : 'var(--text)',
-                    fontSize: 13, textAlign: 'left', cursor: 'pointer', fontWeight: a === editHomeArea ? 700 : 400,
-                  }}>
-                    {a}
-                  </button>
-                ))}
-              </div>
-            )}
+          <div style={{ marginTop: 4 }}>
+            <LocationPicker
+              onSelect={(name) => setEditHomeArea(name)}
+              initialValue={editHomeArea}
+              placeholder="Search area (e.g. BGC, Makati)"
+            />
           </div>
         </div>
 
         <div>
           <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>Home address</label>
-          <input className="input" value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="Your address" style={{ marginTop: 4 }} />
+          <div style={{ marginTop: 4 }}>
+            <LocationPicker
+              onSelect={(name, area) => setEditAddress(area ? `${name}, ${area}` : name)}
+              initialValue={editAddress}
+              placeholder="Search your address"
+            />
+          </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
             {['nobody', 'circles'].map(v => (
               <button key={v} onClick={() => setEditShareAddress(v)} style={{

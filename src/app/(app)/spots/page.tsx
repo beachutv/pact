@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { toStr, fmtShort, fmtWin, travelMin, txtOn, AREAS, DAY_START, DAY_END, getBrowserTimezone, currentHourInTz } from '@/lib/utils'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
+import LocationPicker from '@/components/LocationPicker'
 
 type BusyBlock = { user_id: string; date: string; start_hour: number; end_hour: number }
 type FavSpot = { id: string; name: string; emoji: string; area: string; x: number; y: number; type: string; circle_id: string | null }
@@ -32,15 +33,13 @@ export default function SpotsPage() {
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<PlaceResult[]>([])
   const [searching, setSearching] = useState(false)
-  const searchTimeout = useState<ReturnType<typeof setTimeout> | null>(null)
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Add favorite modal
   const [showFavModal, setShowFavModal] = useState(false)
   const [favName, setFavName] = useState('')
   const [favEmoji, setFavEmoji] = useState('📍')
   const [favArea, setFavArea] = useState('')
-  const [favAreaQuery, setFavAreaQuery] = useState('')
-  const [favAreaFocused, setFavAreaFocused] = useState(false)
   const [savingFav, setSavingFav] = useState(false)
 
   const tz = useMemo(() => getBrowserTimezone(), [])
@@ -223,7 +222,7 @@ export default function SpotsPage() {
       return
     }
     // Debounce
-    if (searchTimeout[0]) clearTimeout(searchTimeout[0])
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
     const timer = setTimeout(async () => {
       setSearching(true)
       try {
@@ -239,7 +238,7 @@ export default function SpotsPage() {
       } catch { }
       setSearching(false)
     }, 400)
-    searchTimeout[1] = timer as any
+    searchTimeoutRef.current = timer
   }
 
   // Save a search result as favorite
@@ -272,7 +271,10 @@ export default function SpotsPage() {
   async function saveFavorite() {
     if (!favName.trim() || !favArea) return
     setSavingFav(true)
-    const coords = AREAS[favArea] || { x: 4.5, y: 5 }
+    const areaNames = Object.keys(AREAS)
+    const exactMatch = AREAS[favArea]
+    const fuzzyMatch = !exactMatch && areaNames.find(a => favArea.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(favArea.toLowerCase()))
+    const coords = exactMatch || (fuzzyMatch ? AREAS[fuzzyMatch] : { x: 14.55, y: 121.0 })
     const id = crypto.randomUUID()
     const { error } = await supabase.from('favorite_spots').insert({
       id,
@@ -615,60 +617,12 @@ export default function SpotsPage() {
               />
             </div>
 
-            <div style={{ position: 'relative', marginBottom: 14 }}>
-              <input
-                type="text"
+            <div style={{ marginBottom: 14 }}>
+              <LocationPicker
+                onSelect={(name, area) => setFavArea(area ? `${name}, ${area}` : name)}
+                initialValue={favArea}
                 placeholder="Search area (e.g. BGC, Makati, Katipunan)"
-                value={favArea || favAreaQuery}
-                onChange={e => {
-                  setFavAreaQuery(e.target.value)
-                  setFavArea('')
-                  setFavAreaFocused(true)
-                }}
-                onFocus={() => setFavAreaFocused(true)}
-                onBlur={() => setTimeout(() => setFavAreaFocused(false), 150)}
-                style={{
-                  width: '100%', padding: '10px 12px', borderRadius: 10,
-                  border: `1.5px solid ${favArea ? 'var(--accent)' : 'var(--border)'}`,
-                  background: 'var(--surface2)',
-                  color: favArea ? 'var(--text)' : (favAreaQuery ? 'var(--text)' : 'var(--text2)'),
-                  fontSize: 13, outline: 'none',
-                }}
               />
-              {favArea && (
-                <span
-                  onClick={() => { setFavArea(''); setFavAreaQuery('') }}
-                  style={{
-                    position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                    cursor: 'pointer', fontSize: 14, color: 'var(--text2)',
-                  }}
-                >✕</span>
-              )}
-              {favAreaFocused && !favArea && (() => {
-                const q = favAreaQuery.toLowerCase()
-                const filtered = Object.keys(AREAS).filter(a => !q || a.toLowerCase().includes(q))
-                return filtered.length > 0 ? (
-                  <div style={{
-                    position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4,
-                    background: 'var(--surface)', border: '1px solid var(--border)',
-                    borderRadius: 10, maxHeight: 180, overflowY: 'auto', zIndex: 10,
-                  }}>
-                    {filtered.slice(0, 15).map(a => (
-                      <div
-                        key={a}
-                        onMouseDown={e => e.preventDefault()}
-                        onClick={() => { setFavArea(a); setFavAreaQuery(''); setFavAreaFocused(false) }}
-                        style={{
-                          padding: '9px 12px', fontSize: 13, cursor: 'pointer',
-                          borderBottom: '1px solid var(--border)',
-                        }}
-                      >
-                        <span style={{ fontWeight: 600 }}>{a}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null
-              })()}
             </div>
 
             <div style={{ display: 'flex', gap: 8 }}>
