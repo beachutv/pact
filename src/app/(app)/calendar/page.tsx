@@ -108,10 +108,10 @@ export default function CalendarPage() {
       const memberIds = circleMembers.map(m => m.id)
       const [blocksRes, connRes] = await Promise.all([
         supabase.from('busy_blocks').select('user_id, date, start_hour, end_hour').in('user_id', memberIds),
-        supabase.from('calendar_connections').select('user_id').in('user_id', memberIds),
+        supabase.rpc('get_connected_user_ids', { p_user_ids: memberIds }),
       ])
       if (blocksRes.data) setBusyBlocks(blocksRes.data)
-      if (connRes.data) setConnectedUserIds(new Set(connRes.data.map(c => c.user_id)))
+      if (connRes.data) setConnectedUserIds(new Set(connRes.data as string[]))
       setActiveIds(new Set(memberIds))
     }
     loadBlocks()
