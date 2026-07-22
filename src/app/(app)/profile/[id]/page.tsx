@@ -219,9 +219,15 @@ export default function ProfilePage() {
   async function handleLeaveCircle() {
     if (!activeCircle) return
     if (!confirm(`Leave ${activeCircle.name}? You'll need a new invite to rejoin.`)) return
-    await supabase.from('circle_members').delete()
-      .eq('circle_id', activeCircle.id)
-      .eq('user_id', user.id)
+    const { error } = await supabase.rpc('remove_circle_member', {
+      p_circle_id: activeCircle.id,
+      p_user_id: user.id,
+    })
+    if (error) {
+      console.error('Leave circle error:', error)
+      alert('Failed to leave circle. Please try again.')
+      return
+    }
     window.location.href = '/calendar'
   }
 
