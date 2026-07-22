@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AREAS, AVATAR_COLORS, txtOn } from '@/lib/utils'
@@ -8,6 +8,14 @@ import { AREAS, AVATAR_COLORS, txtOn } from '@/lib/utils'
 const areaNames = Object.keys(AREAS)
 
 export default function OnboardingPage() {
+  return (
+    <Suspense>
+      <OnboardingInner />
+    </Suspense>
+  )
+}
+
+function OnboardingInner() {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const nextUrl = searchParams.get('next')
