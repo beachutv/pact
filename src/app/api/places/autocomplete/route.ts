@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ predictions: [] })
   }
 
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY || 'AIzaSyDKs-EC4-7NLpKM9UuMNomS4hrDxLNHVkE'
   if (!apiKey) {
     console.error('[Places] GOOGLE_PLACES_API_KEY not set')
     return NextResponse.json({ predictions: [] })

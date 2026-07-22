@@ -163,13 +163,12 @@
 - [x] Birthday display with countdown
 - [x] Calendar settings section (My Calendars, Sync, Disconnect)
 
-### Dashboard (merged Home + Calendar)
+### Calendar (enhanced — replaces Home tab)
 
-- [x] Merged Home and Calendar into single Dashboard tab
-- [x] Upcoming pacts cards on top
+- [x] Upcoming pacts cards on top of calendar view
 - [x] Auto-triggered Sparks (system-computed, no manual button)
-- [x] Birthday reminders
-- [x] Monthly calendar grid below with availability indicators
+- [x] Birthday reminders for circle members
+- [x] Monthly calendar grid with availability indicators
 - [x] Day sheet overlay with hourly timeline
 - [x] Long-press pact quick settings (edit, discuss, delete)
 - [x] Pull-to-refresh syncs calendar and members
@@ -183,8 +182,8 @@
 - [x] Pull-to-refresh on all tabs
 - [x] Persistent live location tracking (watchPosition in AppShell)
 - [x] Profile photo context propagation (updateUser in CircleContext)
-- [x] Bottom navigation (Dashboard, Chat, Plans, Spots) — 4 tabs, sticky
-- [x] Redesigned header: "Hi Name" + avatar left, roadmap/theme/bell/calendar right
+- [x] Bottom navigation (Calendar, Chat, Plans, Spots) — 4 tabs, sticky
+- [x] Redesigned header: "Pact." logo + tagline left, theme/bell/calendar right; circle name + avatars; "Hi Name" + profile photo; circle pill chips
 - [x] Circle name expands to show members list
 - [x] "Your Circles" section with create/join option
 - [x] Viewport zoom prevention on mobile input focus
@@ -241,9 +240,9 @@ src/
   app/
     (app)/
       layout.tsx          — Auth guard + AppShell wrapper (server component)
-      dashboard/page.tsx   — Merged dashboard (pacts, sparks, birthdays + calendar grid)
-      home/page.tsx       — (Legacy, replaced by dashboard)
-      calendar/page.tsx   — (Legacy, replaced by dashboard)
+      calendar/page.tsx   — Main tab: pacts, sparks, birthdays + calendar grid + day sheet
+      dashboard/page.tsx  — (Redirect to /calendar)
+      home/page.tsx       — (Legacy, replaced by calendar)
       chat/page.tsx       — Thread list + message view
       plans/page.tsx      — Plan list with RSVP, edit, swipe delete
       plans/new/page.tsx  — Create new plan form
@@ -272,4 +271,4 @@ src/
 
 ---
 
-*Last updated: July 18, 2026*
+*Last updated: July 22, 2026*
