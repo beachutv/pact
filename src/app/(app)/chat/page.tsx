@@ -107,6 +107,11 @@ export default function ChatPage() {
     loadThreads()
   }, [activeCircle?.id])
 
+  // Reload threads when exiting a thread (so previews are fresh)
+  useEffect(() => {
+    if (!activeThreadId && activeCircle) loadThreads()
+  }, [activeThreadId])
+
   // ─── Realtime: refresh thread list when threads or messages update ───
   useEffect(() => {
     if (!activeCircle) return

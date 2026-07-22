@@ -93,9 +93,15 @@ export default function CircleSettingsPage() {
   }
 
   async function removeMember(memberId: string) {
-    await supabase.from('circle_members').delete()
-      .eq('circle_id', id)
-      .eq('user_id', memberId)
+    const { error } = await supabase.rpc('remove_circle_member', {
+      p_circle_id: id,
+      p_user_id: memberId,
+    })
+    if (error) {
+      console.error('Remove member error:', error)
+      alert('Failed to remove member.')
+      return
+    }
     setMembers(prev => prev.filter(m => m.id !== memberId))
     setActionMember(null)
   }

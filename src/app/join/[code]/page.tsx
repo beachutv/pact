@@ -19,7 +19,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
     .single()
 
   if (!circle) {
-    redirect('/home?error=invalid-invite')
+    redirect('/calendar')
   }
 
   // Check if already a member

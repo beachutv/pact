@@ -39,6 +39,8 @@ export default function CalendarPage() {
   const [pacts, setPacts] = useState<PactEntry[]>([])
   const [longPressPactId, setLongPressPactId] = useState<string | null>(null)
   const pactLongPressTimer = useRef<NodeJS.Timeout | null>(null)
+  // Track which members have connected their calendar
+  const [connectedUserIds, setConnectedUserIds] = useState<Set<string>>(new Set())
 
   // Calendar selection modal
   const [showCalModal, setShowCalModal] = useState(false)
@@ -104,11 +106,12 @@ export default function CalendarPage() {
     if (!activeCircle || circleMembers.length === 0) return
     async function loadBlocks() {
       const memberIds = circleMembers.map(m => m.id)
-      const { data: blocks } = await supabase
-        .from('busy_blocks')
-        .select('user_id, date, start_hour, end_hour')
-        .in('user_id', memberIds)
-      if (blocks) setBusyBlocks(blocks)
+      const [blocksRes, connRes] = await Promise.all([
+        supabase.from('busy_blocks').select('user_id, date, start_hour, end_hour').in('user_id', memberIds),
+        supabase.from('calendar_connections').select('user_id').in('user_id', memberIds),
+      ])
+      if (blocksRes.data) setBusyBlocks(blocksRes.data)
+      if (connRes.data) setConnectedUserIds(new Set(connRes.data.map(c => c.user_id)))
       setActiveIds(new Set(memberIds))
     }
     loadBlocks()
@@ -265,8 +268,14 @@ export default function CalendarPage() {
     [circleMembers, activeIds, user.id]
   )
 
+  // Only members with a connected calendar count toward availability
+  const calConnectedMembers = useMemo(() =>
+    activeMembers.filter(m => connectedUserIds.has(m.id)),
+    [activeMembers, connectedUserIds]
+  )
+
   function freeCountAt(date: string, hour: number) {
-    return activeMembers.filter(m => !isBusy(m.id, date, hour)).length
+    return calConnectedMembers.filter(m => !isBusy(m.id, date, hour)).length
   }
 
   // Find windows where all (or n-1) active members are free
@@ -289,10 +298,10 @@ export default function CalendarPage() {
     return wins
   }
 
-  // Day summary for calendar cell indicators
+  // Day summary for calendar cell indicators — only counts members with calendar connected
   function daySummary(date: string): DaySummary {
     if (date < todayStr) return { past: true }
-    const n = activeMembers.length
+    const n = calConnectedMembers.length
     if (n === 0) return {}
     const allFreeHours = []
     for (let h = DAY_START; h < DAY_END; h++) {
@@ -309,6 +318,8 @@ export default function CalendarPage() {
   // ================= Sparks =================
   const sparks = useMemo((): Spark[] => {
     if (!activeCircle) return []
+    // Can't compute sparks if current user hasn't connected calendar
+    if (!connectedUserIds.has(user.id)) return []
     const myLive = (user as any).live_lat && (user as any).live_lng && (user as any).live_updated_at &&
       (Date.now() - new Date((user as any).live_updated_at).getTime()) < 4 * 3600000
       ? { lat: (user as any).live_lat as number, lng: (user as any).live_lng as number } : null
@@ -318,6 +329,8 @@ export default function CalendarPage() {
 
     for (const m of circleMembers) {
       if (m.id === user.id || dismissedSparks.has(m.id)) continue
+      // Skip members without calendar connected — their availability is unknown
+      if (!connectedUserIds.has(m.id)) continue
 
       const theirLive = m.live_lat && m.live_lng && m.live_updated_at &&
         (Date.now() - new Date(m.live_updated_at).getTime()) < 4 * 3600000
@@ -354,7 +367,7 @@ export default function CalendarPage() {
       })
     }
     return result.sort((a, b) => a.travelTime - b.travelTime).slice(0, 2)
-  }, [activeCircle, circleMembers, busyBlocks, dismissedSparks, todayStr, nowHour, user.id])
+  }, [activeCircle, circleMembers, busyBlocks, dismissedSparks, todayStr, nowHour, user.id, connectedUserIds])
 
   function dismissSpark(memberId: string) {
     setDismissedSparks(prev => new Set(prev).add(memberId))
@@ -894,7 +907,9 @@ export default function CalendarPage() {
                   ))}
                 </div>
                 {/* Member rows */}
-                {activeMembers.map(m => (
+                {activeMembers.map(m => {
+                  const isConnected = connectedUserIds.has(m.id)
+                  return (
                   <div key={m.id} style={{
                     display: 'grid', gridTemplateColumns: `46px repeat(${DAY_END - DAY_START}, 1fr)`,
                     gap: 2, marginBottom: 3,
@@ -905,7 +920,17 @@ export default function CalendarPage() {
                     }}>
                       {m.name.split(' ')[0]}{m.id === user.id ? ' ✏️' : ''}
                     </div>
-                    {Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i).map(h => {
+                    {!isConnected ? (
+                      <div style={{
+                        gridColumn: `span ${DAY_END - DAY_START}`,
+                        height: 17, borderRadius: 4,
+                        background: 'repeating-linear-gradient(90deg, rgba(150,150,150,0.1) 0px, rgba(150,150,150,0.1) 4px, transparent 4px, transparent 8px)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 8, color: 'var(--text2)', fontWeight: 600, letterSpacing: 0.3,
+                      }}>
+                        calendar not connected
+                      </div>
+                    ) : Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i).map(h => {
                       const busy = isBusy(m.id, sheetDate!, h)
                       const isMe = m.id === user.id
                       const isPast = sheetDate === todayStr && h < nowHour
@@ -932,10 +957,11 @@ export default function CalendarPage() {
                       )
                     })}
                   </div>
-                ))}
+                  )
+                })}
               </div>
               <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 5 }}>
-                🟩 free · 🟥 busy · 🟦 pending · 🟧 confirmed · tap your row to toggle
+                🟩 free · 🟥 busy · 🟦 pending · 🟧 confirmed · ▤ not connected · tap your row to toggle
               </div>
 
               {/* Pacts on this day */}

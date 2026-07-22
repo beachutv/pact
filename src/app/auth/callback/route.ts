@@ -15,7 +15,9 @@ export async function GET(request: Request) {
       if (user) {
         const { data: profile } = await supabase.from('users').select('home_area').eq('id', user.id).single()
         if (!profile?.home_area) {
-          return NextResponse.redirect(`${origin}/onboarding`)
+          // Pass the next param through onboarding so invite links work for new users
+          const onboardingUrl = next !== '/calendar' ? `/onboarding?next=${encodeURIComponent(next)}` : '/onboarding'
+          return NextResponse.redirect(`${origin}${onboardingUrl}`)
         }
       }
       return NextResponse.redirect(`${origin}${next}`)

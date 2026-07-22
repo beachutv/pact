@@ -137,15 +137,30 @@ export default function AppShell({
     }
     fetchNotifs()
 
+    // Listen for any notification insert (no user_id filter — RLS handles security,
+    // and default replica identity may not propagate the filter correctly)
     const channel = supabase
       .channel('notifs')
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'notifications',
-        filter: `user_id=eq.${user.id}`,
-      }, () => { fetchNotifs() })
+      }, (payload) => {
+        // Only refetch if the notification is for this user
+        if ((payload.new as any)?.user_id === user.id) {
+          fetchNotifs()
+        }
+      })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    // Also refetch when tab becomes visible (catches missed realtime events)
+    function onVisChange() {
+      if (document.visibilityState === 'visible') fetchNotifs()
+    }
+    document.addEventListener('visibilitychange', onVisChange)
+
+    return () => {
+      supabase.removeChannel(channel)
+      document.removeEventListener('visibilitychange', onVisChange)
+    }
   }, [user.id])
 
   // Chat unread count

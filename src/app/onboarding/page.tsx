@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AREAS, AVATAR_COLORS, txtOn } from '@/lib/utils'
 
@@ -8,6 +9,8 @@ const areaNames = Object.keys(AREAS)
 
 export default function OnboardingPage() {
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const nextUrl = searchParams.get('next')
 
   const [step, setStep] = useState(1)
   const [name, setName] = useState('')
@@ -52,7 +55,7 @@ export default function OnboardingPage() {
       }
 
       // Full page load to ensure server components get fresh data
-      window.location.href = '/calendar'
+      window.location.href = nextUrl || '/calendar'
     } catch (e: any) {
       setError(e.message || 'Something went wrong')
       setLoading(false)

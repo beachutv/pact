@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { txtOn, bdaySoon, AVATAR_COLORS } from '@/lib/utils'
+import { txtOn, bdaySoon, AVATAR_COLORS, AREAS } from '@/lib/utils'
 import { useCircle } from '@/components/AppShell'
 import { useLocationUpdate } from '@/lib/useLocationUpdate'
 
@@ -23,11 +23,13 @@ type FullProfile = {
 
 type GCal = { id: string; summary: string; primary: boolean; backgroundColor: string }
 
+const areaNames = Object.keys(AREAS)
+
 export default function ProfilePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const supabase = createClient()
-  const { user, updateUser } = useCircle()
+  const { user, updateUser, circles, activeCircle } = useCircle()
 
   // Update own location when viewing own profile
   const isMe = id === user.id
@@ -51,8 +53,20 @@ export default function ProfilePage() {
   const [editAddress, setEditAddress] = useState('')
   const [editSharePhone, setEditSharePhone] = useState('nobody')
   const [editShareAddress, setEditShareAddress] = useState('nobody')
+  const [editHomeArea, setEditHomeArea] = useState('')
+  const [areaSearch, setAreaSearch] = useState('')
+  const [showAreaPicker, setShowAreaPicker] = useState(false)
+
+  // Account actions
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
 
   const isOwn = id === user.id
+
+  const filteredAreas = areaSearch.trim()
+    ? areaNames.filter(a => a.toLowerCase().includes(areaSearch.toLowerCase()))
+    : areaNames
 
   useEffect(() => {
     async function load() {
@@ -66,6 +80,7 @@ export default function ProfilePage() {
         setEditAddress(p.address || '')
         setEditSharePhone(p.share_phone || 'nobody')
         setEditShareAddress(p.share_address || 'nobody')
+        setEditHomeArea(p.home_area || '')
       }
     }
     load()
@@ -173,6 +188,7 @@ export default function ProfilePage() {
 
   async function handleSave() {
     setSaving(true)
+    const coords = AREAS[editHomeArea] || AREAS[profile?.home_area || ''] || { x: 14.55, y: 121.0 }
     await supabase.from('users').update({
       name: editName,
       color: editColor,
@@ -180,15 +196,59 @@ export default function ProfilePage() {
       address: editAddress || null,
       share_phone: editSharePhone,
       share_address: editShareAddress,
+      home_area: editHomeArea || profile?.home_area,
+      home_x: coords.x,
+      home_y: coords.y,
     }).eq('id', user.id)
     // Refresh
     const { data } = await supabase.from('users').select('*').eq('id', id).single()
     if (data) {
       setProfile(data as FullProfile)
-      updateUser({ name: editName, color: editColor })
+      updateUser({ name: editName, color: editColor, home_area: editHomeArea || data.home_area })
     }
     setSaving(false)
     setEditing(false)
+  }
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    await supabase.auth.signOut()
+    window.location.href = '/'
+  }
+
+  async function handleLeaveCircle() {
+    if (!activeCircle) return
+    if (!confirm(`Leave ${activeCircle.name}? You'll need a new invite to rejoin.`)) return
+    await supabase.from('circle_members').delete()
+      .eq('circle_id', activeCircle.id)
+      .eq('user_id', user.id)
+    window.location.href = '/calendar'
+  }
+
+  async function handleDeleteAccount() {
+    if (!confirmDeleteAccount) {
+      setConfirmDeleteAccount(true)
+      return
+    }
+    setDeletingAccount(true)
+    try {
+      // Use the SECURITY DEFINER function to clean up all user data
+      const { error } = await supabase.rpc('delete_user_account')
+      if (error) {
+        console.error('Delete account error:', error)
+        alert('Failed to delete account. Please try again.')
+        setDeletingAccount(false)
+        setConfirmDeleteAccount(false)
+        return
+      }
+      await supabase.auth.signOut()
+      window.location.href = '/'
+    } catch (e) {
+      console.error('Delete account error:', e)
+      alert('Failed to delete account.')
+      setDeletingAccount(false)
+      setConfirmDeleteAccount(false)
+    }
   }
 
   if (!profile) return <div style={{ padding: 20 }}><div className="spinner" /></div>
@@ -242,6 +302,49 @@ export default function ProfilePage() {
                 {v === 'nobody' ? '🔒 Hidden' : '👥 Circle mates'}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>Home area</label>
+          <div style={{ position: 'relative', marginTop: 4 }}>
+            <button
+              onClick={() => setShowAreaPicker(!showAreaPicker)}
+              style={{
+                width: '100%', padding: '10px 14px', borderRadius: 12, border: 'none',
+                background: 'var(--surface2)', color: 'var(--text)', fontSize: 14,
+                textAlign: 'left', cursor: 'pointer',
+              }}
+            >
+              📍 {editHomeArea || 'Select area'}
+            </button>
+            {showAreaPicker && (
+              <div style={{
+                position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 20,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 14, boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
+                maxHeight: 220, overflowY: 'auto',
+              }}>
+                <input
+                  className="input"
+                  value={areaSearch}
+                  onChange={e => setAreaSearch(e.target.value)}
+                  placeholder="Search areas..."
+                  autoFocus
+                  style={{ margin: 8, width: 'calc(100% - 16px)', fontSize: 13 }}
+                />
+                {filteredAreas.map(a => (
+                  <button key={a} onClick={() => { setEditHomeArea(a); setShowAreaPicker(false); setAreaSearch('') }} style={{
+                    display: 'block', width: '100%', padding: '8px 14px', border: 'none',
+                    background: a === editHomeArea ? 'var(--accent-soft)' : 'transparent',
+                    color: a === editHomeArea ? 'var(--accent)' : 'var(--text)',
+                    fontSize: 13, textAlign: 'left', cursor: 'pointer', fontWeight: a === editHomeArea ? 700 : 400,
+                  }}>
+                    {a}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -453,6 +556,53 @@ export default function ProfilePage() {
               Disconnect Google Calendar
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Account actions — own profile only */}
+      {isOwn && (
+        <div style={{ width: '100%', maxWidth: 280, marginTop: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>
+            Account
+          </p>
+
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            style={{
+              width: '100%', padding: 12, borderRadius: 12, border: 'none',
+              background: 'var(--surface2)', color: 'var(--text)',
+              fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            {signingOut ? 'Signing out...' : 'Sign out'}
+          </button>
+
+          {activeCircle && (
+            <button
+              onClick={handleLeaveCircle}
+              style={{
+                width: '100%', padding: 12, borderRadius: 12, border: 'none',
+                background: 'var(--surface2)', color: 'var(--red)',
+                fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Leave {activeCircle.name}
+            </button>
+          )}
+
+          <button
+            onClick={handleDeleteAccount}
+            disabled={deletingAccount}
+            style={{
+              width: '100%', padding: 12, borderRadius: 12, border: 'none',
+              background: confirmDeleteAccount ? 'var(--red)' : 'transparent',
+              color: confirmDeleteAccount ? '#fff' : 'var(--red)',
+              fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            {deletingAccount ? 'Deleting...' : confirmDeleteAccount ? 'Tap again to confirm delete' : 'Delete account'}
+          </button>
         </div>
       )}
     </div>
