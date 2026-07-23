@@ -25,6 +25,7 @@ function NewPlanContent() {
   const [sending, setSending] = useState(false)
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
+  const [groupFavs, setGroupFavs] = useState<{ name: string; emoji: string; area: string }[]>([])
 
   // Calendar selection for posting events
   const [gcals, setGcals] = useState<{ id: string; summary: string; primary: boolean; backgroundColor: string }[]>([])
@@ -60,6 +61,21 @@ function NewPlanContent() {
     }
     loadCals()
   }, [])
+
+  // Load group favorite spots for quick selection
+  useEffect(() => {
+    if (!activeCircle) return
+    async function loadGroupFavs() {
+      const { data } = await supabase
+        .from('favorite_spots')
+        .select('name, emoji, area')
+        .eq('circle_id', activeCircle!.id)
+        .eq('visibility', 'group')
+        .limit(10)
+      if (data) setGroupFavs(data)
+    }
+    loadGroupFavs()
+  }, [activeCircle?.id])
 
   function handleLocationSelect(name: string, area: string) {
     setSpotName(name)
@@ -226,6 +242,29 @@ function NewPlanContent() {
       <div>
         <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 6, display: 'block' }}>Where? (optional)</label>
         <LocationPicker onSelect={handleLocationSelect} placeholder="Add location" />
+        {/* Group favorite spots as quick picks */}
+        {groupFavs.length > 0 && !spotName && (
+          <div style={{ marginTop: 8 }}>
+            <p style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Group favorites
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {groupFavs.map(f => (
+                <button
+                  key={f.name}
+                  onClick={() => handleLocationSelect(f.name, f.area)}
+                  style={{
+                    padding: '4px 10px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+                    border: '1px solid var(--border)', cursor: 'pointer',
+                    background: 'var(--surface)', color: 'var(--text2)',
+                  }}
+                >
+                  {f.emoji} {f.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {spotName && spotArea && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 13 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round">

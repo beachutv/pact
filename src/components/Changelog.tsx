@@ -3,9 +3,26 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-const CURRENT_VERSION = '7.0'
+const CURRENT_VERSION = '9.0'
 
 const CHANGELOG = [
+  {
+    version: '9.0',
+    date: 'July 23, 2026',
+    title: 'Smarter Location + Quality of Life',
+    items: [
+      '📍 Location search now uses Google Places — way more accurate addresses everywhere',
+      '🔐 Streamlined sign-in — Google-only login that auto-connects your calendar',
+      '🏠 Home area visibility toggle — choose to show or hide from circle mates',
+      '🔗 Invite links now work seamlessly for existing users',
+      '📌 Location permission no longer re-prompts every time you open the app',
+      '🟢 Online status indicator — see who\'s currently active in your circle',
+      '🔔 Clear individual or all notifications at once',
+      '⚡ Sparks improvements — see all nearby matches, dismissed ones come back',
+      '⭐ Favorite spots can now be private or shared with your group',
+      '💡 Update your home area in your profile for better travel time estimates!',
+    ],
+  },
   {
     version: '7.0',
     date: 'July 18, 2026',

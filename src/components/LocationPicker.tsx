@@ -42,15 +42,19 @@ export default function LocationPicker({ onSelect, initialValue, placeholder }: 
     setRecents(getRecents())
   }, [])
 
-  // Close on outside click
+  // Close on outside click/touch (iOS needs touchstart)
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
+    function handleClick(e: MouseEvent | TouchEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    document.addEventListener('touchstart', handleClick, { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('touchstart', handleClick)
+    }
   }, [])
 
   function handleInput(val: string) {

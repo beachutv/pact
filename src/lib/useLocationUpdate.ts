@@ -50,17 +50,27 @@ export function useLocationUpdate(userId: string, key: string) {
       )
     }
 
-    // Check permission state first — only watch if already granted
-    // This avoids triggering the browser's location permission prompt
+    // Check permission state — only watch if granted, but listen for changes
+    // so we start tracking as soon as the user grants permission
+    let permCleanup: (() => void) | null = null
+
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
         if (result.state === 'granted') {
           startWatching()
+        } else if (result.state === 'prompt') {
+          // Listen for the user granting permission (triggered by AppShell's one-time prompt)
+          const onChange = () => {
+            if (result.state === 'granted') {
+              startWatching()
+            }
+          }
+          result.addEventListener('change', onChange)
+          permCleanup = () => result.removeEventListener('change', onChange)
         }
-        // If 'prompt' or 'denied', don't trigger — user will grant via a manual action
+        // If 'denied', don't do anything
       }).catch(() => {
         // Fallback: some browsers don't support permissions.query for geolocation
-        // In this case, don't auto-trigger the prompt
       })
     }
 
@@ -68,6 +78,7 @@ export function useLocationUpdate(userId: string, key: string) {
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId)
       }
+      if (permCleanup) permCleanup()
     }
   }, [userId, key])
 }

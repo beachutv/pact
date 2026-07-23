@@ -40,6 +40,7 @@ export default function SpotsPage() {
   const [favName, setFavName] = useState('')
   const [favEmoji, setFavEmoji] = useState('📍')
   const [favArea, setFavArea] = useState('')
+  const [favVisibility, setFavVisibility] = useState<'private' | 'group'>('private')
   const [savingFav, setSavingFav] = useState(false)
 
   const tz = useMemo(() => getBrowserTimezone(), [])
@@ -286,6 +287,7 @@ export default function SpotsPage() {
       x: coords.x,
       y: coords.y,
       type: 'food',
+      visibility: favVisibility,
     })
     if (!error) {
       setFavSpots(prev => [...prev, { id, name: favName.trim(), emoji: favEmoji || '📍', area: favArea, x: coords.x, y: coords.y, type: 'food', circle_id: activeCircle?.id || null }])
@@ -293,6 +295,7 @@ export default function SpotsPage() {
       setFavName('')
       setFavEmoji('📍')
       setFavArea('')
+      setFavVisibility('private')
     }
     setSavingFav(false)
   }
@@ -625,7 +628,31 @@ export default function SpotsPage() {
               />
             </div>
 
-            <div style={{ display: 'flex', gap: 8 }}>
+            {/* Private vs Group toggle */}
+            <div style={{ marginBottom: 14, display: 'flex', gap: 6 }}>
+              {(['private', 'group'] as const).map(v => (
+                <button
+                  key={v}
+                  onClick={() => setFavVisibility(v)}
+                  style={{
+                    flex: 1, padding: '9px 0', borderRadius: 10,
+                    border: favVisibility === v ? '2px solid var(--accent)' : '1.5px solid var(--border)',
+                    background: favVisibility === v ? 'var(--accent-soft)' : 'var(--surface2)',
+                    color: favVisibility === v ? 'var(--accent)' : 'var(--text)',
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  {v === 'private' ? '🔒 Just me' : `👥 ${activeCircle?.name || 'Group'}`}
+                </button>
+              ))}
+            </div>
+            {favVisibility === 'group' && (
+              <p style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 14, marginTop: -8 }}>
+                This spot will be visible to everyone in {activeCircle?.name || 'your circle'} and can be used when proposing plans.
+              </p>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, position: 'relative', zIndex: 40 }}>
               <button
                 onClick={() => setShowFavModal(false)}
                 style={{

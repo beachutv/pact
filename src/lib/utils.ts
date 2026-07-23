@@ -139,7 +139,12 @@ export const AVATAR_COLORS = [
 
 /** Travel time between two coordinate points (Metro Manila approximation) */
 export function travelMin(a: { x: number; y: number }, b: { x: number; y: number }): number {
-  return Math.round(Math.hypot(a.x - b.x, a.y - b.y) * 9) + 8
+  // x = lat, y = lng. Convert degree differences to km using Manila-appropriate factors
+  const dLatKm = (a.x - b.x) * 111.32 // 1° lat ≈ 111.32 km
+  const dLngKm = (a.y - b.y) * 107.55 // 1° lng at ~14.5°N ≈ 107.55 km
+  const km = Math.sqrt(dLatKm * dLatKm + dLngKm * dLngKm)
+  // Metro Manila: ~3 min per km average with traffic, +5 min base
+  return Math.round(km * 3) + 5
 }
 
 /** More accurate travel time using GPS lat/lng (Haversine → km → Metro Manila driving minutes) */

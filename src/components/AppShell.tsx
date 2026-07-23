@@ -88,6 +88,13 @@ export default function AppShell({
     TABS.forEach(t => router.prefetch(t.key))
   }, [])
 
+  // Auto-collapse members list and close panels when navigating between tabs
+  useEffect(() => {
+    setShowMembersList(false)
+    setShowNotifs(false)
+    setShowThemePicker(false)
+  }, [pathname])
+
   const [currentUser, setCurrentUser] = useState<UserProfile>(user)
   const [activeCircle, setActiveCircle] = useState<Circle | null>(circles[0] || null)
   const [circleMembers, setCircleMembers] = useState<UserProfile[]>([user])
@@ -230,6 +237,18 @@ export default function AppShell({
     await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
     setUnreadNotifCount(0)
+  }
+
+  async function clearAllNotifs() {
+    await supabase.from('notifications').delete().eq('user_id', user.id)
+    setNotifications([])
+    setUnreadNotifCount(0)
+  }
+
+  async function clearNotif(notifId: string, wasUnread: boolean) {
+    await supabase.from('notifications').delete().eq('id', notifId)
+    setNotifications(prev => prev.filter(n => n.id !== notifId))
+    if (wasUnread) setUnreadNotifCount(prev => Math.max(0, prev - 1))
   }
 
   function notifIcon(type: string) {
@@ -483,6 +502,7 @@ export default function AppShell({
                 const hasLocation = m.live_area && m.live_updated_at
                 const locAge = hasLocation ? Math.floor((Date.now() - new Date(m.live_updated_at!).getTime()) / 60000) : null
                 const locLabel = locAge !== null ? (locAge < 1 ? 'now' : locAge < 60 ? `${locAge}m ago` : `${Math.floor(locAge/60)}h ago`) : null
+                const isOnline = locAge !== null && locAge < 5
                 return (
                   <div
                     key={m.id}
@@ -493,19 +513,29 @@ export default function AppShell({
                       borderBottom: '1px solid var(--border)',
                     }}
                   >
-                    <div
-                      className="avatar"
-                      style={{
-                        width: 28, height: 28, fontSize: 11,
-                        background: m.avatar_url ? `url(${m.avatar_url}) center/cover` : m.color,
-                        color: txtOn(m.color),
-                      }}
-                    >
-                      {!m.avatar_url && m.name[0]}
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <div
+                        className="avatar"
+                        style={{
+                          width: 28, height: 28, fontSize: 11,
+                          background: m.avatar_url ? `url(${m.avatar_url}) center/cover` : m.color,
+                          color: txtOn(m.color),
+                        }}
+                      >
+                        {!m.avatar_url && m.name[0]}
+                      </div>
+                      {isOnline && (
+                        <div style={{
+                          position: 'absolute', bottom: -1, right: -1,
+                          width: 10, height: 10, borderRadius: '50%',
+                          background: '#22c55e', border: '2px solid var(--surface)',
+                        }} />
+                      )}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ fontSize: 12, fontWeight: 600 }}>
                         {m.name}{isMe ? ' (you)' : ''}
+                        {isOnline && <span style={{ fontSize: 10, color: '#22c55e', marginLeft: 4 }}>online</span>}
                       </span>
                       {hasLocation && locAge !== null && locAge < 120 && (
                         <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 1 }}>
@@ -607,12 +637,20 @@ export default function AppShell({
             }}>
               <div style={{ padding: '12px 14px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 14, fontWeight: 800 }}>Notifications</span>
-                {unreadNotifCount > 0 && (
-                  <button onClick={markAllNotifsRead} style={{
-                    background: 'none', border: 'none', fontSize: 11,
-                    fontWeight: 600, color: 'var(--accent)', cursor: 'pointer',
-                  }}>Mark all read</button>
-                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {unreadNotifCount > 0 && (
+                    <button onClick={markAllNotifsRead} style={{
+                      background: 'none', border: 'none', fontSize: 11,
+                      fontWeight: 600, color: 'var(--accent)', cursor: 'pointer',
+                    }}>Mark all read</button>
+                  )}
+                  {notifications.length > 0 && (
+                    <button onClick={clearAllNotifs} style={{
+                      background: 'none', border: 'none', fontSize: 11,
+                      fontWeight: 600, color: 'var(--red)', cursor: 'pointer',
+                    }}>Clear all</button>
+                  )}
+                </div>
               </div>
               {notifications.length === 0 ? (
                 <div style={{ padding: '20px 14px', textAlign: 'center', color: 'var(--text2)', fontSize: 13 }}>
@@ -643,7 +681,14 @@ export default function AppShell({
                       {n.body && <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{n.body}</p>}
                       <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 3 }}>{notifTimeAgo(n.created_at)}</p>
                     </div>
-                    {!n.read && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', marginTop: 4, flexShrink: 0 }} />}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); clearNotif(n.id, !n.read) }}
+                      style={{
+                        background: 'none', border: 'none', color: 'var(--text2)',
+                        fontSize: 14, cursor: 'pointer', padding: '2px 4px',
+                        flexShrink: 0, marginTop: 2,
+                      }}
+                    >✕</button>
                   </div>
                 ))
               )}

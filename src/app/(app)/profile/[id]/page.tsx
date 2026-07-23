@@ -246,7 +246,10 @@ export default function ProfilePage() {
         setConfirmDeleteAccount(false)
         return
       }
-      await supabase.auth.signOut()
+      // Auth user is already deleted by the RPC — signOut may fail, that's fine
+      try { await supabase.auth.signOut() } catch {}
+      // Clear all local storage so no stale state remains
+      localStorage.clear()
       window.location.href = '/'
     } catch (e) {
       console.error('Delete account error:', e)

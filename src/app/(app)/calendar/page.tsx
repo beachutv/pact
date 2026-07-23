@@ -35,7 +35,8 @@ export default function CalendarPage() {
   const [viewMonth, setViewMonth] = useState(new Date().getMonth())
   const [sheetDate, setSheetDate] = useState<string | null>(null)
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set())
-  const [dismissedSparks, setDismissedSparks] = useState<Set<string>>(new Set())
+  // Map of memberId → dismissal timestamp (sparks return after 1 hour)
+  const [dismissedSparks, setDismissedSparks] = useState<Map<string, number>>(new Map())
   const [pacts, setPacts] = useState<PactEntry[]>([])
   const [longPressPactId, setLongPressPactId] = useState<string | null>(null)
   const pactLongPressTimer = useRef<NodeJS.Timeout | null>(null)
@@ -328,7 +329,9 @@ export default function CalendarPage() {
     const result: Spark[] = []
 
     for (const m of circleMembers) {
-      if (m.id === user.id || dismissedSparks.has(m.id)) continue
+      // Skip dismissed sparks (but they return after 1 hour)
+      const dismissedAt = dismissedSparks.get(m.id)
+      if (m.id === user.id || (dismissedAt && Date.now() - dismissedAt < 3600000)) continue
       // Skip members without calendar connected — their availability is unknown
       if (!connectedUserIds.has(m.id)) continue
 
@@ -366,11 +369,11 @@ export default function CalendarPage() {
         area: (m.home_area || '').replace(' (home)', ''),
       })
     }
-    return result.sort((a, b) => a.travelTime - b.travelTime).slice(0, 2)
+    return result.sort((a, b) => a.travelTime - b.travelTime)
   }, [activeCircle, circleMembers, busyBlocks, dismissedSparks, todayStr, nowHour, user.id, connectedUserIds])
 
   function dismissSpark(memberId: string) {
-    setDismissedSparks(prev => new Set(prev).add(memberId))
+    setDismissedSparks(prev => new Map(prev).set(memberId, Date.now()))
   }
 
   // Pact long press handlers
