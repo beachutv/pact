@@ -26,6 +26,26 @@ function NewPlanContent() {
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
   const [groupFavs, setGroupFavs] = useState<{ name: string; emoji: string; area: string }[]>([])
+  // Selected members for the pact (creator always included)
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
+
+  // Initialize selected members to all circle members
+  useEffect(() => {
+    if (circleMembers.length > 0) {
+      setSelectedMemberIds(new Set(circleMembers.map(m => m.id)))
+    }
+  }, [circleMembers])
+
+  function toggleMember(id: string) {
+    // Creator is always included
+    if (id === user.id) return
+    setSelectedMemberIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   // Calendar selection for posting events
   const [gcals, setGcals] = useState<{ id: string; summary: string; primary: boolean; backgroundColor: string }[]>([])
@@ -123,8 +143,8 @@ function NewPlanContent() {
         throw pmErr
       }
 
-      // Push to Google Calendar with smart title
-      const otherMembers = circleMembers.filter(m => m.id !== user.id).map(m => m.name.split(' ')[0])
+      // Push to Google Calendar with smart title (only selected members)
+      const otherMembers = circleMembers.filter(m => m.id !== user.id && selectedMemberIds.has(m.id)).map(m => m.name.split(' ')[0])
       const circleName = activeCircle.name
       fetch('/api/calendar/push-event', {
         method: 'POST',
@@ -142,7 +162,7 @@ function NewPlanContent() {
           calendarId: targetCalId,
           confirmed: false,
           totalCircleMembers: circleMembers.length,
-          pactMemberCount: 1, // just the creator at this point
+          pactMemberCount: selectedMemberIds.size,
         }),
       }).catch(() => {})
 
@@ -277,28 +297,55 @@ function NewPlanContent() {
         )}
       </div>
 
-      {/* Who's free */}
+      {/* Who to invite */}
       <div className="card">
-        <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 6 }}>
-          Who's free {fmtHour(startHour)}–{fmtHour(endHour)}
+        <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>
+          Who's in?
+        </p>
+        <p style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 8 }}>
+          Tap to select who you're making this pact with
         </p>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {circleMembers.map(m => (
-            <div key={m.id} style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', borderRadius: 20,
-              background: 'var(--surface2)', fontSize: 12, fontWeight: 600,
-            }}>
-              <span style={{
-                width: 16, height: 16, borderRadius: '50%', background: m.color,
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 8, fontWeight: 800, color: '#fff',
-              }}>
-                {m.name[0]}
-              </span>
-              {m.name.split(' ')[0]}
-            </div>
-          ))}
+          {circleMembers.map(m => {
+            const isSelected = selectedMemberIds.has(m.id)
+            const isCreator = m.id === user.id
+            return (
+              <button
+                key={m.id}
+                onClick={() => toggleMember(m.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '6px 12px', borderRadius: 20,
+                  fontSize: 12, fontWeight: 600, cursor: isCreator ? 'default' : 'pointer',
+                  border: isSelected ? '2px solid var(--accent)' : '2px solid var(--border)',
+                  background: isSelected ? 'var(--accent-soft, rgba(99,102,241,0.1))' : 'var(--surface2)',
+                  color: isSelected ? 'var(--text)' : 'var(--text2)',
+                  opacity: isSelected ? 1 : 0.5,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {/* Avatar */}
+                <span style={{
+                  width: 18, height: 18, borderRadius: '50%', background: m.color,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 9, fontWeight: 800, color: '#fff',
+                }}>
+                  {m.name[0]}
+                </span>
+                {m.name.split(' ')[0]}
+                {/* Checkmark for selected */}
+                {isSelected && (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+                {/* "You" label for creator */}
+                {isCreator && (
+                  <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 500 }}>(you)</span>
+                )}
+              </button>
+            )
+          })}
         </div>
       </div>
 
