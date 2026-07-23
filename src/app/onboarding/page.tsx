@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useMemo, Suspense } from 'react'
+import { useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AREAS, AVATAR_COLORS, txtOn } from '@/lib/utils'
+import LocationPicker from '@/components/LocationPicker'
 
 const areaNames = Object.keys(AREAS)
 
@@ -24,17 +25,11 @@ function OnboardingInner() {
   const [name, setName] = useState('')
   const [color, setColor] = useState(AVATAR_COLORS[0])
   const [customColor, setCustomColor] = useState('')
-  const [areaSearch, setAreaSearch] = useState('')
   const [homeArea, setHomeArea] = useState('')
+  const [shareHomeArea, setShareHomeArea] = useState('circles')
   const [birthday, setBirthday] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
-  const filteredAreas = useMemo(() => {
-    if (!areaSearch.trim()) return areaNames
-    const q = areaSearch.toLowerCase()
-    return areaNames.filter(a => a.toLowerCase().includes(q))
-  }, [areaSearch])
 
   const activeColor = customColor || color
 
@@ -45,8 +40,12 @@ function OnboardingInner() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setError('Not signed in'); setLoading(false); return }
 
-      const area = homeArea || areaNames[0]
-      const coords = AREAS[area]
+      const area = homeArea || 'Metro Manila'
+      // Fuzzy match for coordinates
+      const exactMatch = AREAS[area]
+      const fuzzyMatch = !exactMatch && areaNames.find(a => area.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(area.toLowerCase()))
+      const coords = exactMatch || (fuzzyMatch ? AREAS[fuzzyMatch] : { x: 14.55, y: 121.0 })
+
       const { error: updateError } = await supabase.from('users').update({
         name: name || 'User',
         color: activeColor,
@@ -54,6 +53,7 @@ function OnboardingInner() {
         home_x: coords.x,
         home_y: coords.y,
         birthday: birthday || null,
+        share_address: shareHomeArea,
       }).eq('id', user.id)
 
       if (updateError) {
@@ -62,8 +62,11 @@ function OnboardingInner() {
         return
       }
 
-      // Full page load to ensure server components get fresh data
-      window.location.href = nextUrl || '/calendar'
+      // Auto-connect calendar: redirect to calendar connect flow
+      // Pass the final destination through so after calendar connect, user lands there
+      const finalDest = nextUrl || '/calendar'
+      const loginHint = user.email ? `&login_hint=${encodeURIComponent(user.email)}` : ''
+      window.location.href = `/api/calendar/connect?next=${encodeURIComponent(finalDest)}${loginHint}`
     } catch (e: any) {
       setError(e.message || 'Something went wrong')
       setLoading(false)
@@ -115,7 +118,6 @@ function OnboardingInner() {
                     {c === activeColor && name ? name[0] : ''}
                   </button>
                 ))}
-                {/* Custom color picker */}
                 <label style={{ position: 'relative', width: 36, height: 36, cursor: 'pointer' }}>
                   <input
                     type="color"
@@ -154,38 +156,30 @@ function OnboardingInner() {
             <p style={{ fontSize: 13, color: 'var(--text2)' }}>
               This helps us find spots that are convenient for your group.
             </p>
-            <input
-              className="input"
-              placeholder="Search areas..."
-              value={areaSearch}
-              onChange={e => setAreaSearch(e.target.value)}
-              autoFocus
+            <LocationPicker
+              onSelect={(name) => setHomeArea(name)}
+              initialValue={homeArea}
+              placeholder="Search your area (e.g. BGC, Makati)"
             />
-            <div style={{
-              display: 'flex', flexDirection: 'column', gap: 4,
-              maxHeight: 240, overflowY: 'auto', padding: '4px 0',
-            }}>
-              {filteredAreas.map(a => (
-                <button
-                  key={a}
-                  onClick={() => setHomeArea(a)}
-                  style={{
-                    padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
-                    border: 'none', textAlign: 'left', fontSize: 14,
-                    background: a === homeArea ? 'var(--accent)' : 'var(--surface2)',
-                    color: a === homeArea ? '#fff' : 'var(--text)',
-                    fontWeight: a === homeArea ? 700 : 400,
-                  }}
-                >
-                  {a}
-                </button>
-              ))}
-              {filteredAreas.length === 0 && (
-                <p style={{ fontSize: 13, color: 'var(--text2)', padding: '8px 14px' }}>
-                  No areas match. Try a different search.
-                </p>
-              )}
+
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 6 }}>
+                Show this on your profile?
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {['nobody', 'circles'].map(v => (
+                  <button key={v} onClick={() => setShareHomeArea(v)} style={{
+                    padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                    background: shareHomeArea === v ? 'var(--accent)' : 'var(--surface2)',
+                    color: shareHomeArea === v ? '#fff' : 'var(--text2)',
+                    border: 'none', fontWeight: 600,
+                  }}>
+                    {v === 'nobody' ? '🔒 Hidden' : '👥 Circle mates'}
+                  </button>
+                ))}
+              </div>
             </div>
+
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-secondary" onClick={() => setStep(1)} style={{ flex: 1 }}>
                 Back
@@ -213,12 +207,15 @@ function OnboardingInner() {
               value={birthday}
               onChange={e => setBirthday(e.target.value)}
             />
+            <p style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.5 }}>
+              After this, you'll connect your Google Calendar so Pact can find times when everyone's free.
+            </p>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-secondary" onClick={() => setStep(2)} style={{ flex: 1 }}>
                 Back
               </button>
               <button className="btn-primary" onClick={handleSave} disabled={loading} style={{ flex: 2 }}>
-                {loading ? 'Saving...' : 'Done'}
+                {loading ? 'Saving...' : 'Connect Calendar →'}
               </button>
             </div>
           </div>

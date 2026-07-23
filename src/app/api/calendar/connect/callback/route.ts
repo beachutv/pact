@@ -48,5 +48,7 @@ export async function GET(request: Request) {
   // TODO: Initial sync — fetch busy blocks for next 60 days
   // This will be implemented in Phase 2
 
-  return NextResponse.redirect(`${origin}/home?connected=google`)
+  // Redirect to the next URL (from state param) or default to calendar
+  const next = searchParams.get('state') || '/calendar'
+  return NextResponse.redirect(`${origin}${next}`)
 }

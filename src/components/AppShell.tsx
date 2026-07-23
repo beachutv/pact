@@ -73,6 +73,16 @@ export default function AppShell({
   // Persistent location tracking across all tabs
   useLocationUpdate(user.id, 'app-shell')
 
+  // Request location permission once (first app load only)
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return
+    const asked = localStorage.getItem('pact_loc_asked')
+    if (asked) return
+    localStorage.setItem('pact_loc_asked', '1')
+    // Single getCurrentPosition triggers the browser prompt once
+    navigator.geolocation.getCurrentPosition(() => {}, () => {}, { timeout: 5000 })
+  }, [])
+
   // Prefetch all tab routes for instant navigation
   useEffect(() => {
     TABS.forEach(t => router.prefetch(t.key))

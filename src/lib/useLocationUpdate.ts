@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 import { nearestArea } from '@/lib/utils'
 
 /**
- * Request the user's live location and update their profile in Supabase.
+ * Track the user's live location and update their profile in Supabase.
  * Uses watchPosition for continuous updates while the app is open.
+ * Only starts tracking if permission is already granted — never triggers the browser prompt.
  * Throttles DB writes to at most once per 2 minutes.
  */
 export function useLocationUpdate(userId: string, key: string) {
@@ -35,19 +36,38 @@ export function useLocationUpdate(userId: string, key: string) {
       }).eq('id', userId)
     }
 
-    // Try watchPosition for continuous updates
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        updateLocation(pos.coords.latitude, pos.coords.longitude)
-      },
-      (err) => {
-        console.log('Location unavailable:', err.message)
-      },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
-    )
+    let watchId: number | null = null
+
+    function startWatching() {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          updateLocation(pos.coords.latitude, pos.coords.longitude)
+        },
+        (err) => {
+          console.log('Location unavailable:', err.message)
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+      )
+    }
+
+    // Check permission state first — only watch if already granted
+    // This avoids triggering the browser's location permission prompt
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+        if (result.state === 'granted') {
+          startWatching()
+        }
+        // If 'prompt' or 'denied', don't trigger — user will grant via a manual action
+      }).catch(() => {
+        // Fallback: some browsers don't support permissions.query for geolocation
+        // In this case, don't auto-trigger the prompt
+      })
+    }
 
     return () => {
-      navigator.geolocation.clearWatch(watchId)
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId)
+      }
     }
   }, [userId, key])
 }

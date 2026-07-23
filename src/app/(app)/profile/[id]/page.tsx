@@ -319,17 +319,6 @@ export default function ProfilePage() {
               placeholder="Search area (e.g. BGC, Makati)"
             />
           </div>
-        </div>
-
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>Home address</label>
-          <div style={{ marginTop: 4 }}>
-            <LocationPicker
-              onSelect={(name, area) => setEditAddress(area ? `${name}, ${area}` : name)}
-              initialValue={editAddress}
-              placeholder="Search your address"
-            />
-          </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
             {['nobody', 'circles'].map(v => (
               <button key={v} onClick={() => setEditShareAddress(v)} style={{
