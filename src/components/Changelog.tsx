@@ -3,9 +3,19 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-const CURRENT_VERSION = '9.0'
+const CURRENT_VERSION = '10.0'
 
 const CHANGELOG = [
+  {
+    version: '10.0',
+    date: 'July 23, 2026',
+    title: 'Plan Creation + UI Polish',
+    items: [
+      '✅ Select who you\'re making a pact with — tap members to include or exclude',
+      '👥 Member list now pops out as an overlay instead of pushing the header down',
+      '🏠 Cleaned up profile — removed redundant home address section',
+    ],
+  },
   {
     version: '9.0',
     date: 'July 23, 2026',
