@@ -96,7 +96,20 @@ export default function AppShell({
   }, [pathname])
 
   const [currentUser, setCurrentUser] = useState<UserProfile>(user)
-  const [activeCircle, setActiveCircle] = useState<Circle | null>(circles[0] || null)
+  // Restore last active circle from localStorage, fallback to first circle
+  const [activeCircle, setActiveCircleState] = useState<Circle | null>(() => {
+    if (typeof window === 'undefined') return circles[0] || null
+    const savedId = localStorage.getItem('pact_active_circle')
+    if (savedId) {
+      const found = circles.find(c => c.id === savedId)
+      if (found) return found
+    }
+    return circles[0] || null
+  })
+  const setActiveCircle = (c: Circle) => {
+    setActiveCircleState(c)
+    localStorage.setItem('pact_active_circle', c.id)
+  }
   const [circleMembers, setCircleMembers] = useState<UserProfile[]>([user])
 
   function updateUser(partial: Partial<UserProfile>) {
@@ -463,16 +476,23 @@ export default function AppShell({
                     key={m.id}
                     style={{
                       width: 24, height: 24, borderRadius: '50%',
-                      background: m.avatar_url ? `url(${m.avatar_url}) center/cover` : m.color,
+                      background: m.color,
                       color: txtOn(m.color),
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 9, fontWeight: 800,
                       border: '2px solid var(--bg)',
                       marginLeft: i > 0 ? -8 : 0,
                       zIndex: 5 - i,
+                      position: 'relative', overflow: 'hidden',
                     }}
                   >
-                    {!m.avatar_url && m.name[0]}
+                    {m.name?.[0] || '?'}
+                    {m.avatar_url && (
+                      <img src={m.avatar_url} alt="" style={{
+                        position: 'absolute', inset: 0, width: '100%', height: '100%',
+                        objectFit: 'cover', borderRadius: '50%',
+                      }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                    )}
                   </div>
                 ))}
                 {circleMembers.length > 5 && (
@@ -491,11 +511,17 @@ export default function AppShell({
             )}
           </div>
 
-          {/* Expanded members list with live locations */}
+          {/* Members list popup overlay */}
           {showMembersList && activeCircle && (
+            <>
+            <div onClick={() => setShowMembersList(false)} style={{
+              position: 'fixed', inset: 0, zIndex: 49,
+            }} />
             <div style={{
-              marginTop: 8, background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 14, padding: '8px 12px',
+              position: 'absolute', left: 12, right: 12, zIndex: 50,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 16, padding: '8px 12px', maxHeight: 320, overflowY: 'auto',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
             }}>
               {circleMembers.map(m => {
                 const isMe = m.id === user.id
@@ -518,11 +544,18 @@ export default function AppShell({
                         className="avatar"
                         style={{
                           width: 28, height: 28, fontSize: 11,
-                          background: m.avatar_url ? `url(${m.avatar_url}) center/cover` : m.color,
+                          background: m.color,
                           color: txtOn(m.color),
+                          position: 'relative', overflow: 'hidden',
                         }}
                       >
-                        {!m.avatar_url && m.name[0]}
+                        {m.name?.[0] || '?'}
+                        {m.avatar_url && (
+                          <img src={m.avatar_url} alt="" style={{
+                            position: 'absolute', inset: 0, width: '100%', height: '100%',
+                            objectFit: 'cover', borderRadius: '50%',
+                          }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                        )}
                       </div>
                       {isOnline && (
                         <div style={{
@@ -557,6 +590,7 @@ export default function AppShell({
                 ⚙️ Circle settings
               </button>
             </div>
+            </>
           )}
 
           {/* Row 3: Hi Name greeting + profile photo */}
@@ -565,15 +599,22 @@ export default function AppShell({
               onClick={() => router.push(`/profile/${currentUser.id}`)}
               style={{
                 width: 42, height: 42, borderRadius: '50%',
-                background: currentUser.avatar_url ? `url(${currentUser.avatar_url}) center/cover` : currentUser.color,
+                background: currentUser.color,
                 color: txtOn(currentUser.color),
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 16, fontWeight: 800, cursor: 'pointer',
                 border: '2px solid var(--border)',
                 flexShrink: 0,
+                position: 'relative', overflow: 'hidden',
               }}
             >
-              {!currentUser.avatar_url && currentUser.name[0]}
+              {currentUser.name?.[0] || '?'}
+              {currentUser.avatar_url && (
+                <img src={currentUser.avatar_url} alt="" style={{
+                  position: 'absolute', inset: 0, width: '100%', height: '100%',
+                  objectFit: 'cover', borderRadius: '50%',
+                }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              )}
             </div>
             <div>
               <p style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.2 }}>

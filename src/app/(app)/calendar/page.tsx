@@ -19,6 +19,8 @@ type Spark = {
   area: string
 }
 type PactEntry = { id: string; date: string; occasion: string | null; spot_name: string; spot_area: string | null; spot_emoji: string | null; win_start: number | null; win_end: number | null; status: string }
+type FavSpot = { id: string; name: string; emoji: string; area: string; x: number; y: number }
+type SpotRec = { name: string; emoji: string; area: string; travelTimes: { name: string; color: string; minutes: number }[]; avgMin: number; source: 'favorite' | 'midpoint' }
 
 export default function CalendarPage() {
   const { user, activeCircle, circleMembers, setCircleMembers } = useCircle()
@@ -43,10 +45,27 @@ export default function CalendarPage() {
   // Track which members have connected their calendar
   const [connectedUserIds, setConnectedUserIds] = useState<Set<string>>(new Set())
 
+  // Favorite spots for recommendations
+  const [favSpots, setFavSpots] = useState<FavSpot[]>([])
+
   // Calendar selection modal
   const [showCalModal, setShowCalModal] = useState(false)
   const [gcals, setGcals] = useState<GCal[]>([])
   const [selectedCals, setSelectedCals] = useState<string[]>([])
+
+  // Load favorite spots for recommendations
+  useEffect(() => {
+    if (!activeCircle) return
+    async function loadFavs() {
+      const { data } = await supabase
+        .from('favorite_spots')
+        .select('id, name, emoji, area, x, y')
+        .or(`user_id.eq.${user.id},and(circle_id.eq.${activeCircle!.id},visibility.eq.group)`)
+        .limit(20)
+      if (data) setFavSpots(data)
+    }
+    loadFavs()
+  }, [activeCircle?.id])
 
   // Auto-sync tracking
   const hasAutoSynced = useRef(false)
@@ -375,6 +394,37 @@ export default function CalendarPage() {
   function dismissSpark(memberId: string) {
     setDismissedSparks(prev => new Map(prev).set(memberId, Date.now()))
   }
+
+  // Spot recommendations for day sheet
+  const spotRecommendations = useMemo((): SpotRec[] => {
+    if (!sheetDate || activeMembers.length < 2 || favSpots.length === 0) return []
+    // Get member coordinates (prefer live, fall back to home)
+    const memberCoords = activeMembers.map(m => {
+      const hasLive = m.live_lat && m.live_lng && m.live_updated_at &&
+        (Date.now() - new Date(m.live_updated_at).getTime()) < 4 * 3600000
+      return {
+        name: m.name.split(' ')[0],
+        color: m.color,
+        x: hasLive ? m.live_lat! : (m as any).home_x || 0,
+        y: hasLive ? m.live_lng! : (m as any).home_y || 0,
+      }
+    }).filter(c => c.x !== 0 || c.y !== 0)
+    if (memberCoords.length < 2) return []
+
+    const recs: SpotRec[] = []
+    for (const spot of favSpots) {
+      if (!spot.x || !spot.y) continue
+      const travelTimes = memberCoords.map(mc => ({
+        name: mc.name,
+        color: mc.color,
+        minutes: travelMin({ x: mc.x, y: mc.y }, { x: spot.x, y: spot.y }),
+      }))
+      const avgMin = Math.round(travelTimes.reduce((s, t) => s + t.minutes, 0) / travelTimes.length)
+      recs.push({ name: spot.name, emoji: spot.emoji, area: spot.area, travelTimes, avgMin, source: 'favorite' })
+    }
+    recs.sort((a, b) => a.avgMin - b.avgMin)
+    return recs.slice(0, 4)
+  }, [sheetDate, activeMembers, favSpots])
 
   // Pact long press handlers
   function onPactTouchStart(pactId: string) {
@@ -926,7 +976,7 @@ export default function CalendarPage() {
                     {!isConnected ? (
                       <div style={{
                         gridColumn: `span ${DAY_END - DAY_START}`,
-                        height: 17, borderRadius: 4,
+                        height: 28, borderRadius: 4,
                         background: 'repeating-linear-gradient(90deg, rgba(150,150,150,0.1) 0px, rgba(150,150,150,0.1) 4px, transparent 4px, transparent 8px)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 8, color: 'var(--text2)', fontWeight: 600, letterSpacing: 0.3,
@@ -948,7 +998,7 @@ export default function CalendarPage() {
                           onClick={isMe && !isPast ? () => toggleManualHour(sheetDate!, h) : undefined}
                           title={isMe ? `${fmtHour(h)} — tap to toggle` : `${m.name.split(' ')[0]}: ${busy ? 'busy' : 'free'}`}
                           style={{
-                            height: 17, borderRadius: 4,
+                            height: 28, borderRadius: 4,
                             background: isPast ? 'rgba(100,100,100,0.15)'
                               : isPactHour ? (isPactConfirmed ? 'rgba(245,158,11,0.35)' : 'rgba(59,130,246,0.22)')
                               : busy ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.14)',
@@ -1034,6 +1084,71 @@ export default function CalendarPage() {
               ) : (
                 <div style={{ fontSize: 12.5, color: 'var(--text2)', padding: '10px 0' }}>
                   😕 No shared window for this group. Try another day or a smaller group.
+                </div>
+              )}
+
+              {/* Spot recommendations */}
+              {spotRecommendations.length > 0 && sheetWindows.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text2)', marginBottom: 8 }}>
+                    📍 Where to meet
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {spotRecommendations.map((rec, i) => (
+                      <div
+                        key={i}
+                        onClick={() => {
+                          const w = sheetWindows[0]
+                          window.location.href = `/plans/new?date=${sheetDate}&hour=${w.s}&end=${w.e}`
+                        }}
+                        style={{
+                          padding: '10px 12px', borderRadius: 12,
+                          background: i === 0 ? 'rgba(52,211,153,0.08)' : 'var(--surface)',
+                          border: i === 0 ? '1.5px solid rgba(52,211,153,0.3)' : '1px solid var(--border)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 16 }}>{rec.emoji}</span>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 700 }}>{rec.name}</div>
+                              <div style={{ fontSize: 10, color: 'var(--text2)' }}>{rec.area}</div>
+                            </div>
+                          </div>
+                          <span style={{
+                            fontSize: 11, fontWeight: 700,
+                            color: rec.avgMin <= 15 ? 'var(--green)' : rec.avgMin <= 25 ? 'var(--text)' : 'var(--text2)',
+                          }}>
+                            ~{rec.avgMin} min avg
+                          </span>
+                        </div>
+                        {/* Per-member travel times */}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                          {rec.travelTimes.map((tt, j) => (
+                            <span key={j} style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                              <span style={{
+                                width: 8, height: 8, borderRadius: '50%', background: tt.color,
+                                display: 'inline-block', flexShrink: 0,
+                              }} />
+                              {tt.name} ~{tt.minutes}m
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* No favorites hint */}
+              {spotRecommendations.length === 0 && sheetWindows.length > 0 && favSpots.length === 0 && (
+                <div style={{
+                  marginTop: 14, padding: '10px 12px', borderRadius: 12,
+                  background: 'var(--surface)', border: '1px dashed var(--border)',
+                  fontSize: 12, color: 'var(--text2)', lineHeight: 1.5,
+                }}>
+                  💡 Save favorite spots in the Spots tab to get location recommendations with travel times here.
                 </div>
               )}
 

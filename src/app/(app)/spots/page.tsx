@@ -592,6 +592,8 @@ export default function SpotsPage() {
             position: 'fixed', bottom: 0, left: 0, right: 0,
             background: 'var(--bg)', borderRadius: '18px 18px 0 0',
             padding: '20px 20px 32px', zIndex: 101,
+            maxHeight: '80vh', overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
           }}>
             <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 14px' }}>⭐ Add a favorite spot</h3>
 
