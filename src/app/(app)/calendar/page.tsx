@@ -88,7 +88,7 @@ const VENUES: { name: string; emoji: string; area: string; x: number; y: number;
   { name: 'Salcedo Saturday Market', emoji: '🫒', area: 'Salcedo Village, Makati', x: 4.1, y: 3.4, type: 'food' },
 ]
 
-function SparkCard({ spark: sp, todayStr, onDismiss }: { spark: Spark; todayStr: string; onDismiss: () => void }) {
+function SparkLine({ spark: sp, todayStr, onDismiss }: { spark: Spark; todayStr: string; onDismiss: () => void }) {
   const [offsetX, setOffsetX] = useState(0)
   const [swiping, setSwiping] = useState(false)
   const [dismissed, setDismissed] = useState(false)
@@ -106,13 +106,11 @@ function SparkCard({ spark: sp, todayStr, onDismiss }: { spark: Spark; todayStr:
     if (!swiping) return
     const dx = e.touches[0].clientX - startX.current
     const dy = e.touches[0].clientY - startY.current
-    // Lock direction on first significant move
     if (isHorizontal.current === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
       isHorizontal.current = Math.abs(dx) > Math.abs(dy)
     }
     if (isHorizontal.current) {
       e.preventDefault()
-      // Only allow swiping left (negative)
       setOffsetX(Math.min(0, dx))
     }
   }
@@ -136,40 +134,37 @@ function SparkCard({ spark: sp, todayStr, onDismiss }: { spark: Spark; todayStr:
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       style={{
-        background: 'linear-gradient(135deg, rgba(118,172,179,0.18), rgba(139,176,126,0.12))',
-        border: '1px solid rgba(118,172,179,0.45)', borderRadius: 16,
-        padding: '10px 14px', marginBottom: 8, position: 'relative',
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: 'linear-gradient(135deg, rgba(118,172,179,0.12), rgba(139,176,126,0.08))',
+        border: '1px solid rgba(118,172,179,0.35)', borderRadius: 12,
+        padding: '8px 10px', marginBottom: 6,
         transform: `translateX(${offsetX}px)`,
         opacity: Math.max(0, 1 + offsetX / 200),
         transition: swiping ? 'none' : 'transform 0.25s ease, opacity 0.25s ease',
       }}
     >
-      <button
-        onClick={onDismiss}
-        style={{
-          position: 'absolute', top: 8, right: 11,
-          background: 'none', border: 'none', color: 'var(--text2)',
-          fontSize: 14, cursor: 'pointer', padding: '2px 4px',
-        }}
-      >✕</button>
-      <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: 0.7 }}>
-        ⚡ Spark
-      </div>
-      <div style={{ fontSize: 12.5, lineHeight: 1.45, marginTop: 3 }}>
-        You're <b>~{sp.travelTime} min</b> from{' '}
-        <b style={{ color: sp.member.color }}>{sp.member.name}</b>{' '}
-        ({sp.area}) and you're both free{' '}
-        <b>{fmtWin(sp.window.s, sp.window.e)}</b> today.
+      <div style={{ flex: 1, fontSize: 12, lineHeight: 1.35, minWidth: 0 }}>
+        <span style={{ color: 'var(--accent)', fontWeight: 800, fontSize: 10 }}>⚡</span>{' '}
+        ~{sp.travelTime} min from <b style={{ color: sp.member.color }}>{sp.member.name.split(' ')[0]}</b>{' '}
+        &amp; both free <b>{fmtWin(sp.window.s, sp.window.e)}</b> today
       </div>
       <button
         onClick={() => window.location.href = `/plans/new?date=${todayStr}&hour=${sp.window.s}&end=${sp.window.e}`}
         style={{
-          marginTop: 8, padding: '8px 14px', border: 'none', borderRadius: 18,
-          background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+          padding: '6px 10px', border: 'none', borderRadius: 14,
+          background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 800,
+          cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
         }}
       >
-        Propose a plan with {sp.member.name.split(' ')[0]}
+        Propose
       </button>
+      <button
+        onClick={onDismiss}
+        style={{
+          background: 'none', border: 'none', color: 'var(--text2)',
+          fontSize: 13, cursor: 'pointer', padding: '0 2px', flexShrink: 0,
+        }}
+      >✕</button>
     </div>
   )
 }
@@ -193,11 +188,25 @@ export default function CalendarPage() {
   const [dismissedSparks, setDismissedSparks] = useState<Map<string, number>>(new Map())
   const [sparkRefreshKey, setSparkRefreshKey] = useState(0)
   const [selectedWinIdx, setSelectedWinIdx] = useState(0)
+  const [selectedSpotIdx, setSelectedSpotIdx] = useState(0)
+  const [showAllSpots, setShowAllSpots] = useState(false)
+  const [showWhosFree, setShowWhosFree] = useState(false)
+  const [whosFreeRange, setWhosFreeRange] = useState(7)
   const [pacts, setPacts] = useState<PactEntry[]>([])
   const [longPressPactId, setLongPressPactId] = useState<string | null>(null)
   const pactLongPressTimer = useRef<NodeJS.Timeout | null>(null)
   // Track which members have connected their calendar
   const [connectedUserIds, setConnectedUserIds] = useState<Set<string>>(new Set())
+
+  // Landscape detection
+  const [isLandscape, setIsLandscape] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(orientation: landscape) and (max-height: 500px)')
+    setIsLandscape(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsLandscape(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   // Favorite spots for recommendations
   const [favSpots, setFavSpots] = useState<FavSpot[]>([])
@@ -548,6 +557,53 @@ export default function CalendarPage() {
   function refreshSparks() {
     setDismissedSparks(new Map())
     setSparkRefreshKey(k => k + 1)
+  }
+
+  // ================= Who's Free =================
+  // Find next mutual free window between current user and a specific member
+  function nextMutualWindow(memberId: string, rangeDays: number): { day: number; ds: string; s: number; e: number; now: boolean } | null {
+    for (let d = 0; d < rangeDays; d++) {
+      const dt = new Date()
+      dt.setDate(dt.getDate() + d)
+      const ds = toStr(dt)
+      let s: number | null = null
+      for (let h = (d === 0 ? nowHour : DAY_START); h <= DAY_END; h++) {
+        const ok = h < DAY_END && !isBusy(user.id, ds, h) && !isBusy(memberId, ds, h)
+        if (ok && s === null) s = h
+        if (!ok && s !== null) {
+          if (h - s >= 2) return { day: d, ds, s, e: h, now: d === 0 && s <= nowHour }
+          s = null
+        }
+      }
+    }
+    return null
+  }
+
+  // Find next window where ALL active members are free
+  function nextGroupWindow(rangeDays: number): { day: number; ds: string; s: number; e: number; now: boolean } | null {
+    const members = circleMembers.filter(m => connectedUserIds.has(m.id))
+    if (members.length < 2) return null
+    for (let d = 0; d < rangeDays; d++) {
+      const dt = new Date()
+      dt.setDate(dt.getDate() + d)
+      const ds = toStr(dt)
+      let s: number | null = null
+      for (let h = (d === 0 ? nowHour : DAY_START); h <= DAY_END; h++) {
+        const ok = h < DAY_END && members.every(m => !isBusy(m.id, ds, h))
+        if (ok && s === null) s = h
+        if (!ok && s !== null) {
+          if (h - s >= 2) return { day: d, ds, s, e: h, now: d === 0 && s <= nowHour }
+          s = null
+        }
+      }
+    }
+    return null
+  }
+
+  function whosFreeLabel(w: { day: number; ds: string; s: number; e: number; now: boolean }): string {
+    if (w.now) return `free now · until ${fmtHour(w.e)}`
+    const when = w.day === 0 ? 'today ' : w.day === 1 ? 'tomorrow ' : new Date(w.ds + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' }) + ' '
+    return `${when}${fmtHour(w.s)} – ${fmtHour(w.e)}`
   }
 
   // Compute where each member is coming from (last busy block location or home)
@@ -937,11 +993,19 @@ export default function CalendarPage() {
   ].sort((a, b) => a.s - b.s) : []
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, position: 'relative' }}>
+    <div style={{
+      display: 'flex',
+      flexDirection: isLandscape && sheetDate ? 'row' : 'column',
+      flex: 1, minHeight: 0, position: 'relative',
+    }}>
       <div
         ref={calPullRef}
         {...calTouchHandlers}
-        style={{ padding: '14px 16px 24px', overflowY: 'auto', flex: 1 }}
+        style={{
+          padding: '14px 16px 24px', overflowY: 'auto',
+          flex: isLandscape && sheetDate ? '0 0 45%' : 1,
+          borderRight: isLandscape && sheetDate ? '1px solid var(--border)' : 'none',
+        }}
       >
         {(calPullY > 0 || calPullRefreshing) && (
           <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text2)', padding: '6px 0',
@@ -1064,13 +1128,29 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {/* Sparks — stacked, swipe left to dismiss */}
+        {/* Sparks — compact 1-line, show 2 with scroll */}
         {sparks.length > 0 && (
-          <div style={{ marginBottom: 14, overflow: 'hidden' }}>
+          <div style={{ marginBottom: 14, maxHeight: sparks.length > 2 ? 120 : undefined, overflowY: sparks.length > 2 ? 'auto' : undefined, overflowX: 'hidden' }}>
             {sparks.map(sp => (
-              <SparkCard key={sp.member.id} spark={sp} todayStr={todayStr} onDismiss={() => dismissSpark(sp.member.id)} />
+              <SparkLine key={sp.member.id} spark={sp} todayStr={todayStr} onDismiss={() => dismissSpark(sp.member.id)} />
             ))}
           </div>
+        )}
+
+        {/* Who's free? button */}
+        {circleMembers.length > 1 && (
+          <button
+            onClick={() => setShowWhosFree(true)}
+            style={{
+              width: '100%', marginBottom: 14, padding: '12px 14px', borderRadius: 14,
+              border: '1px solid var(--border)', background: 'var(--surface2)',
+              color: 'var(--text)', fontSize: 13.5, fontWeight: 800, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            👀 Who{"'"}s free?
+            <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text2)' }}>next 7 days at a glance</span>
+          </button>
         )}
 
         {/* Friend filter */}
@@ -1211,23 +1291,38 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Day sheet overlay */}
+      {/* Day sheet — overlay (portrait) or side panel (landscape) */}
       {sheetDate && (
         <>
-          <div
-            onClick={() => setSheetDate(null)}
-            style={{
-              position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)',
-              zIndex: 30,
-            }}
-          />
-          <div style={{
+          {!isLandscape && (
+            <div
+              onClick={() => setSheetDate(null)}
+              style={{
+                position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)',
+                zIndex: 30,
+              }}
+            />
+          )}
+          <div style={isLandscape ? {
+            flex: '1 1 55%', background: 'var(--surface2)',
+            display: 'flex', flexDirection: 'column', minHeight: 0,
+          } : {
             position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 31,
             background: 'var(--surface2)', borderRadius: '24px 24px 0 0',
             maxHeight: '86%', display: 'flex', flexDirection: 'column',
           }}>
-            <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '12px auto 10px', flexShrink: 0 }} />
-            <div style={{ overflowY: 'auto', padding: '0 18px 26px' }}>
+            {!isLandscape && (
+              <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '12px auto 10px', flexShrink: 0 }} />
+            )}
+            {isLandscape && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px 0', flexShrink: 0 }}>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>{fmtDate(sheetDate)}</span>
+                <button onClick={() => setSheetDate(null)} style={{
+                  background: 'none', border: 'none', color: 'var(--text2)', fontSize: 16, cursor: 'pointer',
+                }}>✕</button>
+              </div>
+            )}
+            <div style={{ overflowY: 'auto', padding: isLandscape ? '4px 18px 18px' : '0 18px 26px' }}>
               <h3 style={{ fontSize: 16, fontWeight: 700 }}>{fmtDate(sheetDate)}</h3>
               <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
                 Checking {activeIds.size === circleMembers.length ? 'everyone' : `${activeMembers.length} members`} · busy blocks are red — friends only see when, never what
@@ -1384,7 +1479,7 @@ export default function CalendarPage() {
                   {sheetWindows.map((w, i) => (
                     <button
                       key={i}
-                      onClick={() => setSelectedWinIdx(i)}
+                      onClick={() => { setSelectedWinIdx(i); setSelectedSpotIdx(0); setShowAllSpots(false) }}
                       style={{
                         padding: '8px 13px', borderRadius: 20, fontSize: 12.5, fontWeight: 700,
                         cursor: 'pointer',
@@ -1425,42 +1520,57 @@ export default function CalendarPage() {
                   </div>
 
                   {/* Spot cards */}
-                  {spotRecommendations.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {spotRecommendations.map((rec, i) => (
-                        <div
-                          key={i}
-                          onClick={() => {
-                            const w = sheetWindows[selectedWinIdx] || sheetWindows[0]
-                            if (w) window.location.href = `/plans/new?date=${sheetDate}&hour=${w.s}&end=${w.e}`
-                          }}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 11,
-                            padding: '10px 12px', borderRadius: 14,
-                            background: i === 0 ? 'rgba(139,176,126,0.08)' : 'var(--surface)',
-                            border: i === 0 ? '1.5px solid rgba(139,176,126,0.3)' : '1.5px solid var(--border)',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <div style={{
-                            fontSize: 20, width: 34, height: 34, background: 'var(--surface3)',
-                            borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                          }}>{rec.emoji}</div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13.5, fontWeight: 700 }}>
-                              {rec.source === 'favorite' ? '⭐ ' : ''}{rec.name}
+                  {spotRecommendations.length > 0 && (() => {
+                    const visibleSpots = showAllSpots ? spotRecommendations : spotRecommendations.slice(0, 3)
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {visibleSpots.map((rec, i) => {
+                          const isSel = i === selectedSpotIdx
+                          return (
+                            <div
+                              key={i}
+                              onClick={() => setSelectedSpotIdx(i)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 11,
+                                padding: '10px 12px', borderRadius: 14,
+                                background: isSel ? 'rgba(139,176,126,0.08)' : 'var(--surface)',
+                                border: isSel ? '1.5px solid rgba(139,176,126,0.3)' : '1.5px solid var(--border)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <div style={{
+                                fontSize: 20, width: 34, height: 34, background: 'var(--surface3)',
+                                borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                              }}>{rec.emoji}</div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+                                  {rec.source === 'favorite' ? '⭐ ' : ''}{rec.name}
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
+                                  {rec.area} · ~{rec.avgMin.toLocaleString()} min avg
+                                </div>
+                              </div>
+                              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--green)', flexShrink: 0, textAlign: 'right', lineHeight: 1.4 }}>
+                                {rec.maxMin.toLocaleString()} min max<br />({rec.maxWho})
+                              </div>
                             </div>
-                            <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
-                              {rec.area} · ~{rec.avgMin.toLocaleString()} min avg
-                            </div>
-                          </div>
-                          <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--green)', flexShrink: 0, textAlign: 'right', lineHeight: 1.4 }}>
-                            {rec.maxMin.toLocaleString()} min max<br />({rec.maxWho})
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                          )
+                        })}
+                        {!showAllSpots && spotRecommendations.length > 3 && (
+                          <button
+                            onClick={() => setShowAllSpots(true)}
+                            style={{
+                              padding: 8, borderRadius: 10, border: '1px solid var(--border)',
+                              background: 'var(--surface2)', color: 'var(--text2)',
+                              fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+                            }}
+                          >
+                            Show {spotRecommendations.length - 3} more suggestions
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })()}
 
                   {/* Add favorite spot button */}
                   <button
@@ -1489,7 +1599,7 @@ export default function CalendarPage() {
                   }}
                 >
                   💬 Suggest {fmtDate(sheetDate!).split(',')[0]}, {fmtHour((sheetWindows[selectedWinIdx] || sheetWindows[0]).s)} – {fmtHour((sheetWindows[selectedWinIdx] || sheetWindows[0]).e)}
-                  {spotRecommendations[0] ? ` · ${spotRecommendations[0].name}` : ''}
+                  {spotRecommendations[selectedSpotIdx] ? ` · ${spotRecommendations[selectedSpotIdx].name}` : ''}
                 </button>
               )}
             </div>
@@ -1498,6 +1608,137 @@ export default function CalendarPage() {
       )}
 
       {/* Calendar selection modal is now in AppShell */}
+
+      {/* Who's free? bottom sheet */}
+      {showWhosFree && (() => {
+        const otherMembers = circleMembers.filter(m => m.id !== user.id && connectedUserIds.has(m.id))
+        const memberWindows = otherMembers.map(m => ({
+          member: m,
+          window: nextMutualWindow(m.id, whosFreeRange),
+        })).sort((a, b) => {
+          if (!a.window) return 1
+          if (!b.window) return -1
+          if (a.window.now !== b.window.now) return a.window.now ? -1 : 1
+          return a.window.day - b.window.day || a.window.s - b.window.s
+        })
+        const groupWin = circleMembers.length > 2 ? nextGroupWindow(whosFreeRange) : null
+
+        return (
+          <>
+            <div
+              onClick={() => setShowWhosFree(false)}
+              style={{
+                position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)',
+                zIndex: 30,
+              }}
+            />
+            <div style={{
+              position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 31,
+              background: 'var(--surface2)', borderRadius: '24px 24px 0 0',
+              maxHeight: '80%', display: 'flex', flexDirection: 'column',
+            }}>
+              <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '12px auto 10px' }} />
+              <div style={{ padding: '0 18px 20px', overflowY: 'auto' }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700 }}>👀 Who{"'"}s free?</h3>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  {[1, 3, 5, 7].map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setWhosFreeRange(r)}
+                      style={{
+                        padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+                        border: r === whosFreeRange ? '1.5px solid var(--green)' : '1.5px solid var(--border)',
+                        background: r === whosFreeRange ? 'rgba(139,176,126,0.15)' : 'var(--surface)',
+                        color: r === whosFreeRange ? 'var(--green)' : 'var(--text2)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {r === 1 ? 'Today' : `${r} days`}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
+                  {/* Everyone row */}
+                  {circleMembers.length > 2 && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 0', borderBottom: '1px solid var(--border)',
+                    }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%', background: 'var(--accent)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0,
+                      }}>
+                        {activeCircle?.emoji || '👥'}
+                      </div>
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>Everyone ({circleMembers.length})</span>
+                      {groupWin ? (
+                        <span style={{
+                          fontSize: 12, fontWeight: 700,
+                          color: groupWin.now ? 'var(--green)' : 'var(--text2)',
+                          display: 'flex', alignItems: 'center', gap: 5,
+                        }}>
+                          {groupWin.now && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)', display: 'inline-block' }} />}
+                          {whosFreeLabel(groupWin)}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>no common window</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Individual member rows */}
+                  {memberWindows.map(({ member: m, window: w }) => (
+                    <div key={m.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 0', borderBottom: '1px solid var(--border)',
+                    }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%', background: m.color,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 12, fontWeight: 700, color: txtOn(m.color), flexShrink: 0,
+                      }}>
+                        {m.name[0]}
+                      </div>
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 700, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {m.name.split(' ')[0]}
+                      </span>
+                      {w ? (
+                        <span style={{
+                          fontSize: 12, fontWeight: 700,
+                          color: w.now ? 'var(--green)' : 'var(--text2)',
+                          display: 'flex', alignItems: 'center', gap: 5,
+                        }}>
+                          {w.now && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)', display: 'inline-block' }} />}
+                          {whosFreeLabel(w)}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>nothing mutual</span>
+                      )}
+                      {w && (
+                        <button
+                          onClick={() => {
+                            setShowWhosFree(false)
+                            window.location.href = `/plans/new?date=${w.ds}&hour=${w.s}&end=${w.e}`
+                          }}
+                          style={{
+                            border: '1px solid var(--border)', background: 'var(--surface3)',
+                            color: 'var(--text)', fontSize: 11, fontWeight: 800,
+                            padding: '6px 10px', borderRadius: 14, cursor: 'pointer', flexShrink: 0,
+                          }}
+                        >
+                          💬
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      })()}
     </div>
   )
 }

@@ -3,9 +3,21 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-const CURRENT_VERSION = '12.0'
+const CURRENT_VERSION = '13.0'
 
 const CHANGELOG = [
+  {
+    version: '13.0',
+    date: 'July 30, 2026',
+    title: 'Who\'s Free + Landscape View',
+    items: [
+      '👀 "Who\'s free?" — see each friend\'s next mutual free window at a glance',
+      '⚡ Sparks are now compact 1-line cards with inline "Propose" button',
+      '📍 Spot suggestions show 3 at a time — tap to highlight, "Show more" to expand',
+      '📱 Landscape mode — turn your phone sideways for calendar + day view side by side',
+      '📍 Location updates instantly when you open the app',
+    ],
+  },
   {
     version: '12.0',
     date: 'July 29, 2026',

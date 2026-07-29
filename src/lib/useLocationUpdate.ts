@@ -6,9 +6,9 @@ import { nearestArea } from '@/lib/utils'
 
 /**
  * Track the user's live location and update their profile in Supabase.
- * Uses watchPosition for continuous updates while the app is open.
- * Only starts tracking if permission is already granted — never triggers the browser prompt.
+ * Uses getCurrentPosition for immediate updates + watchPosition for continuous.
  * Throttles DB writes to at most once per 2 minutes.
+ * Re-triggers on visibility change (app foregrounded).
  */
 export function useLocationUpdate(userId: string, key: string) {
   const hasRun = useRef<string>('')
@@ -36,9 +36,20 @@ export function useLocationUpdate(userId: string, key: string) {
       }).eq('id', userId)
     }
 
+    function getOnce() {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => updateLocation(pos.coords.latitude, pos.coords.longitude),
+        () => {},
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+      )
+    }
+
     let watchId: number | null = null
 
     function startWatching() {
+      // Immediate position on start
+      getOnce()
+
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
           updateLocation(pos.coords.latitude, pos.coords.longitude)
@@ -50,34 +61,40 @@ export function useLocationUpdate(userId: string, key: string) {
       )
     }
 
-    // Check permission state — only watch if granted, but listen for changes
-    // so we start tracking as soon as the user grants permission
+    // Re-trigger location on visibility change (app foregrounded)
+    function onVisChange() {
+      if (document.visibilityState === 'visible') {
+        // Reset throttle so we get fresh location when user comes back
+        lastUpdate.current = 0
+        getOnce()
+      }
+    }
+
     let permCleanup: (() => void) | null = null
 
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
         if (result.state === 'granted') {
           startWatching()
+          document.addEventListener('visibilitychange', onVisChange)
         } else if (result.state === 'prompt') {
-          // Listen for the user granting permission (triggered by AppShell's one-time prompt)
           const onChange = () => {
             if (result.state === 'granted') {
               startWatching()
+              document.addEventListener('visibilitychange', onVisChange)
             }
           }
           result.addEventListener('change', onChange)
           permCleanup = () => result.removeEventListener('change', onChange)
         }
-        // If 'denied', don't do anything
-      }).catch(() => {
-        // Fallback: some browsers don't support permissions.query for geolocation
-      })
+      }).catch(() => {})
     }
 
     return () => {
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId)
       }
+      document.removeEventListener('visibilitychange', onVisChange)
       if (permCleanup) permCleanup()
     }
   }, [userId, key])
