@@ -578,60 +578,62 @@ export default function SpotsPage() {
         )}
       </div>
 
-      {/* Add favorite modal */}
+      {/* Add favorite modal — centered overlay like prototype */}
       {showFavModal && (
-        <>
-          <div
-            onClick={() => setShowFavModal(false)}
-            style={{
-              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-              zIndex: 100,
-            }}
-          />
+        <div
+          onClick={e => { if (e.target === e.currentTarget) setShowFavModal(false) }}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24,
+          }}
+        >
           <div style={{
-            position: 'fixed', bottom: 0, left: 0, right: 0,
-            background: 'var(--bg)', borderRadius: '18px 18px 0 0',
-            padding: '20px 20px 32px', zIndex: 101,
-            maxHeight: '80vh', overflowY: 'auto',
+            background: 'var(--surface2)', borderRadius: 20, padding: 22,
+            width: '100%', maxWidth: 360, maxHeight: '80vh', overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
           }}>
-            <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 14px' }}>⭐ Add a favorite spot</h3>
+            <h3 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>⭐ Add a favorite spot</h3>
+            <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4, lineHeight: 1.5 }}>
+              Your own picks join the recommendations — favorites float to the top when they{"'"}re convenient for the group.
+            </p>
 
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <input
-                type="text"
-                placeholder="Emoji"
-                value={favEmoji}
-                onChange={e => setFavEmoji(e.target.value)}
-                style={{
-                  width: 50, padding: '10px 8px', borderRadius: 10,
-                  border: '1.5px solid var(--border)', background: 'var(--surface2)',
-                  color: 'var(--text)', fontSize: 18, textAlign: 'center', outline: 'none',
-                }}
-              />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
               <input
                 type="text"
                 placeholder="Spot name (e.g. Tita's tapsilogan)"
                 value={favName}
                 onChange={e => setFavName(e.target.value)}
                 style={{
-                  flex: 1, padding: '10px 12px', borderRadius: 10,
-                  border: '1.5px solid var(--border)', background: 'var(--surface2)',
+                  width: '100%', padding: '12px 14px', borderRadius: 12,
+                  border: '1px solid var(--border)', background: 'var(--surface)',
                   color: 'var(--text)', fontSize: 13, outline: 'none',
+                  boxSizing: 'border-box',
                 }}
               />
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <LocationPicker
-                onSelect={(name, area) => setFavArea(area ? `${name}, ${area}` : name)}
-                initialValue={favArea}
-                placeholder="Search area (e.g. BGC, Makati, Katipunan)"
+              <input
+                type="text"
+                placeholder="Emoji (optional, default 📍)"
+                value={favEmoji === '📍' ? '' : favEmoji}
+                onChange={e => setFavEmoji(e.target.value || '📍')}
+                style={{
+                  width: '100%', padding: '12px 14px', borderRadius: 12,
+                  border: '1px solid var(--border)', background: 'var(--surface)',
+                  color: 'var(--text)', fontSize: 13, outline: 'none',
+                  boxSizing: 'border-box',
+                }}
               />
+              <div style={{ position: 'relative', zIndex: 50 }}>
+                <LocationPicker
+                  onSelect={(name, area) => setFavArea(area ? `${name}, ${area}` : name)}
+                  initialValue={favArea}
+                  placeholder="Search area (e.g. BGC, Makati, Katipunan)"
+                />
+              </div>
             </div>
 
             {/* Private vs Group toggle */}
-            <div style={{ marginBottom: 14, display: 'flex', gap: 6 }}>
+            <div style={{ marginTop: 14, display: 'flex', gap: 6 }}>
               {(['private', 'group'] as const).map(v => (
                 <button
                   key={v}
@@ -649,33 +651,31 @@ export default function SpotsPage() {
               ))}
             </div>
             {favVisibility === 'group' && (
-              <p style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 14, marginTop: -8 }}>
-                This spot will be visible to everyone in {activeCircle?.name || 'your circle'} and can be used when proposing plans.
+              <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 6, marginBottom: 0 }}>
+                This spot will be visible to everyone in {activeCircle?.name || 'your circle'}.
               </p>
             )}
 
-            <div style={{ display: 'flex', gap: 8, position: 'relative', zIndex: 40 }}>
-              <button
-                onClick={() => setShowFavModal(false)}
-                style={{
-                  flex: 1, padding: '11px 0', borderRadius: 10,
-                  border: '1.5px solid var(--border)', background: 'var(--surface2)',
-                  color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                }}
-              >Cancel</button>
-              <button
-                onClick={saveFavorite}
-                disabled={!favName.trim() || !favArea || savingFav}
-                style={{
-                  flex: 1, padding: '11px 0', borderRadius: 10,
-                  border: 'none', background: 'var(--accent)', color: '#fff',
-                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                  opacity: (!favName.trim() || !favArea || savingFav) ? 0.5 : 1,
-                }}
-              >{savingFav ? 'Saving...' : 'Save spot'}</button>
-            </div>
+            <button
+              onClick={saveFavorite}
+              disabled={!favName.trim() || !favArea || savingFav}
+              style={{
+                marginTop: 18, width: '100%', padding: 14, borderRadius: 14,
+                border: 'none', background: 'var(--accent)', color: '#fff',
+                fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                opacity: (!favName.trim() || !favArea || savingFav) ? 0.5 : 1,
+              }}
+            >{savingFav ? 'Saving...' : 'Save spot'}</button>
+            <button
+              onClick={() => setShowFavModal(false)}
+              style={{
+                marginTop: 8, width: '100%', padding: 12, borderRadius: 12,
+                border: '1px solid var(--border)', background: 'none',
+                color: 'var(--text2)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}
+            >Cancel</button>
           </div>
-        </>
+        </div>
       )}
     </div>
   )
