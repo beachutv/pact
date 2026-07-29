@@ -12,11 +12,11 @@ const CHANGELOG = [
     title: 'Better Calendar + Spark Cards',
     items: [
       '📅 Calendar view now shows 8am–12mn for bigger, easier-to-tap hour blocks',
-      '⚡ Sparks are now compact cards you can scroll through — swipe up to dismiss',
-      '📍 Each member in the day view now shows where they\'re coming from and when they\'re free',
-      '🗓️ Calendar selection now works reliably from any tab',
-      '🎨 Redesigned header — bigger profile photo, better icon layout, circle pills on their own row',
-      '🔔 Notification button is wider and easier to tap',
+      '⚡ Sparks are now stacked cards — swipe left to dismiss',
+      '🗓️ "My calendars" button works from any tab — reconnect easily if your token expires',
+      '🎨 Cleaner header layout matching the original Pact design',
+      '📍 Spot recommendations now include cafes, activities, coworking, parks, bars, and more',
+      '📍 Real-time location now shows for up to 7 days',
     ],
   },
   {

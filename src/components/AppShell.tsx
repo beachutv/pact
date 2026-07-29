@@ -175,7 +175,10 @@ export default function AppShell({
   const [gcals, setGcals] = useState<GCal[]>([])
   const [selectedCals, setSelectedCals] = useState<string[]>([])
 
+  const [calError, setCalError] = useState<string | null>(null)
+
   async function loadCalendars() {
+    setCalError(null)
     try {
       const res = await fetch('/api/calendar/list')
       if (res.ok) {
@@ -184,16 +187,27 @@ export default function AppShell({
         setSelectedCals(data.selectedIds || ['primary'])
         setShowCalModal(true)
       } else {
-        const err = await res.json().catch(() => ({}))
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }))
         console.error('Calendar list error:', res.status, err)
-        if (res.status === 400) {
-          setGcals([])
-          setSelectedCals([])
-          setShowCalModal(true)
+        setGcals([])
+        setSelectedCals([])
+        if (res.status === 500 && err.error?.includes('Token refresh')) {
+          setCalError('Your Google Calendar session expired. Please reconnect below.')
+        } else if (res.status === 400) {
+          setCalError('No Google Calendar connected yet. Connect one from your profile.')
+        } else if (res.status === 401) {
+          setCalError('Please sign in again to access your calendars.')
+        } else {
+          setCalError(err.error || 'Could not load calendars. Try again.')
         }
+        setShowCalModal(true)
       }
     } catch (e) {
       console.error('Calendar list fetch error:', e)
+      setCalError('Network error — check your connection and try again.')
+      setGcals([])
+      setSelectedCals([])
+      setShowCalModal(true)
     }
   }
 
@@ -396,67 +410,27 @@ export default function AppShell({
   return (
     <CircleContext.Provider value={{ user: currentUser, updateUser, circles, activeCircle, setActiveCircle, circleMembers, setCircleMembers }}>
       <div id="app-shell">
-        {/* Header */}
+        {/* Header — matches prototype: 2-row layout */}
         <header style={{
-          padding: '14px 18px 10px',
+          padding: '16px 18px 10px',
           borderBottom: '1px solid var(--border)',
           flexShrink: 0,
         }}>
-          {/* Row 1: Profile + brand | bell (wide), theme, calendar */}
+          {/* Row 1: Brand | buttons */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div
-                onClick={() => router.push(`/profile/${currentUser.id}`)}
-                style={{
-                  width: 42, height: 42, borderRadius: '50%',
-                  background: currentUser.color,
-                  color: txtOn(currentUser.color),
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 16, fontWeight: 800, cursor: 'pointer',
-                  border: '2px solid var(--border)',
-                  flexShrink: 0, position: 'relative', overflow: 'hidden',
-                }}
-              >
-                {currentUser.name?.[0] || '?'}
-                {currentUser.avatar_url && (
-                  <img src={currentUser.avatar_url} alt="" style={{
-                    position: 'absolute', inset: 0, width: '100%', height: '100%',
-                    objectFit: 'cover', borderRadius: '50%',
-                  }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                )}
-              </div>
-              <div>
-                <p style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1 }}>
-                  Pact<span style={{ color: 'var(--accent)' }}>.</span>
-                </p>
-                <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
-                  plans that actually happen
-                </p>
-              </div>
+            <div
+              onClick={() => router.push(`/profile/${currentUser.id}`)}
+              style={{ cursor: 'pointer' }}
+            >
+              <p style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1 }}>
+                Pact<span style={{ color: 'var(--accent)' }}>.</span>
+              </p>
+              <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
+                plans that actually happen
+              </p>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {/* Notification bell — wider for easier tapping */}
-              <button
-                onClick={() => setShowNotifs(!showNotifs)}
-                style={{
-                  background: 'var(--surface2)', border: '1px solid var(--border)',
-                  cursor: 'pointer', padding: '6px 14px', borderRadius: 20, position: 'relative',
-                  display: 'flex', alignItems: 'center', gap: 5,
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                </svg>
-                {unreadNotifCount > 0 && (
-                  <span style={{
-                    background: 'var(--red)', color: '#fff', borderRadius: 8,
-                    fontSize: 9, fontWeight: 800, padding: '1px 5px', lineHeight: 1.3,
-                  }}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
-                )}
-              </button>
-
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {/* Theme picker */}
               <button
                 onClick={() => setShowThemePicker(!showThemePicker)}
@@ -484,79 +458,82 @@ export default function AppShell({
                 )}
               </button>
 
-              {/* Calendar selector — opens modal directly from any tab */}
+              {/* Notification bell */}
+              <button
+                onClick={() => setShowNotifs(!showNotifs)}
+                style={{
+                  background: 'var(--surface2)', border: '1px solid var(--border)',
+                  cursor: 'pointer', padding: '6px 10px', borderRadius: 20, position: 'relative',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                {unreadNotifCount > 0 && (
+                  <span style={{
+                    background: 'var(--red)', color: '#fff', borderRadius: 8,
+                    fontSize: 9, fontWeight: 800, padding: '1px 5px', lineHeight: 1.3,
+                  }}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
+                )}
+              </button>
+
+              {/* Calendar selector */}
               <button
                 onClick={() => loadCalendars()}
                 title="My Calendars"
                 style={{
                   background: 'var(--surface2)', border: '1px solid var(--border)',
-                  cursor: 'pointer', padding: '6px 8px', borderRadius: 20,
-                  display: 'flex', alignItems: 'center',
+                  cursor: 'pointer', padding: '6px 10px', borderRadius: 20,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  fontSize: 11, fontWeight: 600, color: 'var(--text)',
                 }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
                   <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
                   <line x1="3" y1="10" x2="21" y2="10"/>
                 </svg>
+                My calendars
               </button>
             </div>
           </div>
 
-          {/* Row 2: Circle pills */}
-          {circles.length > 1 && (
-            <div style={{ marginTop: 8, display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
-              {circles.map(c => (
+          {/* Row 2: Circle name + members | circle switcher */}
+          <div style={{ marginTop: 11, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            {activeCircle ? (
+              <>
                 <button
-                  key={c.id}
-                  onClick={() => { setActiveCircle(c); setShowMembersList(false) }}
+                  onClick={() => circles.length > 1 ? setShowYourCircles(!showYourCircles) : setShowMembersList(!showMembersList)}
                   style={{
-                    padding: '5px 12px', borderRadius: 16, fontSize: 12, fontWeight: 700,
-                    border: c.id === activeCircle?.id ? '1.5px solid var(--accent)' : '1px solid var(--border)',
-                    background: c.id === activeCircle?.id ? 'var(--accent-soft)' : 'transparent',
-                    color: c.id === activeCircle?.id ? 'var(--accent)' : 'var(--text2)',
-                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--text2)', fontSize: 13, fontWeight: 600,
+                    padding: 0, display: 'flex', alignItems: 'center', gap: 4,
                   }}
                 >
-                  {c.emoji} {c.name}
+                  {activeCircle.name} · {circleMembers.length} members
+                  {circles.length > 1 && (
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                      {showYourCircles ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
+                    </svg>
+                  )}
                 </button>
-              ))}
-              <button
-                onClick={() => router.push('/circles/new')}
-                style={{
-                  padding: '5px 10px', borderRadius: 16, fontSize: 12, fontWeight: 700,
-                  border: '1px dashed var(--border)',
-                  background: 'transparent', color: 'var(--accent)',
-                  cursor: 'pointer', whiteSpace: 'nowrap',
-                }}
-              >+ New</button>
-            </div>
-          )}
-
-          {/* Row 3: Active circle + members */}
-          <div style={{ marginTop: circles.length > 1 ? 6 : 10, display: 'flex', alignItems: 'center' }}>
-            {activeCircle ? (
-              <button
-                onClick={() => setShowMembersList(!showMembersList)}
-                style={{
-                  fontSize: 13, fontWeight: 600, color: 'var(--text2)',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  padding: 0, display: 'flex', alignItems: 'center', gap: 8,
-                }}
-              >
-                {circles.length <= 1 && <span style={{ fontSize: 14 }}>{activeCircle.emoji}</span>}
-                {circles.length <= 1 && <span>{activeCircle.name}</span>}
-                {circles.length <= 1 && <span style={{ fontSize: 11, opacity: 0.5 }}>·</span>}
-                {/* Avatar stack */}
-                <span style={{ display: 'flex' }}>
-                  {circleMembers.slice(0, 5).map((m, i) => (
+                <button
+                  onClick={() => setShowMembersList(!showMembersList)}
+                  style={{
+                    display: 'flex', alignItems: 'center',
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  }}
+                >
+                  {circleMembers.slice(0, 6).map((m, i) => (
                     <span key={m.id} style={{
-                      width: 24, height: 24, borderRadius: '50%',
+                      width: 28, height: 28, borderRadius: '50%',
                       background: m.color, color: txtOn(m.color),
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 9, fontWeight: 800,
+                      fontSize: 10, fontWeight: 700,
                       border: '2px solid var(--bg)',
-                      marginLeft: i > 0 ? -7 : 0,
+                      marginLeft: i > 0 ? -8 : 0,
                       position: 'relative', overflow: 'hidden',
                     }}>
                       {m.name?.[0] || '?'}
@@ -568,17 +545,69 @@ export default function AppShell({
                       )}
                     </span>
                   ))}
-                </span>
-                <span style={{ fontSize: 12 }}>{circleMembers.length} member{circleMembers.length !== 1 ? 's' : ''}</span>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
-                  {showMembersList ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
-                </svg>
-              </button>
+                  {circleMembers.length > 6 && (
+                    <span style={{
+                      width: 28, height: 28, borderRadius: '50%',
+                      background: 'var(--surface2)', color: 'var(--text2)',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 9, fontWeight: 800, border: '2px solid var(--bg)', marginLeft: -8,
+                    }}>+{circleMembers.length - 6}</span>
+                  )}
+                </button>
+              </>
             ) : (
               <span style={{ fontSize: 12, color: 'var(--text2)' }}>No circles yet</span>
             )}
           </div>
         </header>
+
+        {/* Circle switcher dropdown */}
+        {showYourCircles && circles.length > 1 && typeof document !== 'undefined' && createPortal(
+          <>
+          <div onClick={() => setShowYourCircles(false)} style={{
+            position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.3)',
+          }} />
+          <div style={{
+            position: 'fixed', left: 12, right: 12, top: 90, zIndex: 9999,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 16, padding: '10px 14px',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text2)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Your circles
+            </div>
+            {circles.map(c => (
+              <button
+                key={c.id}
+                onClick={() => { setActiveCircle(c); setShowYourCircles(false) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  width: '100%', padding: '10px 0', textAlign: 'left',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  borderBottom: '1px solid var(--border)',
+                  color: c.id === activeCircle?.id ? 'var(--accent)' : 'var(--text)',
+                  fontSize: 14, fontWeight: c.id === activeCircle?.id ? 700 : 500,
+                }}
+              >
+                <span style={{ fontSize: 18 }}>{c.emoji}</span>
+                {c.name}
+                {c.id === activeCircle?.id && <span style={{ marginLeft: 'auto', fontSize: 12 }}>✓</span>}
+              </button>
+            ))}
+            <button
+              onClick={() => { setShowYourCircles(false); router.push('/circles/new') }}
+              style={{
+                marginTop: 6, fontSize: 13, fontWeight: 600,
+                color: 'var(--accent)', background: 'none', border: 'none',
+                cursor: 'pointer', padding: '6px 0',
+              }}
+            >
+              + Create new circle
+            </button>
+          </div>
+          </>,
+          document.body
+        )}
 
         {/* Members list popup — portal to avoid header clipping */}
         {showMembersList && activeCircle && typeof document !== 'undefined' && createPortal(
@@ -599,7 +628,12 @@ export default function AppShell({
               const isMe = m.id === user.id
               const hasLocation = m.live_area && m.live_updated_at
               const locAge = hasLocation ? Math.floor((Date.now() - new Date(m.live_updated_at!).getTime()) / 60000) : null
-              const locLabel = locAge !== null ? (locAge < 1 ? 'now' : locAge < 60 ? `${locAge}m ago` : `${Math.floor(locAge/60)}h ago`) : null
+              const locLabel = locAge !== null ? (
+                locAge < 1 ? 'now'
+                : locAge < 60 ? `${locAge}m ago`
+                : locAge < 1440 ? `${Math.floor(locAge/60)}h ago`
+                : `${Math.floor(locAge/1440)}d ago`
+              ) : null
               const isOnline = locAge !== null && locAge < 5
               return (
                 <div
@@ -642,7 +676,7 @@ export default function AppShell({
                       {m.name}{isMe ? ' (you)' : ''}
                       {isOnline && <span style={{ fontSize: 10, color: '#8BB07E', marginLeft: 4 }}>online</span>}
                     </span>
-                    {hasLocation && locAge !== null && locAge < 120 && (
+                    {hasLocation && locAge !== null && locAge < 10080 && (
                       <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                         {m.live_area} · {locLabel}
@@ -849,7 +883,15 @@ export default function AppShell({
             <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>
               Pick which calendars Pact checks for busy times. We only read busy/free — never event details.
             </p>
-            {gcals.length === 0 && (
+            {calError && (
+              <div style={{
+                fontSize: 13, color: 'var(--red)', padding: '14px 12px', textAlign: 'center',
+                background: 'rgba(231,118,93,0.1)', borderRadius: 12, marginBottom: 10,
+              }}>
+                {calError}
+              </div>
+            )}
+            {!calError && gcals.length === 0 && (
               <div style={{ fontSize: 13, color: 'var(--text2)', padding: '16px 0', textAlign: 'center' }}>
                 No calendars found. Make sure your Google Calendar is connected.
               </div>
@@ -905,6 +947,18 @@ export default function AppShell({
                 }}
               >
                 Save & sync
+              </button>
+            )}
+            {calError && calError.includes('expired') && (
+              <button
+                onClick={() => { setShowCalModal(false); window.location.href = '/api/calendar/connect' }}
+                style={{
+                  marginTop: 8, width: '100%', padding: 12, border: 'none', borderRadius: 12,
+                  background: 'var(--accent)', color: '#fff',
+                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                Reconnect Google Calendar
               </button>
             )}
             <button

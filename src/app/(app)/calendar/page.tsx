@@ -48,16 +48,44 @@ const VENUES: { name: string; emoji: string; area: string; x: number; y: number;
   // Bars & nightlife
   { name: 'Poblacion Rooftop', emoji: '🍹', area: 'Poblacion, Makati', x: 4.2, y: 3.7, type: 'bar' },
   { name: 'Bank Bar', emoji: '🍸', area: 'BGC, Taguig', x: 5.5, y: 3.4, type: 'bar' },
-  // Activities
-  { name: 'Board Game Café', emoji: '🎲', area: 'Maginhawa, QC', x: 5.2, y: 7.5, type: 'coffee' },
-  { name: 'Family KTV', emoji: '🎤', area: 'Timog Ave, QC', x: 4.8, y: 7, type: 'karaoke' },
-  { name: 'Timezone Arcade', emoji: '🕹️', area: 'Glorietta, Makati', x: 4.1, y: 3.4, type: 'arcade' },
+  { name: 'Xylo at The Palace', emoji: '🍷', area: 'BGC, Taguig', x: 5.6, y: 3.5, type: 'bar' },
+  { name: 'Tipsy Pig', emoji: '🍻', area: 'Kapitolyo, Pasig', x: 5.3, y: 5.3, type: 'bar' },
+  // Desserts & sweets
+  { name: 'Café Mary Grace', emoji: '🧁', area: 'Serendra, BGC', x: 5.5, y: 3.5, type: 'dessert' },
+  { name: 'Sebastian\'s', emoji: '🍦', area: 'Aguirre Ave, BF Homes', x: 4.5, y: 1.8, type: 'dessert' },
+  { name: 'Poison Doughnuts', emoji: '🍩', area: 'Legazpi Village, Makati', x: 4.0, y: 3.3, type: 'dessert' },
+  { name: 'Bungalow', emoji: '🍰', area: 'Scout Castor, QC', x: 5.0, y: 7.2, type: 'dessert' },
+  { name: 'Early Bird Breakfast Club', emoji: '🥞', area: 'Salcedo Village, Makati', x: 4.1, y: 3.4, type: 'food' },
+  // Activities & fun
+  { name: 'Board Game Café', emoji: '🎲', area: 'Maginhawa, QC', x: 5.2, y: 7.5, type: 'activity' },
+  { name: 'Family KTV', emoji: '🎤', area: 'Timog Ave, QC', x: 4.8, y: 7, type: 'activity' },
+  { name: 'Timezone Arcade', emoji: '🕹️', area: 'Glorietta, Makati', x: 4.1, y: 3.4, type: 'activity' },
+  { name: 'B&D by Commune', emoji: '🎳', area: 'Poblacion, Makati', x: 4.2, y: 3.7, type: 'activity' },
+  { name: 'Ace Water Spa', emoji: '♨️', area: 'Kapitolyo, Pasig', x: 5.3, y: 5.4, type: 'activity' },
+  { name: 'Kidzania Manila', emoji: '🎪', area: 'BGC, Taguig', x: 5.5, y: 3.4, type: 'activity' },
+  { name: 'Art in Island Museum', emoji: '🎨', area: 'Cubao, QC', x: 5.5, y: 6.5, type: 'activity' },
+  { name: 'Escape Room PH', emoji: '🔐', area: 'BGC, Taguig', x: 5.5, y: 3.5, type: 'activity' },
+  // Coworking & chill
+  { name: 'Common Ground', emoji: '💻', area: 'Ayala, Makati', x: 4.0, y: 3.4, type: 'cowork' },
+  { name: 'WeWork Uptown', emoji: '💼', area: 'Uptown, BGC', x: 5.4, y: 3.6, type: 'cowork' },
+  { name: 'A-Space', emoji: '🖥️', area: 'Salcedo Village, Makati', x: 4.1, y: 3.5, type: 'cowork' },
+  // Nature & outdoors
+  { name: 'Luneta Park', emoji: '🌳', area: 'Ermita, Manila', x: 3.0, y: 5.0, type: 'outdoor' },
+  { name: 'La Mesa Eco Park', emoji: '🌿', area: 'Novaliches, QC', x: 5.0, y: 9.0, type: 'outdoor' },
+  { name: 'Ninoy Aquino Parks & Wildlife', emoji: '🦋', area: 'Diliman, QC', x: 5.0, y: 7.8, type: 'outdoor' },
   // Malls & shopping
   { name: 'UP Town Center', emoji: '🛍️', area: 'Katipunan, QC', x: 6, y: 8, type: 'mall' },
   { name: 'SM Megamall', emoji: '🛍️', area: 'Megamall, Ortigas', x: 5.4, y: 5.5, type: 'mall' },
   { name: 'Ayala Malls Manila Bay', emoji: '🌊', area: 'Parañaque', x: 3.5, y: 2.8, type: 'mall' },
   { name: 'Eastwood Mall', emoji: '🛍️', area: 'Eastwood, QC', x: 6, y: 6.5, type: 'mall' },
   { name: 'Trinoma', emoji: '🛍️', area: 'North EDSA, QC', x: 4.5, y: 8.3, type: 'mall' },
+  { name: 'Robinsons Galleria', emoji: '🛍️', area: 'Ortigas, Pasig', x: 5.4, y: 5.6, type: 'mall' },
+  { name: 'Greenbelt', emoji: '🛍️', area: 'Ayala, Makati', x: 4.1, y: 3.5, type: 'mall' },
+  { name: 'Venice Grand Canal', emoji: '🏙️', area: 'McKinley Hill, Taguig', x: 5.3, y: 3.3, type: 'mall' },
+  // Markets & food halls
+  { name: 'Mercato Centrale', emoji: '🍢', area: 'BGC, Taguig', x: 5.5, y: 3.5, type: 'food' },
+  { name: 'Legazpi Sunday Market', emoji: '🥑', area: 'Legazpi Village, Makati', x: 4.0, y: 3.3, type: 'food' },
+  { name: 'Salcedo Saturday Market', emoji: '🫒', area: 'Salcedo Village, Makati', x: 4.1, y: 3.4, type: 'food' },
 ]
 
 function SparkCard({ spark: sp, todayStr, onDismiss }: { spark: Spark; todayStr: string; onDismiss: () => void }) {
@@ -628,10 +656,33 @@ export default function CalendarPage() {
         maxWho: maxEntry.name,
         source: (spot.isFav ? 'favorite' : 'venue') as 'favorite' | 'venue',
         score,
+        _type: spot.type,
       }
     }).sort((a, b) => a.score - b.score)
 
-    return scored.slice(0, 10)
+    // Ensure variety — pick best from each type first, then fill remaining
+    const byType = new Map<string, typeof scored[0][]>()
+    scored.forEach(s => {
+      if (!byType.has(s._type)) byType.set(s._type, [])
+      byType.get(s._type)!.push(s)
+    })
+    const diverse: typeof scored = []
+    const usedNames = new Set<string>()
+    // Round-robin: one from each type
+    for (const [, items] of byType) {
+      if (diverse.length >= 10) break
+      const pick = items.find(s => !usedNames.has(s.name))
+      if (pick) { diverse.push(pick); usedNames.add(pick.name) }
+    }
+    // Fill remaining from best overall
+    for (const s of scored) {
+      if (diverse.length >= 10) break
+      if (!usedNames.has(s.name)) { diverse.push(s); usedNames.add(s.name) }
+    }
+    // Re-sort by score
+    diverse.sort((a, b) => a.score - b.score)
+
+    return diverse
   }, [sheetDate, memberOrigins, favSpots, selectedWinIdx, activeMembers])
 
   // Pact long press handlers
