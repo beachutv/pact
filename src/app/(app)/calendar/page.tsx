@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
@@ -10,7 +9,6 @@ import { useLocationUpdate } from '@/lib/useLocationUpdate'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 
 type BusyBlock = { user_id: string; date: string; start_hour: number; end_hour: number }
-type GCal = { id: string; summary: string; primary: boolean; backgroundColor: string }
 type Win = { s: number; e: number; count: number }
 type DaySummary = { past?: boolean; allDay?: boolean; bestFull?: Win; bestPartial?: Win }
 type Spark = {
@@ -176,10 +174,7 @@ export default function CalendarPage() {
   // Favorite spots for recommendations
   const [favSpots, setFavSpots] = useState<FavSpot[]>([])
 
-  // Calendar selection modal
-  const [showCalModal, setShowCalModal] = useState(false)
-  const [gcals, setGcals] = useState<GCal[]>([])
-  const [selectedCals, setSelectedCals] = useState<string[]>([])
+  // Calendar selection modal is now in AppShell (global)
 
   // Load favorite spots for recommendations
   useEffect(() => {
@@ -341,28 +336,7 @@ export default function CalendarPage() {
     setSheetDate(dateParam)
   }, [dateParam, loading])
 
-  // Listen for calendar selector event from header
-  const loadCalRef = useRef<() => void>(() => {})
-  useEffect(() => { loadCalRef.current = loadCalendars })
-  useEffect(() => {
-    function onCalSelector() { loadCalRef.current() }
-    window.addEventListener('pact-open-cal-selector', onCalSelector)
-    return () => window.removeEventListener('pact-open-cal-selector', onCalSelector)
-  }, [])
-
-  // Also open calendar modal via URL param (when navigating from another tab)
-  const openCalHandled = useRef(false)
-  useEffect(() => {
-    if (openCalHandled.current || loading) return
-    if (searchParams.get('openCal') === '1') {
-      openCalHandled.current = true
-      // Small delay to ensure component is ready
-      setTimeout(() => {
-        loadCalendars()
-        window.history.replaceState({}, '', '/calendar')
-      }, 300)
-    }
-  }, [loading, searchParams])
+  // Calendar modal is now handled globally in AppShell
 
   // Sync calendar (manual trigger)
   async function syncCalendar() {
@@ -381,47 +355,7 @@ export default function CalendarPage() {
     setBlockReloadKey(k => k + 1)
   }
 
-  // Load Google calendars for selection modal
-  async function loadCalendars() {
-    try {
-      const res = await fetch('/api/calendar/list')
-      if (res.ok) {
-        const data = await res.json()
-        setGcals(data.calendars || [])
-        setSelectedCals(data.selectedIds || ['primary'])
-        setShowCalModal(true)
-      } else {
-        const err = await res.json().catch(() => ({}))
-        console.error('Calendar list error:', res.status, err)
-        // If no calendar connected, show modal anyway with empty list so user sees the issue
-        if (res.status === 400) {
-          setGcals([])
-          setSelectedCals([])
-          setShowCalModal(true)
-        }
-      }
-    } catch (e) {
-      console.error('Calendar list fetch error:', e)
-    }
-  }
-
-  async function saveCalendarSelection() {
-    await fetch('/api/calendar/list', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ selectedIds: selectedCals }),
-    })
-    setShowCalModal(false)
-    syncCalendar()
-  }
-
-  async function disconnectCalendar() {
-    if (!confirm('Disconnect Google Calendar? You can reconnect anytime.')) return
-    await supabase.from('calendar_connections').delete().eq('user_id', user.id).eq('provider', 'google')
-    await supabase.from('busy_blocks').delete().eq('user_id', user.id).eq('source', 'google')
-    setConnected(false)
-    setBusyBlocks(prev => prev.filter(b => b.user_id !== user.id))
-  }
+  // Calendar selection modal is in AppShell
 
   // Current hour in user's timezone
   const nowHour = useMemo(() => currentHourInTz(tz), [tz])
@@ -1473,95 +1407,7 @@ export default function CalendarPage() {
         </>
       )}
 
-      {/* Calendar selection modal — portaled to body to escape stacking context */}
-      {showCalModal && createPortal(
-        <div
-          onClick={e => { if (e.target === e.currentTarget) setShowCalModal(false) }}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-            zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <div style={{
-            background: 'var(--surface)', borderRadius: 20, padding: 20,
-            width: '90%', maxWidth: 360, maxHeight: '80%', overflowY: 'auto',
-          }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>My calendars</h3>
-            <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>
-              Pick which calendars Pact checks for busy times. We only read busy/free — never event details.
-            </p>
-            {gcals.length === 0 && (
-              <div style={{ fontSize: 13, color: 'var(--text2)', padding: '16px 0', textAlign: 'center' }}>
-                No calendars found. Make sure your Google Calendar is connected.
-              </div>
-            )}
-            {gcals.map(cal => {
-              const on = selectedCals.includes(cal.id)
-              return (
-                <div
-                  key={cal.id}
-                  onClick={() => {
-                    setSelectedCals(prev =>
-                      prev.includes(cal.id)
-                        ? prev.filter(id => id !== cal.id)
-                        : [...prev, cal.id]
-                    )
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '10px 12px', borderRadius: 12, marginBottom: 6,
-                    background: on ? 'var(--accent-soft)' : 'var(--surface2)',
-                    cursor: 'pointer', border: on ? '1.5px solid var(--accent)' : '1.5px solid transparent',
-                  }}
-                >
-                  <div style={{
-                    width: 12, height: 12, borderRadius: 3,
-                    background: cal.backgroundColor,
-                  }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{cal.summary}</div>
-                    {cal.primary && <div style={{ fontSize: 10, color: 'var(--text2)' }}>Primary</div>}
-                  </div>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: 6,
-                    border: on ? 'none' : '2px solid var(--border)',
-                    background: on ? 'var(--accent)' : 'transparent',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#fff', fontSize: 12, fontWeight: 800,
-                  }}>
-                    {on ? '✓' : ''}
-                  </div>
-                </div>
-              )
-            })}
-            {gcals.length > 0 && (
-              <button
-                onClick={saveCalendarSelection}
-                disabled={selectedCals.length === 0}
-                style={{
-                  marginTop: 12, width: '100%', padding: 12, border: 'none', borderRadius: 12,
-                  background: selectedCals.length > 0 ? 'var(--accent)' : 'var(--surface3)',
-                  color: selectedCals.length > 0 ? '#fff' : 'var(--text2)',
-                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                }}
-              >
-                Save & sync
-              </button>
-            )}
-            <button
-              onClick={() => { setShowCalModal(false); disconnectCalendar() }}
-              style={{
-                marginTop: 8, width: '100%', padding: 10, border: 'none', borderRadius: 12,
-                background: 'transparent', color: 'var(--red)',
-                fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              Disconnect Google Calendar
-            </button>
-          </div>
-        </div>,
-        document.body
-      )}
+      {/* Calendar selection modal is now in AppShell */}
     </div>
   )
 }
