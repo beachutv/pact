@@ -3,9 +3,23 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-const CURRENT_VERSION = '11.0'
+const CURRENT_VERSION = '12.0'
 
 const CHANGELOG = [
+  {
+    version: '12.0',
+    date: 'July 29, 2026',
+    title: 'Presence + Smarter Spots',
+    items: [
+      '🟢 Online indicator — see who\'s active in your circle right now',
+      '📍 Spot recommendations now use your live location instead of always saying "from home"',
+      '🔄 Circle reordering — long-press arrows to arrange your circles',
+      '📅 Calendar syncs 3 months ahead for better long-term planning',
+      '💬 Cross-circle DMs now show correct profile photos',
+      '🗑️ Delete proposed hangout messages with long-press',
+      '⏳ Calendar loading indicator when fetching your calendars',
+    ],
+  },
   {
     version: '11.0',
     date: 'July 29, 2026',

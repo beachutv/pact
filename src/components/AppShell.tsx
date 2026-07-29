@@ -24,6 +24,7 @@ export type UserProfile = {
   live_area: string | null
   live_updated_at: string | null
   avatar_url: string | null
+  last_seen_at: string | null
 }
 
 export type Circle = {
@@ -164,6 +165,22 @@ export default function AppShell({
       }
     }).catch(() => {})
   }, [])
+
+  // Heartbeat: update last_seen_at every 2 min while tab is visible (no permissions needed)
+  useEffect(() => {
+    function heartbeat() {
+      if (document.visibilityState === 'visible') {
+        supabase.from('users').update({ last_seen_at: new Date().toISOString() }).eq('id', user.id).then(() => {})
+      }
+    }
+    heartbeat() // immediate on mount
+    const interval = setInterval(heartbeat, 2 * 60 * 1000)
+    document.addEventListener('visibilitychange', heartbeat)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', heartbeat)
+    }
+  }, [user.id])
 
   // Prefetch all tab routes for instant navigation
   useEffect(() => {
@@ -635,7 +652,7 @@ export default function AppShell({
                   }}
                 >
                   {circleMembers.slice(0, 6).map((m, i) => {
-                    const mOnline = m.live_updated_at && (Date.now() - new Date(m.live_updated_at).getTime()) < 5 * 60 * 1000
+                    const mOnline = m.last_seen_at && (Date.now() - new Date(m.last_seen_at).getTime()) < 5 * 60 * 1000
                     return (
                     <span key={m.id} style={{
                       position: 'relative',
@@ -791,7 +808,7 @@ export default function AppShell({
                 : locAge < 1440 ? `${Math.floor(locAge/60)}h ago`
                 : `${Math.floor(locAge/1440)}d ago`
               ) : null
-              const isOnline = locAge !== null && locAge < 5
+              const isOnline = m.last_seen_at ? (Date.now() - new Date(m.last_seen_at).getTime()) < 5 * 60 * 1000 : false
               return (
                 <div
                   key={m.id}

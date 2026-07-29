@@ -562,6 +562,8 @@ export default function CalendarPage() {
     ].sort((a, b) => a.s - b.s)
     const winStart = wins[selectedWinIdx]?.s ?? 18
 
+    const isToday = sheetDate === todayStr
+
     return activeMembers.map(m => {
       let homeX = (m as any).home_x || 0
       let homeY = (m as any).home_y || 0
@@ -577,6 +579,32 @@ export default function CalendarPage() {
         homeY = fallback.y
       }
 
+      // For today: use live location if recent (within 7 days), else fall back to home
+      const liveArea = (m as any).live_area as string | null
+      const liveUpdated = (m as any).live_updated_at as string | null
+      const liveRecent = liveArea && liveUpdated && (Date.now() - new Date(liveUpdated).getTime()) < 7 * 24 * 60 * 60 * 1000
+
+      // Determine current origin: live location (today only) or home
+      let originX = homeX
+      let originY = homeY
+      let originArea = homeArea
+      let originLabel = `from home · ${homeArea || 'unknown'}`
+
+      if (isToday && liveRecent && liveArea) {
+        // Look up grid coordinates for the live area
+        const liveCoords = AREAS[liveArea]
+        const fuzzyLive = !liveCoords ? Object.keys(AREAS).find(a =>
+          liveArea.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(liveArea.toLowerCase())
+        ) : undefined
+        const coords = liveCoords || (fuzzyLive ? AREAS[fuzzyLive] : null)
+        if (coords) {
+          originX = coords.x
+          originY = coords.y
+          originArea = liveArea
+          originLabel = `currently in ${liveArea}`
+        }
+      }
+
       // Find last busy block ending before or at the window start
       const priorBlocks = busyBlocks
         .filter(b => b.user_id === m.id && b.date === sheetDate && b.end_hour <= winStart && b.end_hour >= winStart - 3)
@@ -584,6 +612,17 @@ export default function CalendarPage() {
       const prior = priorBlocks[0]
 
       if (prior) {
+        // If today with live location, use live coords but mention busy block
+        if (isToday && liveRecent && liveArea && originArea !== homeArea) {
+          return {
+            name: m.name.split(' ')[0],
+            color: m.color,
+            x: originX,
+            y: originY,
+            area: originArea,
+            label: `currently in ${originArea} (busy till ${fmtHour(prior.end_hour)})`,
+          }
+        }
         return {
           name: m.name.split(' ')[0],
           color: m.color,
@@ -596,13 +635,13 @@ export default function CalendarPage() {
       return {
         name: m.name.split(' ')[0],
         color: m.color,
-        x: homeX,
-        y: homeY,
-        area: homeArea,
-        label: `from home · ${homeArea || 'unknown'}`,
+        x: originX,
+        y: originY,
+        area: originArea,
+        label: originLabel,
       }
     }).filter(o => o.x !== 0 || o.y !== 0)
-  }, [sheetDate, activeMembers, busyBlocks, selectedWinIdx])
+  }, [sheetDate, activeMembers, busyBlocks, selectedWinIdx, todayStr])
 
   // Spot recommendations using ALL venues + favorites
   const spotRecommendations = useMemo((): SpotRec[] => {
