@@ -23,9 +23,9 @@ type FavSpot = { id: string; name: string; emoji: string; area: string; x: numbe
 type OriginInfo = { name: string; color: string; x: number; y: number; area: string; label: string }
 type SpotRec = { name: string; emoji: string; area: string; travelTimes: { name: string; color: string; minutes: number }[]; avgMin: number; maxMin: number; maxWho: string; source: 'favorite' | 'venue' }
 
-// Known hangout venues in Metro Manila (matches prototype)
+// Known hangout venues in Metro Manila — diverse locations for varied recommendations
 const VENUES: { name: string; emoji: string; area: string; x: number; y: number; type: string }[] = [
-  // Restaurants & cafés (prioritized)
+  // Restaurants — spread across Metro Manila
   { name: 'Wildflour', emoji: '🥐', area: 'BGC, Taguig', x: 5.5, y: 3.5, type: 'food' },
   { name: 'Manam', emoji: '🍛', area: 'Ayala, Makati', x: 4, y: 3.4, type: 'food' },
   { name: 'Mendokoro Ramenba', emoji: '🍜', area: 'Poblacion, Makati', x: 4.2, y: 3.8, type: 'food' },
@@ -34,14 +34,31 @@ const VENUES: { name: string; emoji: string; area: string; x: number; y: number;
   { name: 'Samgyupsalamat', emoji: '🥓', area: 'Timog Ave, QC', x: 4.8, y: 7, type: 'food' },
   { name: 'Tim Ho Wan', emoji: '🥟', area: 'Megamall, Ortigas', x: 5.4, y: 5.5, type: 'food' },
   { name: 'Yabu', emoji: '🍱', area: 'BGC, Taguig', x: 5.6, y: 3.3, type: 'food' },
+  { name: 'Sarsa Kitchen', emoji: '🍗', area: 'Bonifacio Stopover, BGC', x: 5.4, y: 3.6, type: 'food' },
+  { name: 'Ramen Nagi', emoji: '🍜', area: 'SM North EDSA, QC', x: 4.5, y: 8.2, type: 'food' },
+  { name: 'Locavore', emoji: '🥘', area: 'Kapitolyo, Pasig', x: 5.3, y: 5.4, type: 'food' },
+  { name: 'Mesa Filipino', emoji: '🍲', area: 'Greenbelt, Makati', x: 4.1, y: 3.5, type: 'food' },
+  { name: 'Ooma', emoji: '🍣', area: 'Power Plant Mall, Makati', x: 4.3, y: 3.6, type: 'food' },
+  { name: 'Vikings Buffet', emoji: '🍖', area: 'SM MOA, Pasay', x: 3.2, y: 3.2, type: 'food' },
+  { name: 'Liliw\'s Café', emoji: '🥞', area: 'Alabang, Muntinlupa', x: 5.2, y: 1.5, type: 'food' },
+  // Cafés
   { name: 'Kape Diem Café', emoji: '☕', area: 'Katipunan, QC', x: 6, y: 7.9, type: 'coffee' },
   { name: 'CBTL Eastwood', emoji: '☕', area: 'Eastwood, QC', x: 6, y: 6.5, type: 'coffee' },
-  // Other activities
+  { name: 'Yardstick Coffee', emoji: '☕', area: 'Legazpi Village, Makati', x: 4.0, y: 3.3, type: 'coffee' },
+  { name: 'The Commune', emoji: '☕', area: 'Poblacion, Makati', x: 4.2, y: 3.7, type: 'coffee' },
+  // Bars & nightlife
   { name: 'Poblacion Rooftop', emoji: '🍹', area: 'Poblacion, Makati', x: 4.2, y: 3.7, type: 'bar' },
+  { name: 'Bank Bar', emoji: '🍸', area: 'BGC, Taguig', x: 5.5, y: 3.4, type: 'bar' },
+  // Activities
   { name: 'Board Game Café', emoji: '🎲', area: 'Maginhawa, QC', x: 5.2, y: 7.5, type: 'coffee' },
   { name: 'Family KTV', emoji: '🎤', area: 'Timog Ave, QC', x: 4.8, y: 7, type: 'karaoke' },
+  { name: 'Timezone Arcade', emoji: '🕹️', area: 'Glorietta, Makati', x: 4.1, y: 3.4, type: 'arcade' },
+  // Malls & shopping
   { name: 'UP Town Center', emoji: '🛍️', area: 'Katipunan, QC', x: 6, y: 8, type: 'mall' },
   { name: 'SM Megamall', emoji: '🛍️', area: 'Megamall, Ortigas', x: 5.4, y: 5.5, type: 'mall' },
+  { name: 'Ayala Malls Manila Bay', emoji: '🌊', area: 'Parañaque', x: 3.5, y: 2.8, type: 'mall' },
+  { name: 'Eastwood Mall', emoji: '🛍️', area: 'Eastwood, QC', x: 6, y: 6.5, type: 'mall' },
+  { name: 'Trinoma', emoji: '🛍️', area: 'North EDSA, QC', x: 4.5, y: 8.3, type: 'mall' },
 ]
 
 export default function CalendarPage() {
@@ -359,24 +376,41 @@ export default function CalendarPage() {
     return { allDay, bestFull, bestPartial, past: false }
   }
 
+  // Helper: sanitize coordinates — if they look like GPS (>12), fall back to area lookup
+  function sanitizeCoords(x: number, y: number, area: string): { x: number; y: number } {
+    if (x > 12 || y > 12) {
+      const areaCoords = area ? AREAS[area] : undefined
+      const fuzzyKey = !areaCoords ? Object.keys(AREAS).find(a =>
+        area.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(area.toLowerCase())
+      ) : undefined
+      const fallback = areaCoords || (fuzzyKey ? AREAS[fuzzyKey] : { x: 4.5, y: 5.5 })
+      return fallback
+    }
+    return { x, y }
+  }
+
   // ================= Sparks =================
+  const [sparkStatus, setSparkStatus] = useState<string>('')
+
   const sparks = useMemo((): Spark[] => {
-    if (!activeCircle) return []
+    if (!activeCircle) { setSparkStatus('no circle'); return [] }
     // Can't compute sparks if current user hasn't connected calendar
-    if (!connectedUserIds.has(user.id)) return []
+    if (!connectedUserIds.has(user.id)) { setSparkStatus('your calendar is not connected'); return [] }
     const myLive = (user as any).live_lat && (user as any).live_lng && (user as any).live_updated_at &&
       (Date.now() - new Date((user as any).live_updated_at).getTime()) < 4 * 3600000
       ? { lat: (user as any).live_lat as number, lng: (user as any).live_lng as number } : null
-    const myCoords = { x: (user as any).home_x || 0, y: (user as any).home_y || 0 }
+    const rawMyCoords = { x: (user as any).home_x || 0, y: (user as any).home_y || 0 }
+    const myCoords = sanitizeCoords(rawMyCoords.x, rawMyCoords.y, (user as any).home_area || '')
     const h = Math.max(DAY_START, Math.min(nowHour, 20))
     const result: Spark[] = []
+    let debugSkips = { noCal: 0, noCoords: 0, tooFar: 0, noWindow: 0 }
 
     for (const m of circleMembers) {
       // Skip dismissed sparks (but they return after 1 hour)
       const dismissedAt = dismissedSparks.get(m.id)
       if (m.id === user.id || (dismissedAt && Date.now() - dismissedAt < 3600000)) continue
       // Skip members without calendar connected — their availability is unknown
-      if (!connectedUserIds.has(m.id)) continue
+      if (!connectedUserIds.has(m.id)) { debugSkips.noCal++; continue }
 
       const theirLive = m.live_lat && m.live_lng && m.live_updated_at &&
         (Date.now() - new Date(m.live_updated_at).getTime()) < 4 * 3600000
@@ -386,25 +420,26 @@ export default function CalendarPage() {
       if (myLive && theirLive) {
         t = travelMinGps(myLive, theirLive)
       } else {
-        const theirCoords = { x: m.home_x || 0, y: m.home_y || 0 }
-        if (myCoords.x === 0 && myCoords.y === 0) continue
-        if (theirCoords.x === 0 && theirCoords.y === 0) continue
+        const rawTheirCoords = { x: m.home_x || 0, y: m.home_y || 0 }
+        const theirCoords = sanitizeCoords(rawTheirCoords.x, rawTheirCoords.y, m.home_area || '')
+        if (myCoords.x === 0 && myCoords.y === 0) { debugSkips.noCoords++; continue }
+        if (theirCoords.x === 0 && theirCoords.y === 0) { debugSkips.noCoords++; continue }
         t = travelMin(myCoords, theirCoords)
       }
-      if (t > 25) continue
+      if (t > 45) { debugSkips.tooFar++; continue }
 
-      // Find shared free window today (min 2 hours)
+      // Find shared free window today (min 1.5 hours)
       let ws: number | null = null
       let best: { s: number; e: number; len: number } | null = null
       for (let x = h; x <= DAY_END; x++) {
         const ok = x < DAY_END && !isBusy(user.id, todayStr, x) && !isBusy(m.id, todayStr, x)
         if (ok && ws === null) ws = x
         if (!ok && ws !== null) {
-          if (x - ws >= 2 && (!best || x - ws > best.len)) best = { s: ws, e: x, len: x - ws }
+          if (x - ws >= 1.5 && (!best || x - ws > best.len)) best = { s: ws, e: x, len: x - ws }
           ws = null
         }
       }
-      if (!best) continue
+      if (!best) { debugSkips.noWindow++; continue }
       result.push({
         member: m,
         travelTime: t,
@@ -412,6 +447,19 @@ export default function CalendarPage() {
         area: (m.home_area || '').replace(' (home)', ''),
       })
     }
+
+    // Build status message for empty sparks
+    if (result.length === 0) {
+      const reasons: string[] = []
+      if (debugSkips.noCal > 0) reasons.push(`${debugSkips.noCal} haven't connected calendars`)
+      if (debugSkips.tooFar > 0) reasons.push(`${debugSkips.tooFar} are too far away`)
+      if (debugSkips.noWindow > 0) reasons.push(`${debugSkips.noWindow} have no shared free time today`)
+      if (debugSkips.noCoords > 0) reasons.push(`${debugSkips.noCoords} missing location`)
+      setSparkStatus(reasons.length > 0 ? reasons.join(', ') : 'no matches right now')
+    } else {
+      setSparkStatus('')
+    }
+
     return result.sort((a, b) => a.travelTime - b.travelTime)
   }, [activeCircle, circleMembers, busyBlocks, dismissedSparks, todayStr, nowHour, user.id, connectedUserIds, sparkRefreshKey])
 
@@ -533,7 +581,7 @@ export default function CalendarPage() {
       }
     }).sort((a, b) => a.score - b.score)
 
-    return scored.slice(0, 3)
+    return scored.slice(0, 10)
   }, [sheetDate, memberOrigins, favSpots, selectedWinIdx, activeMembers])
 
   // Pact long press handlers
@@ -1026,22 +1074,32 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Floating spark button */}
+      {/* Floating spark button + status tooltip */}
       {!sheetDate && (
-        <button
-          onClick={refreshSparks}
-          style={{
-            position: 'absolute', bottom: 16, right: 16, zIndex: 20,
-            width: 48, height: 48, borderRadius: '50%',
-            background: 'linear-gradient(135deg, rgba(118,172,179,0.9), rgba(139,176,126,0.8))',
-            border: 'none', color: '#fff', fontSize: 20,
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(118,172,179,0.4)',
-          }}
-          title="Check for sparks"
-        >
-          ⚡
-        </button>
+        <div style={{ position: 'absolute', bottom: 16, right: 16, zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          {sparks.length === 0 && sparkStatus && sparkRefreshKey > 0 && (
+            <div style={{
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 12, padding: '8px 12px', fontSize: 11, color: 'var(--text2)',
+              maxWidth: 220, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', lineHeight: 1.4,
+            }}>
+              No sparks right now — {sparkStatus}
+            </div>
+          )}
+          <button
+            onClick={refreshSparks}
+            style={{
+              width: 48, height: 48, borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(118,172,179,0.9), rgba(139,176,126,0.8))',
+              border: 'none', color: '#fff', fontSize: 20,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 16px rgba(118,172,179,0.4)',
+            }}
+            title="Check for sparks"
+          >
+            ⚡
+          </button>
+        </div>
       )}
 
       {/* Day sheet overlay */}
@@ -1152,10 +1210,10 @@ export default function CalendarPage() {
                           title={isMe ? `${fmtHour(h)} — tap to toggle` : `${m.name.split(' ')[0]}: ${busy ? 'busy' : 'free'}`}
                           style={{
                             height: 28, borderRadius: 4,
-                            background: isPast ? 'rgba(100,100,100,0.15)'
+                            background: isPast ? 'rgba(80,80,80,0.1)'
                               : isPactHour ? (isPactConfirmed ? 'rgba(245,158,11,0.35)' : 'rgba(59,130,246,0.22)')
-                              : busy ? 'rgba(231,118,93,0.16)' : 'rgba(139,176,126,0.14)',
-                            border: isPactHour && !isPast ? `1.5px solid ${isPactConfirmed ? '#FFB854' : '#5B7B8A'}` : busy && !isPast ? '1px solid rgba(231,118,93,0.35)' : 'none',
+                              : busy ? 'rgba(231,118,93,0.28)' : 'rgba(139,176,126,0.25)',
+                            border: isPactHour && !isPast ? `1.5px solid ${isPactConfirmed ? '#FFB854' : '#5B7B8A'}` : busy && !isPast ? '1px solid rgba(231,118,93,0.5)' : '1px solid rgba(139,176,126,0.35)',
                             cursor: isMe && !isPast ? 'pointer' : 'default',
                             opacity: isPast ? 0.4 : 1,
                           }}

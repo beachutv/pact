@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, createContext, useContext, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { usePathname, useRouter } from 'next/navigation'
 import { txtOn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -342,23 +343,23 @@ export default function AppShell({
   return (
     <CircleContext.Provider value={{ user: currentUser, updateUser, circles, activeCircle, setActiveCircle, circleMembers, setCircleMembers }}>
       <div id="app-shell">
-        {/* Header — compact */}
+        {/* Header — balanced proportions matching prototype */}
         <header style={{
-          padding: '10px 16px 8px',
+          padding: '14px 18px 10px',
           borderBottom: '1px solid var(--border)',
           flexShrink: 0,
         }}>
-          {/* Row 1: Profile photo + greeting left, icons right */}
+          {/* Row 1: Brand + icons */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div
                 onClick={() => router.push(`/profile/${currentUser.id}`)}
                 style={{
-                  width: 34, height: 34, borderRadius: '50%',
+                  width: 36, height: 36, borderRadius: '50%',
                   background: currentUser.color,
                   color: txtOn(currentUser.color),
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                  fontSize: 14, fontWeight: 800, cursor: 'pointer',
                   border: '2px solid var(--border)',
                   flexShrink: 0, position: 'relative', overflow: 'hidden',
                 }}
@@ -372,116 +373,59 @@ export default function AppShell({
                 )}
               </div>
               <div>
-                <p style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.1 }}>
-                  <span style={{ color: 'var(--accent)' }}>P</span>act.
+                <p style={{ fontSize: 19, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1 }}>
+                  Pact<span style={{ color: 'var(--accent)' }}>.</span>
                 </p>
-                <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 1 }}>
-                  {activeCircle ? `${activeCircle.emoji} ${activeCircle.name}` : 'plans that actually happen'}
+                <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
+                  plans that actually happen
                 </p>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               {/* Theme picker */}
-              <div style={{ position: 'relative' }}>
-                <button
-                  onClick={() => setShowThemePicker(!showThemePicker)}
-                  style={{
-                    background: 'none', border: 'none',
-                    cursor: 'pointer', padding: 4,
-                    display: 'flex', alignItems: 'center',
-                  }}
-                >
-                  {themeIcon === 'sun' ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="5"/>
-                      <line x1="12" y1="1" x2="12" y2="3"/>
-                      <line x1="12" y1="21" x2="12" y2="23"/>
-                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-                      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                      <line x1="1" y1="12" x2="3" y2="12"/>
-                      <line x1="21" y1="12" x2="23" y2="12"/>
-                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-                      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-                    </svg>
-                  ) : themeIcon === 'moon' ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                    </svg>
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"/>
-                      <path d="M12 2a10 10 0 0 1 0 20V2z" fill="var(--text)"/>
-                    </svg>
-                  )}
-                </button>
-                {showThemePicker && (
-                  <>
-                    <div onClick={() => setShowThemePicker(false)} style={{ position: 'fixed', inset: 0, zIndex: 59 }} />
-                    <div style={{
-                      position: 'absolute', right: 0, top: 32, zIndex: 60,
-                      background: 'var(--surface)', border: '1px solid var(--border)',
-                      borderRadius: 14, boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
-                      padding: 6, minWidth: 150,
-                    }}>
-                      {[
-                        { key: 'light', label: 'Light', icon: (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="5"/>
-                            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-                          </svg>
-                        )},
-                        { key: 'dark', label: 'Dark', icon: (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                          </svg>
-                        )},
-                        { key: 'system', label: 'System', icon: (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10"/>
-                            <path d="M12 2a10 10 0 0 1 0 20V2z" fill="currentColor"/>
-                          </svg>
-                        )},
-                      ].map(opt => (
-                        <button
-                          key={opt.key}
-                          onClick={() => selectTheme(opt.key)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            width: '100%', padding: '9px 12px', border: 'none',
-                            borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                            background: theme === opt.key ? 'var(--accent-soft)' : 'transparent',
-                            color: theme === opt.key ? 'var(--accent)' : 'var(--text)',
-                          }}
-                        >
-                          {opt.icon}
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </>
+              <button
+                onClick={() => setShowThemePicker(!showThemePicker)}
+                style={{
+                  background: 'var(--surface2)', border: '1px solid var(--border)',
+                  cursor: 'pointer', padding: '6px 8px', borderRadius: 20,
+                  display: 'flex', alignItems: 'center',
+                }}
+              >
+                {themeIcon === 'sun' ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                  </svg>
+                ) : themeIcon === 'moon' ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20V2z" fill="var(--text)"/>
+                  </svg>
                 )}
-              </div>
+              </button>
 
               {/* Notification bell */}
               <button
                 onClick={() => setShowNotifs(!showNotifs)}
                 style={{
-                  background: 'none', border: 'none',
-                  cursor: 'pointer', padding: 4, position: 'relative',
+                  background: 'var(--surface2)', border: '1px solid var(--border)',
+                  cursor: 'pointer', padding: '6px 8px', borderRadius: 20, position: 'relative',
                   display: 'flex', alignItems: 'center',
                 }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
                 {unreadNotifCount > 0 && (
                   <span style={{
-                    position: 'absolute', top: 0, right: -2,
+                    position: 'absolute', top: -2, right: -2,
                     width: 16, height: 16, borderRadius: '50%',
                     background: 'var(--red)', color: '#fff',
                     fontSize: 9, fontWeight: 800,
@@ -490,13 +434,11 @@ export default function AppShell({
                 )}
               </button>
 
-              {/* Calendar selector button (top right like prototype) */}
+              {/* Calendar selector */}
               <button
                 onClick={async () => {
-                  // Navigate to calendar if not already there, then open selector
                   if (pathname !== '/calendar') {
                     router.push('/calendar')
-                    // Wait a tick for navigation, then dispatch
                     setTimeout(() => window.dispatchEvent(new CustomEvent('pact-open-cal-selector')), 500)
                   } else {
                     window.dispatchEvent(new CustomEvent('pact-open-cal-selector'))
@@ -504,42 +446,44 @@ export default function AppShell({
                 }}
                 title="My Calendars"
                 style={{
-                  background: 'none', border: 'none',
-                  cursor: 'pointer', padding: 4,
+                  background: 'var(--surface2)', border: '1px solid var(--border)',
+                  cursor: 'pointer', padding: '6px 8px', borderRadius: 20,
                   display: 'flex', alignItems: 'center',
                 }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                  <line x1="16" y1="2" x2="16" y2="6"/>
-                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
                   <line x1="3" y1="10" x2="21" y2="10"/>
                 </svg>
               </button>
             </div>
           </div>
 
-          {/* Row 2: Circle members + expand */}
-          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Row 2: Circle + members */}
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             {activeCircle ? (
               <button
                 onClick={() => setShowMembersList(!showMembersList)}
                 style={{
-                  fontSize: 11, fontWeight: 600, color: 'var(--text2)',
+                  fontSize: 13, fontWeight: 600, color: 'var(--text2)',
                   background: 'none', border: 'none', cursor: 'pointer',
-                  padding: 0, display: 'flex', alignItems: 'center', gap: 6,
+                  padding: 0, display: 'flex', alignItems: 'center', gap: 8,
                 }}
               >
+                <span style={{ fontSize: 13 }}>{activeCircle.emoji}</span>
+                <span>{activeCircle.name}</span>
+                <span style={{ fontSize: 11, opacity: 0.7 }}>·</span>
                 {/* Inline avatar stack */}
-                <span style={{ display: 'flex' }}>
-                  {circleMembers.slice(0, 4).map((m, i) => (
+                <span style={{ display: 'flex', marginLeft: -2 }}>
+                  {circleMembers.slice(0, 5).map((m, i) => (
                     <span key={m.id} style={{
-                      width: 20, height: 20, borderRadius: '50%',
+                      width: 22, height: 22, borderRadius: '50%',
                       background: m.color, color: txtOn(m.color),
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 8, fontWeight: 800,
-                      border: '1.5px solid var(--bg)',
-                      marginLeft: i > 0 ? -6 : 0,
+                      fontSize: 9, fontWeight: 800,
+                      border: '2px solid var(--bg)',
+                      marginLeft: i > 0 ? -7 : 0,
                       position: 'relative', overflow: 'hidden',
                     }}>
                       {m.name?.[0] || '?'}
@@ -552,137 +496,197 @@ export default function AppShell({
                     </span>
                   ))}
                 </span>
-                {circleMembers.length} member{circleMembers.length > 1 ? 's' : ''} {showMembersList ? '▴' : '▾'}
+                <span style={{ fontSize: 11 }}>{circleMembers.length}</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                  {showMembersList ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
+                </svg>
               </button>
             ) : (
-              <span style={{ fontSize: 11, color: 'var(--text2)' }}>No circles yet</span>
+              <span style={{ fontSize: 12, color: 'var(--text2)' }}>No circles yet</span>
             )}
 
-          {/* Members list popup overlay */}
-          {showMembersList && activeCircle && (
-            <>
-            <div onClick={() => setShowMembersList(false)} style={{
-              position: 'fixed', inset: 0, zIndex: 49,
-            }} />
-            <div style={{
-              position: 'absolute', left: 12, right: 12, zIndex: 50,
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 16, padding: '8px 12px', maxHeight: 320, overflowY: 'auto',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
-            }}>
-              {circleMembers.map(m => {
-                const isMe = m.id === user.id
-                const hasLocation = m.live_area && m.live_updated_at
-                const locAge = hasLocation ? Math.floor((Date.now() - new Date(m.live_updated_at!).getTime()) / 60000) : null
-                const locLabel = locAge !== null ? (locAge < 1 ? 'now' : locAge < 60 ? `${locAge}m ago` : `${Math.floor(locAge/60)}h ago`) : null
-                const isOnline = locAge !== null && locAge < 5
-                return (
-                  <div
-                    key={m.id}
-                    onClick={() => router.push(`/profile/${m.id}`)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '6px 0', cursor: 'pointer',
-                      borderBottom: '1px solid var(--border)',
-                    }}
-                  >
-                    <div style={{ position: 'relative', flexShrink: 0 }}>
-                      <div
-                        className="avatar"
-                        style={{
-                          width: 28, height: 28, fontSize: 11,
-                          background: m.color,
-                          color: txtOn(m.color),
-                          position: 'relative', overflow: 'hidden',
-                        }}
-                      >
-                        {m.name?.[0] || '?'}
-                        {m.avatar_url && (
-                          <img src={m.avatar_url} alt="" style={{
-                            position: 'absolute', inset: 0, width: '100%', height: '100%',
-                            objectFit: 'cover', borderRadius: '50%',
-                          }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                        )}
-                      </div>
-                      {isOnline && (
-                        <div style={{
-                          position: 'absolute', bottom: -1, right: -1,
-                          width: 10, height: 10, borderRadius: '50%',
-                          background: '#8BB07E', border: '2px solid var(--surface)',
-                        }} />
-                      )}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600 }}>
-                        {m.name}{isMe ? ' (you)' : ''}
-                        {isOnline && <span style={{ fontSize: 10, color: '#8BB07E', marginLeft: 4 }}>online</span>}
-                      </span>
-                      {hasLocation && locAge !== null && locAge < 120 && (
-                        <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                          {m.live_area} · {locLabel}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowMembersList(false); router.push(`/circles/${activeCircle.id}/settings`) }}
-                style={{
-                  marginTop: 6, fontSize: 12, fontWeight: 600,
-                  color: 'var(--accent)', background: 'none', border: 'none',
-                  cursor: 'pointer', padding: '4px 0',
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                Circle settings
-              </button>
-            </div>
-            </>
-          )}
-
-          {/* Circle pills — inline, compact */}
+            {/* Circle pills */}
             {circles.length > 1 && (
-              <span style={{ display: 'flex', gap: 4, marginLeft: 'auto', flexWrap: 'nowrap', overflow: 'auto' }}>
+              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                 {circles.map(c => (
                   <button
                     key={c.id}
                     onClick={() => { setActiveCircle(c); setShowMembersList(false) }}
                     style={{
-                      padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700,
+                      padding: '4px 10px', borderRadius: 14, fontSize: 11, fontWeight: 700,
                       border: c.id === activeCircle?.id ? '1.5px solid var(--accent)' : '1px solid var(--border)',
                       background: c.id === activeCircle?.id ? 'var(--accent-soft)' : 'transparent',
                       color: c.id === activeCircle?.id ? 'var(--accent)' : 'var(--text2)',
                       cursor: 'pointer', whiteSpace: 'nowrap',
                     }}
                   >
-                    {c.emoji} {c.name}
+                    {c.emoji}
                   </button>
                 ))}
                 <button
                   onClick={() => router.push('/circles/new')}
                   style={{
-                    padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700,
+                    padding: '4px 8px', borderRadius: 14, fontSize: 11, fontWeight: 700,
                     border: '1px dashed var(--border)',
                     background: 'transparent', color: 'var(--accent)',
-                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    cursor: 'pointer',
                   }}
-                >+ New</button>
-              </span>
+                >+</button>
+              </div>
             )}
           </div>
+        </header>
 
-          {/* Notifications dropdown */}
-          {showNotifs && (
-            <>
+        {/* Members list popup — portal to avoid header clipping */}
+        {showMembersList && activeCircle && typeof document !== 'undefined' && createPortal(
+          <>
+          <div onClick={() => setShowMembersList(false)} style={{
+            position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.3)',
+          }} />
+          <div style={{
+            position: 'fixed', left: 12, right: 12, top: 100, zIndex: 9999,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 16, padding: '10px 14px', maxHeight: 360, overflowY: 'auto',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              {activeCircle.emoji} {activeCircle.name} · {circleMembers.length} members
+            </div>
+            {circleMembers.map(m => {
+              const isMe = m.id === user.id
+              const hasLocation = m.live_area && m.live_updated_at
+              const locAge = hasLocation ? Math.floor((Date.now() - new Date(m.live_updated_at!).getTime()) / 60000) : null
+              const locLabel = locAge !== null ? (locAge < 1 ? 'now' : locAge < 60 ? `${locAge}m ago` : `${Math.floor(locAge/60)}h ago`) : null
+              const isOnline = locAge !== null && locAge < 5
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => { setShowMembersList(false); router.push(`/profile/${m.id}`) }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 0', cursor: 'pointer',
+                    borderBottom: '1px solid var(--border)',
+                  }}
+                >
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div
+                      className="avatar"
+                      style={{
+                        width: 32, height: 32, fontSize: 12,
+                        background: m.color,
+                        color: txtOn(m.color),
+                        position: 'relative', overflow: 'hidden',
+                      }}
+                    >
+                      {m.name?.[0] || '?'}
+                      {m.avatar_url && (
+                        <img src={m.avatar_url} alt="" style={{
+                          position: 'absolute', inset: 0, width: '100%', height: '100%',
+                          objectFit: 'cover', borderRadius: '50%',
+                        }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      )}
+                    </div>
+                    {isOnline && (
+                      <div style={{
+                        position: 'absolute', bottom: -1, right: -1,
+                        width: 10, height: 10, borderRadius: '50%',
+                        background: '#8BB07E', border: '2px solid var(--surface)',
+                      }} />
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>
+                      {m.name}{isMe ? ' (you)' : ''}
+                      {isOnline && <span style={{ fontSize: 10, color: '#8BB07E', marginLeft: 4 }}>online</span>}
+                    </span>
+                    {hasLocation && locAge !== null && locAge < 120 && (
+                      <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        {m.live_area} · {locLabel}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowMembersList(false); router.push(`/circles/${activeCircle.id}/settings`) }}
+              style={{
+                marginTop: 8, fontSize: 12, fontWeight: 600,
+                color: 'var(--accent)', background: 'none', border: 'none',
+                cursor: 'pointer', padding: '4px 0',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              Circle settings
+            </button>
+          </div>
+          </>,
+          document.body
+        )}
+
+        {/* Theme picker dropdown — portal */}
+        {showThemePicker && typeof document !== 'undefined' && createPortal(
+          <>
+            <div onClick={() => setShowThemePicker(false)} style={{ position: 'fixed', inset: 0, zIndex: 9998 }} />
+            <div style={{
+              position: 'fixed', right: 16, top: 52, zIndex: 9999,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 14, boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
+              padding: 6, minWidth: 150,
+            }}>
+              {[
+                { key: 'light', label: 'Light', icon: (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="5"/>
+                    <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                  </svg>
+                )},
+                { key: 'dark', label: 'Dark', icon: (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                  </svg>
+                )},
+                { key: 'system', label: 'System', icon: (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 2a10 10 0 0 1 0 20V2z" fill="currentColor"/>
+                  </svg>
+                )},
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => selectTheme(opt.key)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    width: '100%', padding: '9px 12px', border: 'none',
+                    borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    background: theme === opt.key ? 'var(--accent-soft)' : 'transparent',
+                    color: theme === opt.key ? 'var(--accent)' : 'var(--text)',
+                  }}
+                >
+                  {opt.icon}
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </>,
+          document.body
+        )}
+
+        {/* Notifications dropdown — portal */}
+        {showNotifs && typeof document !== 'undefined' && createPortal(
+          <>
             <div onClick={() => setShowNotifs(false)} style={{
-              position: 'fixed', inset: 0, zIndex: 49,
+              position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.3)',
             }} />
             <div style={{
-              position: 'absolute', right: 12, top: 56, zIndex: 50,
+              position: 'fixed', right: 12, left: 12, top: 60, zIndex: 9999,
               background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 16, width: 300, maxHeight: 360, overflowY: 'auto',
+              borderRadius: 16, maxWidth: 340, marginLeft: 'auto', maxHeight: 400, overflowY: 'auto',
               boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
             }}>
               <div style={{ padding: '12px 14px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -743,9 +747,9 @@ export default function AppShell({
                 ))
               )}
             </div>
-            </>
-          )}
-        </header>
+          </>,
+          document.body
+        )}
 
         {/* Main content */}
         <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column' }}>
