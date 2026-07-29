@@ -236,9 +236,11 @@ export default function AppShell({
     window.location.reload()
   }
 
-  // Fetch circle members when circle changes
+  // Fetch circle members when circle changes + realtime location updates
   useEffect(() => {
     if (!activeCircle) return
+    let memberIds: string[] = []
+
     async function fetchMembers() {
       const { data } = await supabase
         .from('circle_members')
@@ -248,9 +250,33 @@ export default function AppShell({
       if (data) {
         const members = data.map(d => (d as any).users).filter(Boolean) as UserProfile[]
         setCircleMembers(members)
+        memberIds = members.map(m => m.id)
       }
     }
     fetchMembers()
+
+    // Realtime: update member profiles (location, avatar, name, etc.) as they change
+    const channel = supabase
+      .channel(`members-${activeCircle.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'users',
+      }, (payload) => {
+        const updated = payload.new as UserProfile
+        if (memberIds.length > 0 && !memberIds.includes(updated.id)) return
+        setCircleMembers(prev => prev.map(m => m.id === updated.id ? { ...m, ...updated } : m))
+      })
+      .subscribe()
+
+    // Also refetch when tab becomes visible (catches missed realtime events)
+    function onVisChange() {
+      if (document.visibilityState === 'visible') fetchMembers()
+    }
+    document.addEventListener('visibilitychange', onVisChange)
+
+    return () => {
+      supabase.removeChannel(channel)
+      document.removeEventListener('visibilitychange', onVisChange)
+    }
   }, [activeCircle?.id])
 
   // Notifications
