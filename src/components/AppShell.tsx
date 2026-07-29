@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, createContext, useContext, useEffect } from 'react'
+import { useState, createContext, useContext, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname, useRouter } from 'next/navigation'
 import { txtOn } from '@/lib/utils'
@@ -108,17 +108,61 @@ export default function AppShell({
   const router = useRouter()
   const supabase = createClient()
 
+  // Circle ordering — persisted in localStorage
+  const [orderedCircles, setOrderedCircles] = useState<Circle[]>(() => {
+    if (typeof window === 'undefined') return circles
+    try {
+      const saved = localStorage.getItem('pact_circle_order')
+      if (saved) {
+        const order: string[] = JSON.parse(saved)
+        const sorted = [...circles].sort((a, b) => {
+          const ai = order.indexOf(a.id)
+          const bi = order.indexOf(b.id)
+          if (ai === -1 && bi === -1) return 0
+          if (ai === -1) return 1
+          if (bi === -1) return -1
+          return ai - bi
+        })
+        return sorted
+      }
+    } catch {}
+    return circles
+  })
+
+  function moveCircle(circleId: string, direction: 'up' | 'down') {
+    setOrderedCircles(prev => {
+      const idx = prev.findIndex(c => c.id === circleId)
+      if (idx === -1) return prev
+      const newIdx = direction === 'up' ? idx - 1 : idx + 1
+      if (newIdx < 0 || newIdx >= prev.length) return prev
+      const next = [...prev]
+      ;[next[idx], next[newIdx]] = [next[newIdx], next[idx]]
+      localStorage.setItem('pact_circle_order', JSON.stringify(next.map(c => c.id)))
+      return next
+    })
+  }
+
   // Persistent location tracking across all tabs
   useLocationUpdate(user.id, 'app-shell')
 
-  // Request location permission once (first app load only)
+  // Request location permission if not yet granted
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) return
-    const asked = localStorage.getItem('pact_loc_asked')
-    if (asked) return
-    localStorage.setItem('pact_loc_asked', '1')
-    // Single getCurrentPosition triggers the browser prompt once
-    navigator.geolocation.getCurrentPosition(() => {}, () => {}, { timeout: 5000 })
+    if (!navigator.permissions) {
+      // Fallback: try once if we haven't asked before
+      const asked = localStorage.getItem('pact_loc_asked')
+      if (!asked) {
+        localStorage.setItem('pact_loc_asked', '1')
+        navigator.geolocation.getCurrentPosition(() => {}, () => {}, { timeout: 5000 })
+      }
+      return
+    }
+    navigator.permissions.query({ name: 'geolocation' }).then(result => {
+      if (result.state === 'prompt') {
+        // Trigger the browser permission dialog
+        navigator.geolocation.getCurrentPosition(() => {}, () => {}, { timeout: 5000 })
+      }
+    }).catch(() => {})
   }, [])
 
   // Prefetch all tab routes for instant navigation
@@ -210,6 +254,15 @@ export default function AppShell({
       setShowCalModal(true)
     }
   }
+
+  // Listen for calendar modal open events from other pages (e.g. profile)
+  const loadCalRef = useRef(loadCalendars)
+  loadCalRef.current = loadCalendars
+  useEffect(() => {
+    const handler = () => loadCalRef.current()
+    window.addEventListener('pact-open-cal-selector', handler)
+    return () => window.removeEventListener('pact-open-cal-selector', handler)
+  }, [])
 
   async function saveCalendarSelection() {
     await fetch('/api/calendar/list', {
@@ -442,48 +495,39 @@ export default function AppShell({
           borderBottom: '1px solid var(--border)',
           flexShrink: 0,
         }}>
-          {/* Row 1: Brand | buttons */}
+          {/* Row 1: Avatar + Brand | buttons */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div
               onClick={() => router.push(`/profile/${currentUser.id}`)}
-              style={{ cursor: 'pointer' }}
+              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
             >
-              <p style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1 }}>
-                Pact<span style={{ color: 'var(--accent)' }}>.</span>
-              </p>
-              <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
-                plans that actually happen
-              </p>
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                background: currentUser.color, color: txtOn(currentUser.color),
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 15, fontWeight: 800, position: 'relative', overflow: 'hidden',
+              }}>
+                {currentUser.name[0]}
+                {currentUser.avatar_url && (
+                  <img
+                    src={currentUser.avatar_url}
+                    alt=""
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                  />
+                )}
+              </div>
+              <div>
+                <p style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1 }}>
+                  Pact<span style={{ color: 'var(--accent)' }}>.</span>
+                </p>
+                <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
+                  plans that actually happen
+                </p>
+              </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {/* Theme picker */}
-              <button
-                onClick={() => setShowThemePicker(!showThemePicker)}
-                style={{
-                  background: 'var(--surface2)', border: '1px solid var(--border)',
-                  cursor: 'pointer', padding: '6px 8px', borderRadius: 20,
-                  display: 'flex', alignItems: 'center',
-                }}
-              >
-                {themeIcon === 'sun' ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-                  </svg>
-                ) : themeIcon === 'moon' ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                  </svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20V2z" fill="var(--text)"/>
-                  </svg>
-                )}
-              </button>
-
               {/* Notification bell */}
               <button
                 onClick={() => setShowNotifs(!showNotifs)}
@@ -522,6 +566,33 @@ export default function AppShell({
                   <line x1="3" y1="10" x2="21" y2="10"/>
                 </svg>
                 My calendars
+              </button>
+
+              {/* Theme picker */}
+              <button
+                onClick={() => setShowThemePicker(!showThemePicker)}
+                style={{
+                  background: 'var(--surface2)', border: '1px solid var(--border)',
+                  cursor: 'pointer', padding: '6px 8px', borderRadius: 20,
+                  display: 'flex', alignItems: 'center',
+                }}
+              >
+                {themeIcon === 'sun' ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                  </svg>
+                ) : themeIcon === 'moon' ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20V2z" fill="var(--text)"/>
+                  </svg>
+                )}
               </button>
             </div>
           </div>
@@ -602,23 +673,57 @@ export default function AppShell({
             <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text2)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>
               Your circles
             </div>
-            {circles.map(c => (
-              <button
+            {orderedCircles.map((c, i) => (
+              <div
                 key={c.id}
-                onClick={() => { setActiveCircle(c); setShowYourCircles(false) }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
-                  width: '100%', padding: '10px 0', textAlign: 'left',
-                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '10px 0',
                   borderBottom: '1px solid var(--border)',
-                  color: c.id === activeCircle?.id ? 'var(--accent)' : 'var(--text)',
-                  fontSize: 14, fontWeight: c.id === activeCircle?.id ? 700 : 500,
                 }}
               >
-                <span style={{ fontSize: 18 }}>{c.emoji}</span>
-                {c.name}
-                {c.id === activeCircle?.id && <span style={{ marginLeft: 'auto', fontSize: 12 }}>✓</span>}
-              </button>
+                <button
+                  onClick={() => { setActiveCircle(c); setShowYourCircles(false) }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    flex: 1, textAlign: 'left',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: c.id === activeCircle?.id ? 'var(--accent)' : 'var(--text)',
+                    fontSize: 14, fontWeight: c.id === activeCircle?.id ? 700 : 500,
+                    padding: 0,
+                  }}
+                >
+                  <span style={{ fontSize: 18 }}>{c.emoji}</span>
+                  {c.name}
+                  {c.id === activeCircle?.id && <span style={{ marginLeft: 'auto', fontSize: 12 }}>✓</span>}
+                </button>
+                {orderedCircles.length > 1 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginLeft: 'auto' }}>
+                    <button
+                      onClick={() => moveCircle(c.id, 'up')}
+                      disabled={i === 0}
+                      style={{
+                        background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer',
+                        padding: 2, opacity: i === 0 ? 0.2 : 0.5, lineHeight: 1,
+                        color: 'var(--text)',
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+                    </button>
+                    <button
+                      onClick={() => moveCircle(c.id, 'down')}
+                      disabled={i === orderedCircles.length - 1}
+                      style={{
+                        background: 'none', border: 'none', cursor: i === orderedCircles.length - 1 ? 'default' : 'pointer',
+                        padding: 2, opacity: i === orderedCircles.length - 1 ? 0.2 : 0.5, lineHeight: 1,
+                        color: 'var(--text)',
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
             <button
               onClick={() => { setShowYourCircles(false); router.push('/circles/new') }}

@@ -77,6 +77,10 @@ export default function ChatPage() {
   const longPressActive = useRef(false)
   const QUICK_EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🔥']
 
+  // Cache for users not in the active circle (e.g. DM partners from other circles)
+  const [userCache, setUserCache] = useState<Record<string, UserProfile>>({})
+  const fetchingUsers = useRef<Set<string>>(new Set())
+
   // Tap → quick actions menu
   const [quickActionMsg, setQuickActionMsg] = useState<Message | null>(null)
 
@@ -173,6 +177,22 @@ export default function ChatPage() {
 
     setThreads(result)
     setLoading(false)
+
+    // Fetch profiles for thread members not in current circle
+    const allMemberIds = new Set<string>()
+    result.forEach(t => t.member_ids.forEach(id => allMemberIds.add(id)))
+    const circleMemberIds = new Set(circleMembers.map(m => m.id))
+    const unknownIds = [...allMemberIds].filter(id => !circleMemberIds.has(id) && !userCache[id] && !fetchingUsers.current.has(id))
+    if (unknownIds.length > 0) {
+      unknownIds.forEach(id => fetchingUsers.current.add(id))
+      const { data: profiles } = await supabase.from('users').select('*').in('id', unknownIds)
+      if (profiles) {
+        const newCache: Record<string, UserProfile> = {}
+        profiles.forEach(p => { newCache[p.id] = p as UserProfile })
+        setUserCache(prev => ({ ...prev, ...newCache }))
+      }
+      unknownIds.forEach(id => fetchingUsers.current.delete(id))
+    }
   }
 
   // ─── Load messages ───
@@ -293,7 +313,7 @@ export default function ChatPage() {
   }
 
   function getMember(uid: string): UserProfile | undefined {
-    return circleMembers.find(m => m.id === uid)
+    return circleMembers.find(m => m.id === uid) || userCache[uid]
   }
 
   function isUnread(t: Thread): boolean {
