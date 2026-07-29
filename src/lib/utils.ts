@@ -175,7 +175,7 @@ export function currentHourInTz(tz: string): number {
   return parseInt(str)
 }
 
-export const DAY_START = 6
+export const DAY_START = 8
 export const DAY_END = 24
 
 /** Real GPS coordinates for Metro Manila areas (for live location matching) */

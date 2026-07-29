@@ -3,9 +3,22 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-const CURRENT_VERSION = '10.0'
+const CURRENT_VERSION = '11.0'
 
 const CHANGELOG = [
+  {
+    version: '11.0',
+    date: 'July 29, 2026',
+    title: 'Better Calendar + Spark Cards',
+    items: [
+      '📅 Calendar view now shows 8am–12mn for bigger, easier-to-tap hour blocks',
+      '⚡ Sparks are now compact cards you can scroll through — swipe up to dismiss',
+      '📍 Each member in the day view now shows where they\'re coming from and when they\'re free',
+      '🗓️ Calendar selection now works reliably from any tab',
+      '🎨 Redesigned header — bigger profile photo, better icon layout, circle pills on their own row',
+      '🔔 Notification button is wider and easier to tap',
+    ],
+  },
   {
     version: '10.0',
     date: 'July 23, 2026',

@@ -61,6 +61,79 @@ const VENUES: { name: string; emoji: string; area: string; x: number; y: number;
   { name: 'Trinoma', emoji: '🛍️', area: 'North EDSA, QC', x: 4.5, y: 8.3, type: 'mall' },
 ]
 
+function SparkCard({ spark: sp, todayStr, onDismiss }: { spark: Spark; todayStr: string; onDismiss: () => void }) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [offsetY, setOffsetY] = useState(0)
+  const [swiping, setSwiping] = useState(false)
+  const startY = useRef(0)
+
+  function onTouchStart(e: React.TouchEvent) {
+    startY.current = e.touches[0].clientY
+    setSwiping(true)
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    if (!swiping) return
+    const dy = e.touches[0].clientY - startY.current
+    // Only allow swiping up (negative = up)
+    setOffsetY(Math.min(0, dy))
+  }
+  function onTouchEnd() {
+    setSwiping(false)
+    if (offsetY < -50) {
+      // Dismissed — animate out then call onDismiss
+      setOffsetY(-200)
+      setTimeout(onDismiss, 200)
+    } else {
+      setOffsetY(0)
+    }
+  }
+
+  return (
+    <div
+      ref={cardRef}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      style={{
+        minWidth: 220, maxWidth: 260, flexShrink: 0,
+        background: 'linear-gradient(135deg, rgba(118,172,179,0.18), rgba(139,176,126,0.12))',
+        border: '1px solid rgba(118,172,179,0.45)', borderRadius: 14,
+        padding: '10px 12px', position: 'relative',
+        transform: `translateY(${offsetY}px)`,
+        opacity: offsetY < -50 ? 0 : 1,
+        transition: swiping ? 'none' : 'transform 0.2s ease, opacity 0.2s ease',
+      }}
+    >
+      <button
+        onClick={onDismiss}
+        style={{
+          position: 'absolute', top: 6, right: 8,
+          background: 'none', border: 'none', color: 'var(--text2)',
+          fontSize: 12, cursor: 'pointer', padding: '2px 4px',
+        }}
+      >✕</button>
+      <div style={{ fontSize: 8.5, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+        ⚡ Spark
+      </div>
+      <div style={{ fontSize: 11.5, lineHeight: 1.4, marginTop: 3 }}>
+        <b>~{sp.travelTime} min</b> from{' '}
+        <b style={{ color: sp.member.color }}>{sp.member.name.split(' ')[0]}</b>{' '}
+        · free <b>{fmtWin(sp.window.s, sp.window.e)}</b>
+      </div>
+      <button
+        onClick={() => window.location.href = `/plans/new?date=${todayStr}&hour=${sp.window.s}&end=${sp.window.e}`}
+        style={{
+          marginTop: 7, padding: '6px 12px', border: 'none', borderRadius: 14,
+          background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer',
+          width: '100%',
+        }}
+      >
+        Plan with {sp.member.name.split(' ')[0]}
+      </button>
+    </div>
+  )
+}
+
 export default function CalendarPage() {
   const { user, activeCircle, circleMembers, setCircleMembers } = useCircle()
   const supabase = createClient()
@@ -260,6 +333,20 @@ export default function CalendarPage() {
     window.addEventListener('pact-open-cal-selector', onCalSelector)
     return () => window.removeEventListener('pact-open-cal-selector', onCalSelector)
   }, [])
+
+  // Also open calendar modal via URL param (when navigating from another tab)
+  const openCalHandled = useRef(false)
+  useEffect(() => {
+    if (openCalHandled.current || loading) return
+    if (searchParams.get('openCal') === '1') {
+      openCalHandled.current = true
+      // Small delay to ensure component is ready
+      setTimeout(() => {
+        loadCalendars()
+        window.history.replaceState({}, '', '/calendar')
+      }, 300)
+    }
+  }, [loading, searchParams])
 
   // Sync calendar (manual trigger)
   async function syncCalendar() {
@@ -924,43 +1011,17 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {/* Sparks */}
+        {/* Sparks — compact horizontal scroll with swipe-to-dismiss */}
         {sparks.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            {sparks.map(sp => (
-              <div key={sp.member.id} style={{
-                background: 'linear-gradient(135deg, rgba(118,172,179,0.18), rgba(139,176,126,0.12))',
-                border: '1px solid rgba(118,172,179,0.45)', borderRadius: 16,
-                padding: '12px 14px', marginBottom: 8, position: 'relative',
-              }}>
-                <button
-                  onClick={() => dismissSpark(sp.member.id)}
-                  style={{
-                    position: 'absolute', top: 8, right: 11,
-                    background: 'none', border: 'none', color: 'var(--text2)',
-                    fontSize: 14, cursor: 'pointer', padding: '2px 4px',
-                  }}
-                >✕</button>
-                <div style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: 0.7 }}>
-                  ⚡ Spark
-                </div>
-                <div style={{ fontSize: 13, lineHeight: 1.45, marginTop: 4 }}>
-                  You're <b>~{sp.travelTime} min</b> from{' '}
-                  <b style={{ color: sp.member.color }}>{sp.member.name}</b>{' '}
-                  ({sp.area}) and you're both free{' '}
-                  <b>{fmtWin(sp.window.s, sp.window.e)}</b> today.
-                </div>
-                <button
-                  onClick={() => window.location.href = `/plans/new?date=${todayStr}&hour=${sp.window.s}&end=${sp.window.e}`}
-                  style={{
-                    marginTop: 9, padding: '8px 14px', border: 'none', borderRadius: 18,
-                    background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer',
-                  }}
-                >
-                  Propose a plan with {sp.member.name.split(' ')[0]}
-                </button>
-              </div>
-            ))}
+          <div style={{ marginBottom: 10, overflow: 'hidden' }}>
+            <div style={{
+              display: 'flex', gap: 8, overflowX: 'auto', padding: '2px 0 6px',
+              WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
+            }}>
+              {sparks.map(sp => (
+                <SparkCard key={sp.member.id} spark={sp} todayStr={todayStr} onDismiss={() => dismissSpark(sp.member.id)} />
+              ))}
+            </div>
           </div>
         )}
 
@@ -1173,10 +1234,12 @@ export default function CalendarPage() {
                 {/* Member rows */}
                 {activeMembers.map(m => {
                   const isConnected = connectedUserIds.has(m.id)
+                  const origin = memberOrigins.find(o => o.name === m.name.split(' ')[0])
                   return (
-                  <div key={m.id} style={{
+                  <div key={m.id} style={{ marginBottom: 5 }}>
+                  <div style={{
                     display: 'grid', gridTemplateColumns: `46px repeat(${DAY_END - DAY_START}, 1fr)`,
-                    gap: 2, marginBottom: 3,
+                    gap: 2,
                   }}>
                     <div style={{
                       fontSize: 10.5, fontWeight: 700, color: m.color,
@@ -1220,6 +1283,15 @@ export default function CalendarPage() {
                         />
                       )
                     })}
+                  </div>
+                  {origin && (
+                    <div style={{
+                      fontSize: 9, color: 'var(--text2)', paddingLeft: 48, marginTop: 1,
+                      fontStyle: 'italic',
+                    }}>
+                      {origin.label}
+                    </div>
+                  )}
                   </div>
                   )
                 })}

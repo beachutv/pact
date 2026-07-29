@@ -343,23 +343,23 @@ export default function AppShell({
   return (
     <CircleContext.Provider value={{ user: currentUser, updateUser, circles, activeCircle, setActiveCircle, circleMembers, setCircleMembers }}>
       <div id="app-shell">
-        {/* Header — balanced proportions matching prototype */}
+        {/* Header */}
         <header style={{
           padding: '14px 18px 10px',
           borderBottom: '1px solid var(--border)',
           flexShrink: 0,
         }}>
-          {/* Row 1: Brand + icons */}
+          {/* Row 1: Profile + brand | bell (wide), theme, calendar */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div
                 onClick={() => router.push(`/profile/${currentUser.id}`)}
                 style={{
-                  width: 36, height: 36, borderRadius: '50%',
+                  width: 42, height: 42, borderRadius: '50%',
                   background: currentUser.color,
                   color: txtOn(currentUser.color),
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 14, fontWeight: 800, cursor: 'pointer',
+                  fontSize: 16, fontWeight: 800, cursor: 'pointer',
                   border: '2px solid var(--border)',
                   flexShrink: 0, position: 'relative', overflow: 'hidden',
                 }}
@@ -373,7 +373,7 @@ export default function AppShell({
                 )}
               </div>
               <div>
-                <p style={{ fontSize: 19, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1 }}>
+                <p style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1 }}>
                   Pact<span style={{ color: 'var(--accent)' }}>.</span>
                 </p>
                 <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
@@ -382,7 +382,28 @@ export default function AppShell({
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {/* Notification bell — wider for easier tapping */}
+              <button
+                onClick={() => setShowNotifs(!showNotifs)}
+                style={{
+                  background: 'var(--surface2)', border: '1px solid var(--border)',
+                  cursor: 'pointer', padding: '6px 14px', borderRadius: 20, position: 'relative',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                {unreadNotifCount > 0 && (
+                  <span style={{
+                    background: 'var(--red)', color: '#fff', borderRadius: 8,
+                    fontSize: 9, fontWeight: 800, padding: '1px 5px', lineHeight: 1.3,
+                  }}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
+                )}
+              </button>
+
               {/* Theme picker */}
               <button
                 onClick={() => setShowThemePicker(!showThemePicker)}
@@ -410,36 +431,11 @@ export default function AppShell({
                 )}
               </button>
 
-              {/* Notification bell */}
-              <button
-                onClick={() => setShowNotifs(!showNotifs)}
-                style={{
-                  background: 'var(--surface2)', border: '1px solid var(--border)',
-                  cursor: 'pointer', padding: '6px 8px', borderRadius: 20, position: 'relative',
-                  display: 'flex', alignItems: 'center',
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                </svg>
-                {unreadNotifCount > 0 && (
-                  <span style={{
-                    position: 'absolute', top: -2, right: -2,
-                    width: 16, height: 16, borderRadius: '50%',
-                    background: 'var(--red)', color: '#fff',
-                    fontSize: 9, fontWeight: 800,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
-                )}
-              </button>
-
               {/* Calendar selector */}
               <button
-                onClick={async () => {
+                onClick={() => {
                   if (pathname !== '/calendar') {
-                    router.push('/calendar')
-                    setTimeout(() => window.dispatchEvent(new CustomEvent('pact-open-cal-selector')), 500)
+                    router.push('/calendar?openCal=1')
                   } else {
                     window.dispatchEvent(new CustomEvent('pact-open-cal-selector'))
                   }
@@ -460,8 +456,38 @@ export default function AppShell({
             </div>
           </div>
 
-          {/* Row 2: Circle + members */}
-          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* Row 2: Circle pills */}
+          {circles.length > 1 && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+              {circles.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => { setActiveCircle(c); setShowMembersList(false) }}
+                  style={{
+                    padding: '5px 12px', borderRadius: 16, fontSize: 12, fontWeight: 700,
+                    border: c.id === activeCircle?.id ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                    background: c.id === activeCircle?.id ? 'var(--accent-soft)' : 'transparent',
+                    color: c.id === activeCircle?.id ? 'var(--accent)' : 'var(--text2)',
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  {c.emoji} {c.name}
+                </button>
+              ))}
+              <button
+                onClick={() => router.push('/circles/new')}
+                style={{
+                  padding: '5px 10px', borderRadius: 16, fontSize: 12, fontWeight: 700,
+                  border: '1px dashed var(--border)',
+                  background: 'transparent', color: 'var(--accent)',
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >+ New</button>
+            </div>
+          )}
+
+          {/* Row 3: Active circle + members */}
+          <div style={{ marginTop: circles.length > 1 ? 6 : 10, display: 'flex', alignItems: 'center' }}>
             {activeCircle ? (
               <button
                 onClick={() => setShowMembersList(!showMembersList)}
@@ -471,14 +497,14 @@ export default function AppShell({
                   padding: 0, display: 'flex', alignItems: 'center', gap: 8,
                 }}
               >
-                <span style={{ fontSize: 13 }}>{activeCircle.emoji}</span>
-                <span>{activeCircle.name}</span>
-                <span style={{ fontSize: 11, opacity: 0.7 }}>·</span>
-                {/* Inline avatar stack */}
-                <span style={{ display: 'flex', marginLeft: -2 }}>
+                {circles.length <= 1 && <span style={{ fontSize: 14 }}>{activeCircle.emoji}</span>}
+                {circles.length <= 1 && <span>{activeCircle.name}</span>}
+                {circles.length <= 1 && <span style={{ fontSize: 11, opacity: 0.5 }}>·</span>}
+                {/* Avatar stack */}
+                <span style={{ display: 'flex' }}>
                   {circleMembers.slice(0, 5).map((m, i) => (
                     <span key={m.id} style={{
-                      width: 22, height: 22, borderRadius: '50%',
+                      width: 24, height: 24, borderRadius: '50%',
                       background: m.color, color: txtOn(m.color),
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 9, fontWeight: 800,
@@ -496,43 +522,13 @@ export default function AppShell({
                     </span>
                   ))}
                 </span>
-                <span style={{ fontSize: 11 }}>{circleMembers.length}</span>
+                <span style={{ fontSize: 12 }}>{circleMembers.length} member{circleMembers.length !== 1 ? 's' : ''}</span>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
                   {showMembersList ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
                 </svg>
               </button>
             ) : (
               <span style={{ fontSize: 12, color: 'var(--text2)' }}>No circles yet</span>
-            )}
-
-            {/* Circle pills */}
-            {circles.length > 1 && (
-              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                {circles.map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => { setActiveCircle(c); setShowMembersList(false) }}
-                    style={{
-                      padding: '4px 10px', borderRadius: 14, fontSize: 11, fontWeight: 700,
-                      border: c.id === activeCircle?.id ? '1.5px solid var(--accent)' : '1px solid var(--border)',
-                      background: c.id === activeCircle?.id ? 'var(--accent-soft)' : 'transparent',
-                      color: c.id === activeCircle?.id ? 'var(--accent)' : 'var(--text2)',
-                      cursor: 'pointer', whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {c.emoji}
-                  </button>
-                ))}
-                <button
-                  onClick={() => router.push('/circles/new')}
-                  style={{
-                    padding: '4px 8px', borderRadius: 14, fontSize: 11, fontWeight: 700,
-                    border: '1px dashed var(--border)',
-                    background: 'transparent', color: 'var(--accent)',
-                    cursor: 'pointer',
-                  }}
-                >+</button>
-              </div>
             )}
           </div>
         </header>
