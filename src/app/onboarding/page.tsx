@@ -84,7 +84,7 @@ function OnboardingInner() {
         </p>
 
         {error && (
-          <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 12, padding: '8px 12px', background: 'rgba(239,68,68,0.1)', borderRadius: 8 }}>
+          <p style={{ color: 'var(--red)', fontSize: 13, marginBottom: 12, padding: '8px 12px', background: 'var(--red-soft)', borderRadius: 8 }}>
             {error}
           </p>
         )}
@@ -121,7 +121,7 @@ function OnboardingInner() {
                 <label style={{ position: 'relative', width: 36, height: 36, cursor: 'pointer' }}>
                   <input
                     type="color"
-                    value={customColor || '#7c5cff'}
+                    value={customColor || '#76ACB3'}
                     onChange={e => { setCustomColor(e.target.value); setColor('') }}
                     style={{
                       position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer',

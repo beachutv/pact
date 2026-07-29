@@ -49,12 +49,49 @@ export function useCircle() {
   return ctx
 }
 
+// ---- SVG Nav Icons (Lucide-style line icons) ----
+function CalendarIcon({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+  )
+}
+function ChatIcon({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+  )
+}
+function PlansIcon({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+    </svg>
+  )
+}
+function SpotsIcon({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+    </svg>
+  )
+}
+
+const NAV_ICONS: Record<string, (props: { color: string }) => React.ReactNode> = {
+  '/calendar': CalendarIcon,
+  '/chat': ChatIcon,
+  '/plans': PlansIcon,
+  '/spots': SpotsIcon,
+}
+
 // ---- Nav tabs (4 tabs) ----
 const TABS = [
-  { key: '/calendar', icon: '📅', label: 'Calendar' },
-  { key: '/chat', icon: '💬', label: 'Chat' },
-  { key: '/plans', icon: '📌', label: 'Plans' },
-  { key: '/spots', icon: '📍', label: 'Spots' },
+  { key: '/calendar', label: 'Calendar' },
+  { key: '/chat', label: 'Chat' },
+  { key: '/plans', label: 'Plans' },
+  { key: '/spots', label: 'Spots' },
 ]
 
 export default function AppShell({
@@ -265,13 +302,14 @@ export default function AppShell({
   }
 
   function notifIcon(type: string) {
+    const s = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
     switch (type) {
-      case 'message': return '💬'
-      case 'pact_new': return '🎉'
-      case 'pact_change': return '✏️'
-      case 'pact_upcoming': return '⏰'
-      case 'spark': return '⚡'
-      default: return '🔔'
+      case 'message': return <svg {...s} stroke="var(--accent)"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      case 'pact_new': return <svg {...s} stroke="var(--green)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      case 'pact_change': return <svg {...s} stroke="var(--amber)"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      case 'pact_upcoming': return <svg {...s} stroke="var(--lavender)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      case 'spark': return <svg {...s} stroke="var(--amber)"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      default: return <svg {...s} stroke="var(--text2)"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
     }
   }
 
@@ -561,18 +599,19 @@ export default function AppShell({
                         <div style={{
                           position: 'absolute', bottom: -1, right: -1,
                           width: 10, height: 10, borderRadius: '50%',
-                          background: '#22c55e', border: '2px solid var(--surface)',
+                          background: '#8BB07E', border: '2px solid var(--surface)',
                         }} />
                       )}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ fontSize: 12, fontWeight: 600 }}>
                         {m.name}{isMe ? ' (you)' : ''}
-                        {isOnline && <span style={{ fontSize: 10, color: '#22c55e', marginLeft: 4 }}>online</span>}
+                        {isOnline && <span style={{ fontSize: 10, color: '#8BB07E', marginLeft: 4 }}>online</span>}
                       </span>
                       {hasLocation && locAge !== null && locAge < 120 && (
-                        <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 1 }}>
-                          📍 {m.live_area} · {locLabel}
+                        <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                          {m.live_area} · {locLabel}
                         </p>
                       )}
                     </div>
@@ -587,7 +626,8 @@ export default function AppShell({
                   cursor: 'pointer', padding: '4px 0',
                 }}
               >
-                ⚙️ Circle settings
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Circle settings
               </button>
             </div>
             </>
@@ -618,7 +658,7 @@ export default function AppShell({
             </div>
             <div>
               <p style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.2 }}>
-                Hi {firstName} 👋
+                Hi, {firstName}
               </p>
               <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2, lineHeight: 1.3 }}>
                 {activeCircle ? `Pick a date to see when ${activeCircle.name} is free` : 'Create or join a circle to get started'}
@@ -716,7 +756,7 @@ export default function AppShell({
                       borderTop: '1px solid var(--border)',
                     }}
                   >
-                    <span style={{ fontSize: 18, flexShrink: 0 }}>{notifIcon(n.type)}</span>
+                    <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>{notifIcon(n.type)}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 13, fontWeight: n.read ? 500 : 700, lineHeight: 1.3 }}>{n.title}</p>
                       {n.body && <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{n.body}</p>}
@@ -747,6 +787,8 @@ export default function AppShell({
         <nav className="bottom-nav">
           {TABS.map(tab => {
             const isActive = pathname === tab.key
+            const IconComp = NAV_ICONS[tab.key]
+            const iconColor = isActive ? 'var(--accent)' : 'var(--text2)'
             return (
               <button
                 key={tab.key}
@@ -754,7 +796,7 @@ export default function AppShell({
                 onClick={() => router.push(tab.key)}
                 style={{ position: 'relative' }}
               >
-                <span className="nav-icon">{tab.icon}</span>
+                <span className="nav-icon">{IconComp ? <IconComp color={iconColor} /> : null}</span>
                 {tab.label}
                 {/* Chat unread badge */}
                 {tab.key === '/chat' && chatUnreadCount > 0 && (

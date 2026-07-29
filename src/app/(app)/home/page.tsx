@@ -360,8 +360,8 @@ export default function HomePage() {
 
       {visibleSparks.map(sp => (
         <div key={sp.member.id} style={{
-          background: 'linear-gradient(135deg, rgba(124,92,255,0.18), rgba(52,211,153,0.12))',
-          border: '1px solid rgba(124,92,255,0.45)', borderRadius: 16,
+          background: 'linear-gradient(135deg, rgba(118,172,179,0.18), rgba(139,176,126,0.12))',
+          border: '1px solid rgba(118,172,179,0.45)', borderRadius: 16,
           padding: '12px 14px', position: 'relative',
         }}>
           <button
@@ -495,8 +495,8 @@ export default function HomePage() {
         style={{
           position: 'fixed', bottom: 80, right: 20, zIndex: 20,
           width: 56, height: 56, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #7c5cff, #34d399)',
-          border: 'none', boxShadow: '0 4px 16px rgba(124,92,255,0.4)',
+          background: 'linear-gradient(135deg, #76ACB3, #8BB07E)',
+          border: 'none', boxShadow: '0 4px 16px rgba(118,172,179,0.4)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 24, cursor: 'pointer',
         }}

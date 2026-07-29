@@ -3,11 +3,11 @@ export default function PrivacyPage() {
     <div style={{
       maxWidth: 680, margin: '0 auto', padding: '40px 20px',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      color: '#e0e0e0', background: '#0f1117', minHeight: '100vh',
+      color: '#e0e0e0', background: '#141A1F', minHeight: '100vh',
       lineHeight: 1.7, fontSize: 15,
     }}>
       <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>
-        <span style={{ color: '#7c5cff' }}>P</span>act — Privacy Policy
+        <span style={{ color: '#76ACB3' }}>P</span>act — Privacy Policy
       </h1>
       <p style={{ color: '#888', fontSize: 13, marginBottom: 32 }}>
         Last updated: July 2026
@@ -62,7 +62,7 @@ export default function PrivacyPage() {
         <p>
           Pact's use and transfer of information received from Google APIs adheres to the{' '}
           <a href="https://developers.google.com/terms/api-services-user-data-policy"
-            style={{ color: '#7c5cff' }}
+            style={{ color: '#76ACB3' }}
             target="_blank" rel="noopener noreferrer">
             Google API Services User Data Policy
           </a>, including the Limited Use requirements.
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
           You can disconnect your Google Calendar at any time from the calendar settings
           in the app. You can revoke Pact's access to your Google account at{' '}
           <a href="https://myaccount.google.com/permissions"
-            style={{ color: '#7c5cff' }}
+            style={{ color: '#76ACB3' }}
             target="_blank" rel="noopener noreferrer">
             myaccount.google.com/permissions
           </a>.
@@ -113,7 +113,7 @@ export default function PrivacyPage() {
       <Section title="Contact">
         <p>
           For questions about this privacy policy, contact us at{' '}
-          <a href="mailto:beatricelinchu@gmail.com" style={{ color: '#7c5cff' }}>
+          <a href="mailto:beatricelinchu@gmail.com" style={{ color: '#76ACB3' }}>
             beatricelinchu@gmail.com
           </a>.
         </p>

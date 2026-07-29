@@ -53,7 +53,7 @@ export async function GET() {
     summary: c.summary || c.id,
     description: c.description || '',
     primary: c.primary || false,
-    backgroundColor: c.backgroundColor || '#7c5cff',
+    backgroundColor: c.backgroundColor || '#76ACB3',
     accessRole: c.accessRole,
   }))
 

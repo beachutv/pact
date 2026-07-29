@@ -636,7 +636,7 @@ export default function CalendarPage() {
       }
       if (hasPending) {
         bg = 'rgba(59,130,246,0.15)' // blue fill for pending pacts
-        borderColor = '#3b82f6'
+        borderColor = '#5B7B8A'
       }
 
       // Special event mini icons (occasion-based like birthdays, anniversaries)
@@ -785,7 +785,7 @@ export default function CalendarPage() {
                     </div>
                     <span style={{
                       fontSize: 11, fontWeight: 700, color: 'var(--green)',
-                      background: 'rgba(52,211,153,0.12)', padding: '3px 10px',
+                      background: 'rgba(139,176,126,0.12)', padding: '3px 10px',
                       borderRadius: 12, whiteSpace: 'nowrap',
                     }}>
                       {count}
@@ -869,8 +869,8 @@ export default function CalendarPage() {
           <div style={{ marginBottom: 14 }}>
             {sparks.map(sp => (
               <div key={sp.member.id} style={{
-                background: 'linear-gradient(135deg, rgba(124,92,255,0.18), rgba(52,211,153,0.12))',
-                border: '1px solid rgba(124,92,255,0.45)', borderRadius: 16,
+                background: 'linear-gradient(135deg, rgba(118,172,179,0.18), rgba(139,176,126,0.12))',
+                border: '1px solid rgba(118,172,179,0.45)', borderRadius: 16,
                 padding: '12px 14px', marginBottom: 8, position: 'relative',
               }}>
                 <button
@@ -993,7 +993,7 @@ export default function CalendarPage() {
             <i style={{ width: 9, height: 9, border: '1.5px solid var(--accent)', borderRadius: 3, display: 'inline-block' }} /> today
           </span>
           <span style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <i style={{ width: 9, height: 9, border: '1.5px solid #3b82f6', borderRadius: 3, display: 'inline-block' }} /> pending
+            <i style={{ width: 9, height: 9, border: '1.5px solid #5B7B8A', borderRadius: 3, display: 'inline-block' }} /> pending
           </span>
           <span style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
             <i style={{ width: 9, height: 9, background: 'rgba(245,158,11,0.3)', borderRadius: 3, display: 'inline-block' }} /> confirmed
@@ -1021,10 +1021,10 @@ export default function CalendarPage() {
           style={{
             position: 'absolute', bottom: 16, right: 16, zIndex: 20,
             width: 48, height: 48, borderRadius: '50%',
-            background: 'linear-gradient(135deg, rgba(124,92,255,0.9), rgba(52,211,153,0.8))',
+            background: 'linear-gradient(135deg, rgba(118,172,179,0.9), rgba(139,176,126,0.8))',
             border: 'none', color: '#fff', fontSize: 20,
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(124,92,255,0.4)',
+            boxShadow: '0 4px 16px rgba(118,172,179,0.4)',
           }}
           title="Check for sparks"
         >
@@ -1060,7 +1060,7 @@ export default function CalendarPage() {
                   key={p.id}
                   style={{
                     marginTop: 10, padding: '10px 12px', borderRadius: 12,
-                    background: 'var(--accent-soft)', border: '1px solid rgba(124,92,255,0.4)',
+                    background: 'var(--accent-soft)', border: '1px solid rgba(118,172,179,0.4)',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                     fontSize: 12.5, fontWeight: 700,
                   }}
@@ -1082,7 +1082,7 @@ export default function CalendarPage() {
               {/* All free banner */}
               {daySummary(sheetDate).allDay && (
                 <div style={{
-                  marginTop: 10, background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.4)',
+                  marginTop: 10, background: 'rgba(139,176,126,0.12)', border: '1px solid rgba(139,176,126,0.4)',
                   color: 'var(--green)', fontSize: 12.5, fontWeight: 700, padding: '9px 12px', borderRadius: 12, textAlign: 'center',
                 }}>
                   🎉 {activeIds.size === circleMembers.length ? "Everyone's" : "This group is"} free all day — lock it in!
@@ -1142,8 +1142,8 @@ export default function CalendarPage() {
                             height: 28, borderRadius: 4,
                             background: isPast ? 'rgba(100,100,100,0.15)'
                               : isPactHour ? (isPactConfirmed ? 'rgba(245,158,11,0.35)' : 'rgba(59,130,246,0.22)')
-                              : busy ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.14)',
-                            border: isPactHour && !isPast ? `1.5px solid ${isPactConfirmed ? '#f59e0b' : '#3b82f6'}` : busy && !isPast ? '1px solid rgba(248,113,113,0.35)' : 'none',
+                              : busy ? 'rgba(231,118,93,0.16)' : 'rgba(139,176,126,0.14)',
+                            border: isPactHour && !isPast ? `1.5px solid ${isPactConfirmed ? '#FFB854' : '#5B7B8A'}` : busy && !isPast ? '1px solid rgba(231,118,93,0.35)' : 'none',
                             cursor: isMe && !isPast ? 'pointer' : 'default',
                             opacity: isPast ? 0.4 : 1,
                           }}
@@ -1173,7 +1173,7 @@ export default function CalendarPage() {
                       style={{
                         padding: '10px 12px', borderRadius: 12, marginBottom: 6,
                         background: isConfirmed ? 'rgba(245, 158, 11, 0.15)' : 'var(--surface)',
-                        border: `1.5px solid ${isConfirmed ? '#f59e0b' : '#3b82f6'}`,
+                        border: `1.5px solid ${isConfirmed ? '#FFB854' : '#5B7B8A'}`,
                         cursor: 'pointer',
                       }}
                     >
@@ -1210,7 +1210,7 @@ export default function CalendarPage() {
                         padding: '8px 13px', borderRadius: 20, fontSize: 12.5, fontWeight: 700,
                         cursor: 'pointer',
                         border: i === selectedWinIdx ? '1.5px solid var(--green)' : '1.5px solid var(--border)',
-                        background: i === selectedWinIdx ? 'rgba(52,211,153,0.15)' : w.full ? 'rgba(52,211,153,0.06)' : 'var(--surface)',
+                        background: i === selectedWinIdx ? 'rgba(139,176,126,0.15)' : w.full ? 'rgba(139,176,126,0.06)' : 'var(--surface)',
                         color: w.full ? 'var(--green)' : 'var(--text2)',
                       }}
                     >
@@ -1258,8 +1258,8 @@ export default function CalendarPage() {
                           style={{
                             display: 'flex', alignItems: 'center', gap: 11,
                             padding: '10px 12px', borderRadius: 14,
-                            background: i === 0 ? 'rgba(52,211,153,0.08)' : 'var(--surface)',
-                            border: i === 0 ? '1.5px solid rgba(52,211,153,0.3)' : '1.5px solid var(--border)',
+                            background: i === 0 ? 'rgba(139,176,126,0.08)' : 'var(--surface)',
+                            border: i === 0 ? '1.5px solid rgba(139,176,126,0.3)' : '1.5px solid var(--border)',
                             cursor: 'pointer',
                           }}
                         >

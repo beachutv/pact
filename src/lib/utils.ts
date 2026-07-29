@@ -132,9 +132,9 @@ export const AREAS: Record<string, { x: number; y: number }> = {
 
 /** Available avatar colors */
 export const AVATAR_COLORS = [
-  '#7c5cff', '#f472b6', '#38bdf8', '#fbbf24', '#4ade80',
-  '#fb923c', '#2dd4bf', '#a3e635', '#f97316', '#e879f9',
-  '#64748b', '#ef4444',
+  '#76ACB3', '#E7765D', '#FFB854', '#A8897C', '#5B7B8A',
+  '#B09AC4', '#8BB07E', '#D4917B', '#7BA6C4', '#C4A87B',
+  '#8B9F7E', '#C48B9A',
 ]
 
 /** Travel time between two abstract grid coordinate points (Metro Manila approximation) */

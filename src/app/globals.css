@@ -1,46 +1,52 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0f1117;
-  --surface: #181b24;
-  --surface2: #1f2330;
-  --surface3: #262b3b;
-  --border: #2c3245;
-  --text: #eef0f6;
-  --text2: #9aa1b5;
-  --accent: #7c5cff;
-  --accent-soft: rgba(124,92,255,.16);
-  --green: #34d399;
-  --green-soft: rgba(52,211,153,.14);
-  --red: #f87171;
-  --red-soft: rgba(248,113,113,.16);
-  --amber: #fbbf24;
-  --amber-soft: rgba(251,191,36,.16);
+  --bg: #141A1F;
+  --surface: #1C2429;
+  --surface2: #242D33;
+  --surface3: #2D373E;
+  --border: #374149;
+  --text: #F0EDE8;
+  --text2: #A8897C;
+  --accent: #76ACB3;
+  --accent-soft: rgba(118,172,179,.16);
+  --green: #8BB07E;
+  --green-soft: rgba(139,176,126,.14);
+  --red: #E7765D;
+  --red-soft: rgba(231,118,93,.16);
+  --amber: #FFB854;
+  --amber-soft: rgba(255,184,84,.16);
+  --lavender: #B09AC4;
+  --lavender-soft: rgba(176,154,196,.16);
+  --slate: #5B7B8A;
   --radius: 16px;
   --badge-bg: #ffffff;
   --badge-border: rgba(0,0,0,.18);
-  --body-bg: #07080c;
+  --body-bg: #0E1317;
 }
 
 [data-theme="light"] {
-  --bg: #f7f8fc;
-  --surface: #ffffff;
-  --surface2: #f0f1f7;
-  --surface3: #e5e7f0;
-  --border: #d8dbe8;
-  --text: #191c28;
-  --text2: #636a80;
-  --accent: #6d4aff;
-  --accent-soft: rgba(109,74,255,.12);
-  --green: #0d9f6e;
-  --green-soft: rgba(13,159,110,.12);
-  --red: #e5484d;
-  --red-soft: rgba(229,72,77,.12);
-  --amber: #d97706;
-  --amber-soft: rgba(217,119,6,.12);
-  --badge-bg: #262b3b;
+  --bg: #F5F2EE;
+  --surface: #FFFFFF;
+  --surface2: #EDE9E4;
+  --surface3: #E2DDD7;
+  --border: #D4CEC6;
+  --text: #1A2128;
+  --text2: #5B7B8A;
+  --accent: #5E9AA3;
+  --accent-soft: rgba(94,154,163,.12);
+  --green: #6F9A63;
+  --green-soft: rgba(111,154,99,.12);
+  --red: #D4634D;
+  --red-soft: rgba(212,99,77,.12);
+  --amber: #E5A040;
+  --amber-soft: rgba(229,160,64,.12);
+  --lavender: #9580A8;
+  --lavender-soft: rgba(149,128,168,.12);
+  --slate: #5B7B8A;
+  --badge-bg: #242D33;
   --badge-border: rgba(255,255,255,.25);
-  --body-bg: #e9eaf2;
+  --body-bg: #E8E4DF;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -97,7 +103,7 @@ body {
 
 select.input {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239aa1b5' viewBox='0 0 16 16'%3E%3Cpath d='M8 12L2 6h12z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23A8897C' viewBox='0 0 16 16'%3E%3Cpath d='M8 12L2 6h12z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
   padding-right: 36px;
@@ -115,7 +121,7 @@ select.input {
   cursor: pointer; border: none; background: none; position: relative;
 }
 .nav-tab.active { color: var(--accent); }
-.nav-tab .nav-icon { font-size: 18px; }
+.nav-tab .nav-icon { font-size: 18px; line-height: 1; display: flex; align-items: center; justify-content: center; }
 
 .toast {
   position: fixed; bottom: 80px; left: 50%;

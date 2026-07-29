@@ -312,7 +312,7 @@ export default function ChatPage() {
 
   function threadAvatar(t: Thread): { color: string; initial: string; avatarUrl?: string } {
     if (t.color) return { color: t.color, initial: (t.name || 'G')[0] }
-    if (t.circle_id) return { color: '#7c5cff', initial: activeCircle?.emoji || 'G' }
+    if (t.circle_id) return { color: '#76ACB3', initial: activeCircle?.emoji || 'G' }
     const others = t.member_ids.filter(id => id !== user.id)
     if (others.length === 1) {
       const m = getMember(others[0])
