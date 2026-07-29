@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
@@ -62,73 +63,86 @@ const VENUES: { name: string; emoji: string; area: string; x: number; y: number;
 ]
 
 function SparkCard({ spark: sp, todayStr, onDismiss }: { spark: Spark; todayStr: string; onDismiss: () => void }) {
-  const cardRef = useRef<HTMLDivElement>(null)
-  const [offsetY, setOffsetY] = useState(0)
+  const [offsetX, setOffsetX] = useState(0)
   const [swiping, setSwiping] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
+  const startX = useRef(0)
   const startY = useRef(0)
+  const isHorizontal = useRef<boolean | null>(null)
 
   function onTouchStart(e: React.TouchEvent) {
+    startX.current = e.touches[0].clientX
     startY.current = e.touches[0].clientY
+    isHorizontal.current = null
     setSwiping(true)
   }
   function onTouchMove(e: React.TouchEvent) {
     if (!swiping) return
+    const dx = e.touches[0].clientX - startX.current
     const dy = e.touches[0].clientY - startY.current
-    // Only allow swiping up (negative = up)
-    setOffsetY(Math.min(0, dy))
+    // Lock direction on first significant move
+    if (isHorizontal.current === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      isHorizontal.current = Math.abs(dx) > Math.abs(dy)
+    }
+    if (isHorizontal.current) {
+      e.preventDefault()
+      // Only allow swiping left (negative)
+      setOffsetX(Math.min(0, dx))
+    }
   }
   function onTouchEnd() {
     setSwiping(false)
-    if (offsetY < -50) {
-      // Dismissed — animate out then call onDismiss
-      setOffsetY(-200)
-      setTimeout(onDismiss, 200)
+    isHorizontal.current = null
+    if (offsetX < -80) {
+      setDismissed(true)
+      setOffsetX(-500)
+      setTimeout(onDismiss, 250)
     } else {
-      setOffsetY(0)
+      setOffsetX(0)
     }
   }
 
+  if (dismissed) return null
+
   return (
     <div
-      ref={cardRef}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       style={{
-        minWidth: 220, maxWidth: 260, flexShrink: 0,
         background: 'linear-gradient(135deg, rgba(118,172,179,0.18), rgba(139,176,126,0.12))',
-        border: '1px solid rgba(118,172,179,0.45)', borderRadius: 14,
-        padding: '10px 12px', position: 'relative',
-        transform: `translateY(${offsetY}px)`,
-        opacity: offsetY < -50 ? 0 : 1,
-        transition: swiping ? 'none' : 'transform 0.2s ease, opacity 0.2s ease',
+        border: '1px solid rgba(118,172,179,0.45)', borderRadius: 16,
+        padding: '10px 14px', marginBottom: 8, position: 'relative',
+        transform: `translateX(${offsetX}px)`,
+        opacity: Math.max(0, 1 + offsetX / 200),
+        transition: swiping ? 'none' : 'transform 0.25s ease, opacity 0.25s ease',
       }}
     >
       <button
         onClick={onDismiss}
         style={{
-          position: 'absolute', top: 6, right: 8,
+          position: 'absolute', top: 8, right: 11,
           background: 'none', border: 'none', color: 'var(--text2)',
-          fontSize: 12, cursor: 'pointer', padding: '2px 4px',
+          fontSize: 14, cursor: 'pointer', padding: '2px 4px',
         }}
       >✕</button>
-      <div style={{ fontSize: 8.5, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+      <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: 0.7 }}>
         ⚡ Spark
       </div>
-      <div style={{ fontSize: 11.5, lineHeight: 1.4, marginTop: 3 }}>
-        <b>~{sp.travelTime} min</b> from{' '}
-        <b style={{ color: sp.member.color }}>{sp.member.name.split(' ')[0]}</b>{' '}
-        · free <b>{fmtWin(sp.window.s, sp.window.e)}</b>
+      <div style={{ fontSize: 12.5, lineHeight: 1.45, marginTop: 3 }}>
+        You're <b>~{sp.travelTime} min</b> from{' '}
+        <b style={{ color: sp.member.color }}>{sp.member.name}</b>{' '}
+        ({sp.area}) and you're both free{' '}
+        <b>{fmtWin(sp.window.s, sp.window.e)}</b> today.
       </div>
       <button
         onClick={() => window.location.href = `/plans/new?date=${todayStr}&hour=${sp.window.s}&end=${sp.window.e}`}
         style={{
-          marginTop: 7, padding: '6px 12px', border: 'none', borderRadius: 14,
-          background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer',
-          width: '100%',
+          marginTop: 8, padding: '8px 14px', border: 'none', borderRadius: 18,
+          background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer',
         }}
       >
-        Plan with {sp.member.name.split(' ')[0]}
+        Propose a plan with {sp.member.name.split(' ')[0]}
       </button>
     </div>
   )
@@ -328,8 +342,10 @@ export default function CalendarPage() {
   }, [dateParam, loading])
 
   // Listen for calendar selector event from header
+  const loadCalRef = useRef<() => void>(() => {})
+  useEffect(() => { loadCalRef.current = loadCalendars })
   useEffect(() => {
-    function onCalSelector() { loadCalendars() }
+    function onCalSelector() { loadCalRef.current() }
     window.addEventListener('pact-open-cal-selector', onCalSelector)
     return () => window.removeEventListener('pact-open-cal-selector', onCalSelector)
   }, [])
@@ -367,12 +383,25 @@ export default function CalendarPage() {
 
   // Load Google calendars for selection modal
   async function loadCalendars() {
-    const res = await fetch('/api/calendar/list')
-    if (res.ok) {
-      const data = await res.json()
-      setGcals(data.calendars)
-      setSelectedCals(data.selectedIds)
-      setShowCalModal(true)
+    try {
+      const res = await fetch('/api/calendar/list')
+      if (res.ok) {
+        const data = await res.json()
+        setGcals(data.calendars || [])
+        setSelectedCals(data.selectedIds || ['primary'])
+        setShowCalModal(true)
+      } else {
+        const err = await res.json().catch(() => ({}))
+        console.error('Calendar list error:', res.status, err)
+        // If no calendar connected, show modal anyway with empty list so user sees the issue
+        if (res.status === 400) {
+          setGcals([])
+          setSelectedCals([])
+          setShowCalModal(true)
+        }
+      }
+    } catch (e) {
+      console.error('Calendar list fetch error:', e)
     }
   }
 
@@ -1011,17 +1040,12 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {/* Sparks — compact horizontal scroll with swipe-to-dismiss */}
+        {/* Sparks — stacked, swipe left to dismiss */}
         {sparks.length > 0 && (
-          <div style={{ marginBottom: 10, overflow: 'hidden' }}>
-            <div style={{
-              display: 'flex', gap: 8, overflowX: 'auto', padding: '2px 0 6px',
-              WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
-            }}>
-              {sparks.map(sp => (
-                <SparkCard key={sp.member.id} spark={sp} todayStr={todayStr} onDismiss={() => dismissSpark(sp.member.id)} />
-              ))}
-            </div>
+          <div style={{ marginBottom: 14, overflow: 'hidden' }}>
+            {sparks.map(sp => (
+              <SparkCard key={sp.member.id} spark={sp} todayStr={todayStr} onDismiss={() => dismissSpark(sp.member.id)} />
+            ))}
           </div>
         )}
 
@@ -1234,12 +1258,10 @@ export default function CalendarPage() {
                 {/* Member rows */}
                 {activeMembers.map(m => {
                   const isConnected = connectedUserIds.has(m.id)
-                  const origin = memberOrigins.find(o => o.name === m.name.split(' ')[0])
                   return (
-                  <div key={m.id} style={{ marginBottom: 5 }}>
-                  <div style={{
+                  <div key={m.id} style={{
                     display: 'grid', gridTemplateColumns: `46px repeat(${DAY_END - DAY_START}, 1fr)`,
-                    gap: 2,
+                    gap: 2, marginBottom: 3,
                   }}>
                     <div style={{
                       fontSize: 10.5, fontWeight: 700, color: m.color,
@@ -1283,15 +1305,6 @@ export default function CalendarPage() {
                         />
                       )
                     })}
-                  </div>
-                  {origin && (
-                    <div style={{
-                      fontSize: 9, color: 'var(--text2)', paddingLeft: 48, marginTop: 1,
-                      fontStyle: 'italic',
-                    }}>
-                      {origin.label}
-                    </div>
-                  )}
                   </div>
                   )
                 })}
@@ -1460,13 +1473,13 @@ export default function CalendarPage() {
         </>
       )}
 
-      {/* Calendar selection modal */}
-      {showCalModal && (
+      {/* Calendar selection modal — portaled to body to escape stacking context */}
+      {showCalModal && createPortal(
         <div
           onClick={e => { if (e.target === e.currentTarget) setShowCalModal(false) }}
           style={{
-            position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)',
-            zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+            zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
           <div style={{
@@ -1477,6 +1490,11 @@ export default function CalendarPage() {
             <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>
               Pick which calendars Pact checks for busy times. We only read busy/free — never event details.
             </p>
+            {gcals.length === 0 && (
+              <div style={{ fontSize: 13, color: 'var(--text2)', padding: '16px 0', textAlign: 'center' }}>
+                No calendars found. Make sure your Google Calendar is connected.
+              </div>
+            )}
             {gcals.map(cal => {
               const on = selectedCals.includes(cal.id)
               return (
@@ -1516,18 +1534,20 @@ export default function CalendarPage() {
                 </div>
               )
             })}
-            <button
-              onClick={saveCalendarSelection}
-              disabled={selectedCals.length === 0}
-              style={{
-                marginTop: 12, width: '100%', padding: 12, border: 'none', borderRadius: 12,
-                background: selectedCals.length > 0 ? 'var(--accent)' : 'var(--surface3)',
-                color: selectedCals.length > 0 ? '#fff' : 'var(--text2)',
-                fontSize: 14, fontWeight: 700, cursor: 'pointer',
-              }}
-            >
-              Save & sync
-            </button>
+            {gcals.length > 0 && (
+              <button
+                onClick={saveCalendarSelection}
+                disabled={selectedCals.length === 0}
+                style={{
+                  marginTop: 12, width: '100%', padding: 12, border: 'none', borderRadius: 12,
+                  background: selectedCals.length > 0 ? 'var(--accent)' : 'var(--surface3)',
+                  color: selectedCals.length > 0 ? '#fff' : 'var(--text2)',
+                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                Save & sync
+              </button>
+            )}
             <button
               onClick={() => { setShowCalModal(false); disconnectCalendar() }}
               style={{
@@ -1539,7 +1559,8 @@ export default function CalendarPage() {
               Disconnect Google Calendar
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
