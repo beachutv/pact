@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { toStr, fmtShort, fmtWin, travelMin, txtOn, AREAS, DAY_START, DAY_END, getBrowserTimezone, currentHourInTz } from '@/lib/utils'
@@ -578,13 +579,13 @@ export default function SpotsPage() {
         )}
       </div>
 
-      {/* Add favorite modal — centered overlay like prototype */}
-      {showFavModal && (
+      {/* Add favorite modal — portaled to body so it overlays header */}
+      {showFavModal && createPortal(
         <div
           onClick={e => { if (e.target === e.currentTarget) setShowFavModal(false) }}
           style={{
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-            zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 24,
           }}
         >
@@ -675,7 +676,8 @@ export default function SpotsPage() {
               }}
             >Cancel</button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

@@ -25,21 +25,23 @@ type SpotRec = { name: string; emoji: string; area: string; travelTimes: { name:
 
 // Known hangout venues in Metro Manila (matches prototype)
 const VENUES: { name: string; emoji: string; area: string; x: number; y: number; type: string }[] = [
+  // Restaurants & cafés (prioritized)
+  { name: 'Wildflour', emoji: '🥐', area: 'BGC, Taguig', x: 5.5, y: 3.5, type: 'food' },
+  { name: 'Manam', emoji: '🍛', area: 'Ayala, Makati', x: 4, y: 3.4, type: 'food' },
+  { name: 'Mendokoro Ramenba', emoji: '🍜', area: 'Poblacion, Makati', x: 4.2, y: 3.8, type: 'food' },
+  { name: 'Maginhawa Food Trip', emoji: '🍳', area: 'Maginhawa, QC', x: 5.2, y: 7.5, type: 'food' },
+  { name: 'Kapitolyo Food Crawl', emoji: '🌮', area: 'Kapitolyo, Pasig', x: 5.3, y: 5.3, type: 'food' },
+  { name: 'Samgyupsalamat', emoji: '🥓', area: 'Timog Ave, QC', x: 4.8, y: 7, type: 'food' },
+  { name: 'Tim Ho Wan', emoji: '🥟', area: 'Megamall, Ortigas', x: 5.4, y: 5.5, type: 'food' },
+  { name: 'Yabu', emoji: '🍱', area: 'BGC, Taguig', x: 5.6, y: 3.3, type: 'food' },
   { name: 'Kape Diem Café', emoji: '☕', area: 'Katipunan, QC', x: 6, y: 7.9, type: 'coffee' },
-  { name: 'The Sisig Joint', emoji: '🍳', area: 'Kapitolyo, Pasig', x: 5.2, y: 5.2, type: 'food' },
-  { name: 'UP Sunken Garden', emoji: '🌳', area: 'Diliman, QC', x: 5, y: 8.2, type: 'park' },
-  { name: 'High Score Arcade', emoji: '🕹️', area: 'Megamall, Ortigas', x: 5.4, y: 5.5, type: 'arcade' },
-  { name: 'Indie Cinema', emoji: '🎬', area: 'San Juan', x: 4.3, y: 5.6, type: 'cinema' },
+  { name: 'CBTL Eastwood', emoji: '☕', area: 'Eastwood, QC', x: 6, y: 6.5, type: 'coffee' },
+  // Other activities
   { name: 'Poblacion Rooftop', emoji: '🍹', area: 'Poblacion, Makati', x: 4.2, y: 3.7, type: 'bar' },
   { name: 'Board Game Café', emoji: '🎲', area: 'Maginhawa, QC', x: 5.2, y: 7.5, type: 'coffee' },
   { name: 'Family KTV', emoji: '🎤', area: 'Timog Ave, QC', x: 4.8, y: 7, type: 'karaoke' },
-  { name: 'Mercato Food Park', emoji: '🌮', area: 'BGC, Taguig', x: 5.6, y: 3.3, type: 'food' },
-  { name: 'National Museum', emoji: '🖼️', area: 'Ermita, Manila', x: 2.8, y: 5, type: 'museum' },
-  { name: 'Ramen Kuroda', emoji: '🍜', area: 'Poblacion, Makati', x: 4.2, y: 3.8, type: 'food' },
-  { name: 'Samgyup City', emoji: '🥓', area: 'Timog Ave, QC', x: 4.8, y: 7, type: 'food' },
+  { name: 'UP Town Center', emoji: '🛍️', area: 'Katipunan, QC', x: 6, y: 8, type: 'mall' },
   { name: 'SM Megamall', emoji: '🛍️', area: 'Megamall, Ortigas', x: 5.4, y: 5.5, type: 'mall' },
-  { name: 'Escape Room MNL', emoji: '🔐', area: 'Megamall, Ortigas', x: 5.5, y: 5.6, type: 'arcade' },
-  { name: 'La Mesa Eco Park', emoji: '🌲', area: 'Diliman, QC', x: 5.1, y: 8.3, type: 'park' },
 ]
 
 export default function CalendarPage() {
@@ -435,9 +437,19 @@ export default function CalendarPage() {
     const winStart = wins[selectedWinIdx]?.s ?? 18
 
     return activeMembers.map(m => {
-      const homeX = (m as any).home_x || 0
-      const homeY = (m as any).home_y || 0
+      let homeX = (m as any).home_x || 0
+      let homeY = (m as any).home_y || 0
       const homeArea = (m as any).home_area || ''
+      // Sanity check: if coords look like GPS (lat/lng ~14/121) instead of grid (0-10), look up area
+      if (homeX > 12 || homeY > 12) {
+        const areaCoords = homeArea ? AREAS[homeArea] : undefined
+        const fuzzyKey = !areaCoords ? Object.keys(AREAS).find(a =>
+          homeArea.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(homeArea.toLowerCase())
+        ) : undefined
+        const fallback = areaCoords || (fuzzyKey ? AREAS[fuzzyKey] : { x: 4.5, y: 5.5 })
+        homeX = fallback.x
+        homeY = fallback.y
+      }
 
       // Find last busy block ending before or at the window start
       const priorBlocks = busyBlocks
@@ -1272,11 +1284,11 @@ export default function CalendarPage() {
                               {rec.source === 'favorite' ? '⭐ ' : ''}{rec.name}
                             </div>
                             <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
-                              {rec.area} · ~{rec.avgMin} min avg for the group
+                              {rec.area} · ~{rec.avgMin.toLocaleString()} min avg
                             </div>
                           </div>
                           <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--green)', flexShrink: 0, textAlign: 'right', lineHeight: 1.4 }}>
-                            {rec.maxMin} min max<br />({rec.maxWho})
+                            {rec.maxMin.toLocaleString()} min max<br />({rec.maxWho})
                           </div>
                         </div>
                       ))}

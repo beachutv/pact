@@ -342,22 +342,46 @@ export default function AppShell({
   return (
     <CircleContext.Provider value={{ user: currentUser, updateUser, circles, activeCircle, setActiveCircle, circleMembers, setCircleMembers }}>
       <div id="app-shell">
-        {/* Header — matches prototype */}
+        {/* Header — compact */}
         <header style={{
-          padding: '14px 18px 10px',
+          padding: '10px 16px 8px',
           borderBottom: '1px solid var(--border)',
           flexShrink: 0,
         }}>
-          {/* Row 1: Pact. logo left, theme/bell/calendar icons right */}
+          {/* Row 1: Profile photo + greeting left, icons right */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <p style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1 }}>
-                <span style={{ color: 'var(--accent)' }}>P</span>act.
-              </p>
-              <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2 }}>plans that actually happen</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div
+                onClick={() => router.push(`/profile/${currentUser.id}`)}
+                style={{
+                  width: 34, height: 34, borderRadius: '50%',
+                  background: currentUser.color,
+                  color: txtOn(currentUser.color),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                  border: '2px solid var(--border)',
+                  flexShrink: 0, position: 'relative', overflow: 'hidden',
+                }}
+              >
+                {currentUser.name?.[0] || '?'}
+                {currentUser.avatar_url && (
+                  <img src={currentUser.avatar_url} alt="" style={{
+                    position: 'absolute', inset: 0, width: '100%', height: '100%',
+                    objectFit: 'cover', borderRadius: '50%',
+                  }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                )}
+              </div>
+              <div>
+                <p style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.1 }}>
+                  <span style={{ color: 'var(--accent)' }}>P</span>act.
+                </p>
+                <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 1 }}>
+                  {activeCircle ? `${activeCircle.emoji} ${activeCircle.name}` : 'plans that actually happen'}
+                </p>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               {/* Theme picker */}
               <div style={{ position: 'relative' }}>
                 <button
@@ -469,8 +493,14 @@ export default function AppShell({
               {/* Calendar selector button (top right like prototype) */}
               <button
                 onClick={async () => {
-                  // Load and show calendar selection — dispatch custom event for dashboard
-                  window.dispatchEvent(new CustomEvent('pact-open-cal-selector'))
+                  // Navigate to calendar if not already there, then open selector
+                  if (pathname !== '/calendar') {
+                    router.push('/calendar')
+                    // Wait a tick for navigation, then dispatch
+                    setTimeout(() => window.dispatchEvent(new CustomEvent('pact-open-cal-selector')), 500)
+                  } else {
+                    window.dispatchEvent(new CustomEvent('pact-open-cal-selector'))
+                  }
                 }}
                 title="My Calendars"
                 style={{
@@ -489,65 +519,44 @@ export default function AppShell({
             </div>
           </div>
 
-          {/* Row 2: Circle name left, avatar stack right — click to expand */}
-          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* Row 2: Circle members + expand */}
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
             {activeCircle ? (
               <button
                 onClick={() => setShowMembersList(!showMembersList)}
                 style={{
-                  fontSize: 13, fontWeight: 600, color: 'var(--text2)',
+                  fontSize: 11, fontWeight: 600, color: 'var(--text2)',
                   background: 'none', border: 'none', cursor: 'pointer',
-                  padding: 0,
+                  padding: 0, display: 'flex', alignItems: 'center', gap: 6,
                 }}
               >
-                {activeCircle.emoji} {activeCircle.name} · {circleMembers.length} member{circleMembers.length > 1 ? 's' : ''} {showMembersList ? '▴' : '▾'}
+                {/* Inline avatar stack */}
+                <span style={{ display: 'flex' }}>
+                  {circleMembers.slice(0, 4).map((m, i) => (
+                    <span key={m.id} style={{
+                      width: 20, height: 20, borderRadius: '50%',
+                      background: m.color, color: txtOn(m.color),
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 8, fontWeight: 800,
+                      border: '1.5px solid var(--bg)',
+                      marginLeft: i > 0 ? -6 : 0,
+                      position: 'relative', overflow: 'hidden',
+                    }}>
+                      {m.name?.[0] || '?'}
+                      {m.avatar_url && (
+                        <img src={m.avatar_url} alt="" style={{
+                          position: 'absolute', inset: 0, width: '100%', height: '100%',
+                          objectFit: 'cover', borderRadius: '50%',
+                        }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      )}
+                    </span>
+                  ))}
+                </span>
+                {circleMembers.length} member{circleMembers.length > 1 ? 's' : ''} {showMembersList ? '▴' : '▾'}
               </button>
             ) : (
-              <span style={{ fontSize: 13, color: 'var(--text2)' }}>No circles yet</span>
+              <span style={{ fontSize: 11, color: 'var(--text2)' }}>No circles yet</span>
             )}
-
-            {/* Avatar stack */}
-            {activeCircle && (
-              <div style={{ display: 'flex', marginLeft: 'auto' }}>
-                {circleMembers.slice(0, 5).map((m, i) => (
-                  <div
-                    key={m.id}
-                    style={{
-                      width: 24, height: 24, borderRadius: '50%',
-                      background: m.color,
-                      color: txtOn(m.color),
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 9, fontWeight: 800,
-                      border: '2px solid var(--bg)',
-                      marginLeft: i > 0 ? -8 : 0,
-                      zIndex: 5 - i,
-                      position: 'relative', overflow: 'hidden',
-                    }}
-                  >
-                    {m.name?.[0] || '?'}
-                    {m.avatar_url && (
-                      <img src={m.avatar_url} alt="" style={{
-                        position: 'absolute', inset: 0, width: '100%', height: '100%',
-                        objectFit: 'cover', borderRadius: '50%',
-                      }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                    )}
-                  </div>
-                ))}
-                {circleMembers.length > 5 && (
-                  <div style={{
-                    width: 24, height: 24, borderRadius: '50%',
-                    background: 'var(--surface2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 8, fontWeight: 800, color: 'var(--text2)',
-                    border: '2px solid var(--bg)',
-                    marginLeft: -8,
-                  }}>
-                    +{circleMembers.length - 5}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
 
           {/* Members list popup overlay */}
           {showMembersList && activeCircle && (
@@ -633,75 +642,35 @@ export default function AppShell({
             </>
           )}
 
-          {/* Row 3: Hi Name greeting + profile photo */}
-          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div
-              onClick={() => router.push(`/profile/${currentUser.id}`)}
-              style={{
-                width: 42, height: 42, borderRadius: '50%',
-                background: currentUser.color,
-                color: txtOn(currentUser.color),
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 16, fontWeight: 800, cursor: 'pointer',
-                border: '2px solid var(--border)',
-                flexShrink: 0,
-                position: 'relative', overflow: 'hidden',
-              }}
-            >
-              {currentUser.name?.[0] || '?'}
-              {currentUser.avatar_url && (
-                <img src={currentUser.avatar_url} alt="" style={{
-                  position: 'absolute', inset: 0, width: '100%', height: '100%',
-                  objectFit: 'cover', borderRadius: '50%',
-                }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-              )}
-            </div>
-            <div>
-              <p style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.2 }}>
-                Hi, {firstName}
-              </p>
-              <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2, lineHeight: 1.3 }}>
-                {activeCircle ? `Pick a date to see when ${activeCircle.name} is free` : 'Create or join a circle to get started'}
-              </p>
-            </div>
-          </div>
-
-          {/* YOUR CIRCLES — pill chips */}
-          <div style={{ marginTop: 10 }}>
-            <p style={{
-              fontSize: 10, fontWeight: 800, color: 'var(--text2)',
-              textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6,
-            }}>
-              Your Circles
-            </p>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-              {circles.map(c => (
+          {/* Circle pills — inline, compact */}
+            {circles.length > 1 && (
+              <span style={{ display: 'flex', gap: 4, marginLeft: 'auto', flexWrap: 'nowrap', overflow: 'auto' }}>
+                {circles.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => { setActiveCircle(c); setShowMembersList(false) }}
+                    style={{
+                      padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700,
+                      border: c.id === activeCircle?.id ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                      background: c.id === activeCircle?.id ? 'var(--accent-soft)' : 'transparent',
+                      color: c.id === activeCircle?.id ? 'var(--accent)' : 'var(--text2)',
+                      cursor: 'pointer', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {c.emoji} {c.name}
+                  </button>
+                ))}
                 <button
-                  key={c.id}
-                  onClick={() => { setActiveCircle(c); setShowMembersList(false) }}
+                  onClick={() => router.push('/circles/new')}
                   style={{
-                    padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                    border: c.id === activeCircle?.id ? '2px solid var(--accent)' : '1px solid var(--border)',
-                    background: c.id === activeCircle?.id ? 'var(--accent-soft)' : 'var(--surface)',
-                    color: c.id === activeCircle?.id ? 'var(--accent)' : 'var(--text)',
-                    cursor: 'pointer',
+                    padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700,
+                    border: '1px dashed var(--border)',
+                    background: 'transparent', color: 'var(--accent)',
+                    cursor: 'pointer', whiteSpace: 'nowrap',
                   }}
-                >
-                  {c.emoji} {c.name}
-                </button>
-              ))}
-              <button
-                onClick={() => router.push('/circles/new')}
-                style={{
-                  padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                  border: '1px dashed var(--border)',
-                  background: 'transparent', color: 'var(--accent)',
-                  cursor: 'pointer',
-                }}
-              >
-                ＋ New
-              </button>
-            </div>
+                >+ New</button>
+              </span>
+            )}
           </div>
 
           {/* Notifications dropdown */}

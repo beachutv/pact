@@ -457,7 +457,7 @@ export default function ProfilePage() {
           onClick={e => { if (e.target === e.currentTarget) setShowCalModal(false) }}
           style={{
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-            zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
           <div style={{

@@ -44,7 +44,7 @@ function OnboardingInner() {
       // Fuzzy match for coordinates
       const exactMatch = AREAS[area]
       const fuzzyMatch = !exactMatch && areaNames.find(a => area.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(area.toLowerCase()))
-      const coords = exactMatch || (fuzzyMatch ? AREAS[fuzzyMatch] : { x: 14.55, y: 121.0 })
+      const coords = exactMatch || (fuzzyMatch ? AREAS[fuzzyMatch] : { x: 4.5, y: 5.5 })
 
       const { error: updateError } = await supabase.from('users').update({
         name: name || 'User',
