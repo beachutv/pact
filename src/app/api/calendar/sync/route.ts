@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-const DAYS_AHEAD = 30
+const DAYS_AHEAD = 90
 
 async function getAccessToken(conn: any, supabase: any) {
   const expiry = new Date(conn.token_expiry)

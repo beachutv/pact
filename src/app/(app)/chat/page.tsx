@@ -79,6 +79,7 @@ export default function ChatPage() {
 
   // Cache for users not in the active circle (e.g. DM partners from other circles)
   const [userCache, setUserCache] = useState<Record<string, UserProfile>>({})
+  const userCacheRef = useRef<Record<string, UserProfile>>({})
   const fetchingUsers = useRef<Set<string>>(new Set())
 
   // Tap → quick actions menu
@@ -182,14 +183,15 @@ export default function ChatPage() {
     const allMemberIds = new Set<string>()
     result.forEach(t => t.member_ids.forEach(id => allMemberIds.add(id)))
     const circleMemberIds = new Set(circleMembers.map(m => m.id))
-    const unknownIds = [...allMemberIds].filter(id => !circleMemberIds.has(id) && !userCache[id] && !fetchingUsers.current.has(id))
+    const unknownIds = [...allMemberIds].filter(id => !circleMemberIds.has(id) && !userCacheRef.current[id] && !fetchingUsers.current.has(id))
     if (unknownIds.length > 0) {
       unknownIds.forEach(id => fetchingUsers.current.add(id))
       const { data: profiles } = await supabase.from('users').select('*').in('id', unknownIds)
       if (profiles) {
-        const newCache: Record<string, UserProfile> = {}
-        profiles.forEach(p => { newCache[p.id] = p as UserProfile })
-        setUserCache(prev => ({ ...prev, ...newCache }))
+        const newEntries: Record<string, UserProfile> = {}
+        profiles.forEach(p => { newEntries[p.id] = p as UserProfile })
+        userCacheRef.current = { ...userCacheRef.current, ...newEntries }
+        setUserCache(prev => ({ ...prev, ...newEntries }))
       }
       unknownIds.forEach(id => fetchingUsers.current.delete(id))
     }
@@ -1040,9 +1042,16 @@ export default function ChatPage() {
             const myRsvp = msg.rsvps.find(r => r.user_id === user.id)
             const inCount = msg.rsvps.filter(r => r.response === 'in').length
             return (
-              <div key={msg.id} style={{
-                display: 'flex', gap: 8, flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-end',
-              }}>
+              <div
+                key={msg.id}
+                onTouchStart={e => { onMsgTouchStart(e, msg) }}
+                onTouchEnd={() => { onMsgTouchEnd() }}
+                onClick={() => onMsgTap(msg)}
+                style={{
+                  display: 'flex', gap: 8, flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-end',
+                  WebkitUserSelect: 'none', userSelect: 'none',
+                }}
+              >
                 <div className="avatar" style={{
                   background: sender?.avatar_url ? `url(${sender.avatar_url}) center/cover` : (sender?.color || 'var(--surface2)'),
                   color: txtOn(sender?.color || '#666'), width: 28, height: 28, fontSize: 10, flexShrink: 0,

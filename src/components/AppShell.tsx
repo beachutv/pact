@@ -220,9 +220,11 @@ export default function AppShell({
   const [selectedCals, setSelectedCals] = useState<string[]>([])
 
   const [calError, setCalError] = useState<string | null>(null)
+  const [calLoading, setCalLoading] = useState(false)
 
   async function loadCalendars() {
     setCalError(null)
+    setCalLoading(true)
     try {
       const res = await fetch('/api/calendar/list')
       if (res.ok) {
@@ -252,6 +254,8 @@ export default function AppShell({
       setGcals([])
       setSelectedCals([])
       setShowCalModal(true)
+    } finally {
+      setCalLoading(false)
     }
   }
 
@@ -551,21 +555,28 @@ export default function AppShell({
 
               {/* Calendar selector */}
               <button
-                onClick={() => loadCalendars()}
+                onClick={() => !calLoading && loadCalendars()}
                 title="My Calendars"
                 style={{
                   background: 'var(--surface2)', border: '1px solid var(--border)',
-                  cursor: 'pointer', padding: '6px 10px', borderRadius: 20,
+                  cursor: calLoading ? 'wait' : 'pointer', padding: '6px 10px', borderRadius: 20,
                   display: 'flex', alignItems: 'center', gap: 5,
                   fontSize: 11, fontWeight: 600, color: 'var(--text)',
+                  opacity: calLoading ? 0.6 : 1,
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                  <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-                  <line x1="3" y1="10" x2="21" y2="10"/>
-                </svg>
-                My calendars
+                {calLoading ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                    <line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                )}
+                {calLoading ? 'Loading...' : 'My calendars'}
               </button>
 
               {/* Theme picker */}
@@ -623,25 +634,40 @@ export default function AppShell({
                     background: 'none', border: 'none', cursor: 'pointer', padding: 0,
                   }}
                 >
-                  {circleMembers.slice(0, 6).map((m, i) => (
+                  {circleMembers.slice(0, 6).map((m, i) => {
+                    const mOnline = m.live_updated_at && (Date.now() - new Date(m.live_updated_at).getTime()) < 5 * 60 * 1000
+                    return (
                     <span key={m.id} style={{
-                      width: 28, height: 28, borderRadius: '50%',
-                      background: m.color, color: txtOn(m.color),
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 10, fontWeight: 700,
-                      border: '2px solid var(--bg)',
+                      position: 'relative',
                       marginLeft: i > 0 ? -8 : 0,
-                      position: 'relative', overflow: 'hidden',
                     }}>
-                      {m.name?.[0] || '?'}
-                      {m.avatar_url && (
-                        <img src={m.avatar_url} alt="" style={{
-                          position: 'absolute', inset: 0, width: '100%', height: '100%',
-                          objectFit: 'cover', borderRadius: '50%',
-                        }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      <span style={{
+                        width: 28, height: 28, borderRadius: '50%',
+                        background: m.color, color: txtOn(m.color),
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 10, fontWeight: 700,
+                        border: '2px solid var(--bg)',
+                        position: 'relative', overflow: 'hidden',
+                      }}>
+                        {m.name?.[0] || '?'}
+                        {m.avatar_url && (
+                          <img src={m.avatar_url} alt="" style={{
+                            position: 'absolute', inset: 0, width: '100%', height: '100%',
+                            objectFit: 'cover', borderRadius: '50%',
+                          }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                        )}
+                      </span>
+                      {mOnline && (
+                        <span style={{
+                          position: 'absolute', bottom: 0, right: 0,
+                          width: 8, height: 8, borderRadius: '50%',
+                          background: '#34d399', border: '1.5px solid var(--bg)',
+                          zIndex: 2,
+                        }} />
                       )}
                     </span>
-                  ))}
+                    )
+                  })}
                   {circleMembers.length > 6 && (
                     <span style={{
                       width: 28, height: 28, borderRadius: '50%',
