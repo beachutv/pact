@@ -199,7 +199,7 @@ export default function AppShell({
 
   // Auto-collapse members list and close panels when navigating between tabs
   useEffect(() => {
-    setShowMembersList(false)
+    setShowCirclePanel(false)
     setShowNotifs(false)
     setShowThemePicker(false)
   }, [pathname])
@@ -226,10 +226,11 @@ export default function AppShell({
     setCircleMembers(prev => prev.map(m => m.id === user.id ? { ...m, ...partial } : m))
   }
 
-  // Circle members expanded from circle name
-  const [showMembersList, setShowMembersList] = useState(false)
-  // Your Circles section
-  const [showYourCircles, setShowYourCircles] = useState(false)
+  // Unified circle panel (replaces separate members + circles dropdowns)
+  const [showCirclePanel, setShowCirclePanel] = useState(false)
+  // Legacy aliases for compatibility (auto-close on nav)
+  const showMembersList = false
+  const showYourCircles = false
 
   const [theme, setTheme] = useState(user.theme || 'dark')
   const [showThemePicker, setShowThemePicker] = useState(false)
@@ -738,39 +739,31 @@ export default function AppShell({
             </div>
           </div>
 
-          {/* Row 2: Circle name + members | circle switcher */}
-          <div style={{ marginTop: 11, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* Row 2: Circle name + avatars — single tap opens unified panel */}
+          <button
+            onClick={() => activeCircle ? setShowCirclePanel(!showCirclePanel) : router.push('/circles/new')}
+            style={{
+              marginTop: 11, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+            }}
+          >
             {activeCircle ? (
               <>
-                <button
-                  onClick={() => circles.length > 1 ? setShowYourCircles(!showYourCircles) : setShowMembersList(!showMembersList)}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'var(--text2)', fontSize: 13, fontWeight: 600,
-                    padding: 0, display: 'flex', alignItems: 'center', gap: 4,
-                  }}
-                >
-                  {activeCircle.name} · {circleMembers.length} members
-                  {circles.length > 1 && (
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
-                      {showYourCircles ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
-                    </svg>
-                  )}
-                </button>
-                <button
-                  onClick={() => setShowMembersList(!showMembersList)}
-                  style={{
-                    display: 'flex', alignItems: 'center',
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                  }}
-                >
+                <span style={{
+                  color: 'var(--text2)', fontSize: 13, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}>
+                  <span style={{ fontSize: 15 }}>{activeCircle.emoji}</span>
+                  {activeCircle.name} · {circleMembers.length}
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+                    {showCirclePanel ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
+                  </svg>
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center' }}>
                   {circleMembers.slice(0, 6).map((m, i) => {
                     const mOnline = m.last_seen_at && (Date.now() - new Date(m.last_seen_at).getTime()) < 5 * 60 * 1000
                     return (
-                    <span key={m.id} style={{
-                      position: 'relative',
-                      marginLeft: i > 0 ? -8 : 0,
-                    }}>
+                    <span key={m.id} style={{ position: 'relative', marginLeft: i > 0 ? -8 : 0 }}>
                       <span style={{
                         width: 28, height: 28, borderRadius: '50%',
                         background: m.color, color: txtOn(m.color),
@@ -806,186 +799,176 @@ export default function AppShell({
                       fontSize: 9, fontWeight: 800, border: '2px solid var(--bg)', marginLeft: -8,
                     }}>+{circleMembers.length - 6}</span>
                   )}
-                </button>
+                </span>
               </>
             ) : (
-              <span style={{ fontSize: 12, color: 'var(--text2)' }}>No circles yet</span>
+              <span style={{ fontSize: 12, color: 'var(--text2)' }}>No circles yet — tap to create one</span>
             )}
-          </div>
+          </button>
           </>
           )}
         </header>
 
-        {/* Circle switcher dropdown */}
-        {showYourCircles && circles.length > 1 && typeof document !== 'undefined' && createPortal(
+        {/* Unified circle panel — members + circle switcher + settings in one place */}
+        {showCirclePanel && activeCircle && typeof document !== 'undefined' && createPortal(
           <>
-          <div onClick={() => setShowYourCircles(false)} style={{
+          <div onClick={() => setShowCirclePanel(false)} style={{
             position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.3)',
           }} />
           <div style={{
             position: 'fixed', left: 12, right: 12, top: 90, zIndex: 9999,
             background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 16, padding: '10px 14px',
+            borderRadius: 16, maxHeight: '70vh', overflowY: 'auto',
             boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
           }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text2)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Your circles
-            </div>
-            {orderedCircles.map((c, i) => (
-              <div
-                key={c.id}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 0',
-                  borderBottom: '1px solid var(--border)',
-                }}
-              >
-                <button
-                  onClick={() => { setActiveCircle(c); setShowYourCircles(false) }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    flex: 1, textAlign: 'left',
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: c.id === activeCircle?.id ? 'var(--accent)' : 'var(--text)',
-                    fontSize: 14, fontWeight: c.id === activeCircle?.id ? 700 : 500,
-                    padding: 0,
-                  }}
-                >
-                  <span style={{ fontSize: 18 }}>{c.emoji}</span>
-                  {c.name}
-                  {c.id === activeCircle?.id && <span style={{ marginLeft: 'auto', fontSize: 12 }}>✓</span>}
-                </button>
-                {orderedCircles.length > 1 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginLeft: 'auto' }}>
-                    <button
-                      onClick={() => moveCircle(c.id, 'up')}
-                      disabled={i === 0}
-                      style={{
-                        background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer',
-                        padding: 2, opacity: i === 0 ? 0.2 : 0.5, lineHeight: 1,
-                        color: 'var(--text)',
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>
-                    </button>
-                    <button
-                      onClick={() => moveCircle(c.id, 'down')}
-                      disabled={i === orderedCircles.length - 1}
-                      style={{
-                        background: 'none', border: 'none', cursor: i === orderedCircles.length - 1 ? 'default' : 'pointer',
-                        padding: 2, opacity: i === orderedCircles.length - 1 ? 0.2 : 0.5, lineHeight: 1,
-                        color: 'var(--text)',
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-                    </button>
-                  </div>
-                )}
+            {/* Active circle header with actions */}
+            <div style={{
+              padding: '14px 14px 10px', borderBottom: '1px solid var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 20 }}>{activeCircle.emoji}</span>
+                <div>
+                  <p style={{ fontSize: 15, fontWeight: 800 }}>{activeCircle.name}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text2)' }}>{circleMembers.length} members</p>
+                </div>
               </div>
-            ))}
-            <button
-              onClick={() => { setShowYourCircles(false); router.push('/circles/new') }}
-              style={{
-                marginTop: 6, fontSize: 13, fontWeight: 600,
-                color: 'var(--accent)', background: 'none', border: 'none',
-                cursor: 'pointer', padding: '6px 0',
-              }}
-            >
-              + Create new circle
-            </button>
-          </div>
-          </>,
-          document.body
-        )}
-
-        {/* Members list popup — portal to avoid header clipping */}
-        {showMembersList && activeCircle && typeof document !== 'undefined' && createPortal(
-          <>
-          <div onClick={() => setShowMembersList(false)} style={{
-            position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.3)',
-          }} />
-          <div style={{
-            position: 'fixed', left: 12, right: 12, top: 100, zIndex: 9999,
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 16, padding: '10px 14px', maxHeight: 360, overflowY: 'auto',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              {activeCircle.emoji} {activeCircle.name} · {circleMembers.length} members
-            </div>
-            {circleMembers.map(m => {
-              const isMe = m.id === user.id
-              const hasLocation = m.live_area && m.live_updated_at
-              const locAge = hasLocation ? Math.floor((Date.now() - new Date(m.live_updated_at!).getTime()) / 60000) : null
-              const locLabel = locAge !== null ? (
-                locAge < 1 ? 'now'
-                : locAge < 60 ? `${locAge}m ago`
-                : locAge < 1440 ? `${Math.floor(locAge/60)}h ago`
-                : `${Math.floor(locAge/1440)}d ago`
-              ) : null
-              const isOnline = m.last_seen_at ? (Date.now() - new Date(m.last_seen_at).getTime()) < 5 * 60 * 1000 : false
-              return (
-                <div
-                  key={m.id}
-                  onClick={() => { setShowMembersList(false); router.push(`/profile/${m.id}`) }}
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/join/${activeCircle.invite_code}`)
+                  }}
+                  title="Copy invite link"
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '8px 0', cursor: 'pointer',
-                    borderBottom: '1px solid var(--border)',
+                    background: 'var(--surface2)', border: '1px solid var(--border)',
+                    borderRadius: 10, padding: '6px 8px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center',
                   }}
                 >
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <div
-                      className="avatar"
-                      style={{
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                  </svg>
+                </button>
+                <button
+                  onClick={() => { setShowCirclePanel(false); router.push(`/circles/${activeCircle.id}/settings`) }}
+                  title="Circle settings"
+                  style={{
+                    background: 'var(--surface2)', border: '1px solid var(--border)',
+                    borderRadius: 10, padding: '6px 8px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Members list */}
+            <div style={{ padding: '6px 14px' }}>
+              {circleMembers.map(m => {
+                const isMe = m.id === user.id
+                const hasLocation = m.live_area && m.live_updated_at
+                const locAge = hasLocation ? Math.floor((Date.now() - new Date(m.live_updated_at!).getTime()) / 60000) : null
+                const locLabel = locAge !== null ? (
+                  locAge < 1 ? 'now'
+                  : locAge < 60 ? `${locAge}m ago`
+                  : locAge < 1440 ? `${Math.floor(locAge/60)}h ago`
+                  : `${Math.floor(locAge/1440)}d ago`
+                ) : null
+                const isOnline = m.last_seen_at ? (Date.now() - new Date(m.last_seen_at).getTime()) < 5 * 60 * 1000 : false
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => { setShowCirclePanel(false); router.push(`/profile/${m.id}`) }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '8px 0', cursor: 'pointer',
+                      borderBottom: '1px solid var(--border)',
+                    }}
+                  >
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <div className="avatar" style={{
                         width: 32, height: 32, fontSize: 12,
-                        background: m.color,
-                        color: txtOn(m.color),
+                        background: m.color, color: txtOn(m.color),
                         position: 'relative', overflow: 'hidden',
-                      }}
-                    >
-                      {m.name?.[0] || '?'}
-                      {m.avatar_url && (
-                        <img src={m.avatar_url} alt="" style={{
-                          position: 'absolute', inset: 0, width: '100%', height: '100%',
-                          objectFit: 'cover', borderRadius: '50%',
-                        }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      }}>
+                        {m.name?.[0] || '?'}
+                        {m.avatar_url && (
+                          <img src={m.avatar_url} alt="" style={{
+                            position: 'absolute', inset: 0, width: '100%', height: '100%',
+                            objectFit: 'cover', borderRadius: '50%',
+                          }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                        )}
+                      </div>
+                      {isOnline && (
+                        <div style={{
+                          position: 'absolute', bottom: -1, right: -1,
+                          width: 10, height: 10, borderRadius: '50%',
+                          background: '#8BB07E', border: '2px solid var(--surface)',
+                        }} />
                       )}
                     </div>
-                    {isOnline && (
-                      <div style={{
-                        position: 'absolute', bottom: -1, right: -1,
-                        width: 10, height: 10, borderRadius: '50%',
-                        background: '#8BB07E', border: '2px solid var(--surface)',
-                      }} />
-                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>
+                        {m.name}{isMe ? ' (you)' : ''}
+                        {isOnline && <span style={{ fontSize: 10, color: '#8BB07E', marginLeft: 4 }}>online</span>}
+                      </span>
+                      {hasLocation && locAge !== null && locAge < 10080 && (
+                        <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                          {m.live_area} · {locLabel}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>
-                      {m.name}{isMe ? ' (you)' : ''}
-                      {isOnline && <span style={{ fontSize: 10, color: '#8BB07E', marginLeft: 4 }}>online</span>}
-                    </span>
-                    {hasLocation && locAge !== null && locAge < 10080 && (
-                      <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                        {m.live_area} · {locLabel}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowMembersList(false); router.push(`/circles/${activeCircle.id}/settings`) }}
-              style={{
-                marginTop: 8, fontSize: 12, fontWeight: 600,
-                color: 'var(--accent)', background: 'none', border: 'none',
-                cursor: 'pointer', padding: '4px 0',
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-              Circle settings
-            </button>
+                )
+              })}
+            </div>
+
+            {/* Other circles — only if user has more than one */}
+            {circles.length > 1 && (
+              <div style={{ padding: '6px 14px', borderTop: '1px solid var(--border)' }}>
+                <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+                  Switch circle
+                </p>
+                {orderedCircles.filter(c => c.id !== activeCircle.id).map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => { setActiveCircle(c); setShowCirclePanel(false) }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                      padding: '9px 0', background: 'none', border: 'none', cursor: 'pointer',
+                      borderBottom: '1px solid var(--border)',
+                      color: 'var(--text)', fontSize: 14, fontWeight: 500, textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ fontSize: 17 }}>{c.emoji}</span>
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Footer actions */}
+            <div style={{
+              padding: '10px 14px', borderTop: '1px solid var(--border)',
+              display: 'flex', gap: 8,
+            }}>
+              <button
+                onClick={() => { setShowCirclePanel(false); router.push('/circles/new') }}
+                style={{
+                  flex: 1, fontSize: 12, fontWeight: 700,
+                  color: 'var(--accent)', background: 'var(--accent-soft)', border: 'none',
+                  borderRadius: 10, padding: '9px 0', cursor: 'pointer',
+                }}
+              >
+                + New circle
+              </button>
+            </div>
           </div>
           </>,
           document.body
