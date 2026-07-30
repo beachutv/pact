@@ -129,7 +129,7 @@ export default function SpotsPage() {
     const areaNames = Object.keys(AREAS)
     const exactMatch = AREAS[favArea]
     const fuzzyMatch = !exactMatch && areaNames.find(a => favArea.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(favArea.toLowerCase()))
-    const coords = exactMatch || (fuzzyMatch ? AREAS[fuzzyMatch] : { x: 14.55, y: 121.0 })
+    const coords = exactMatch || (fuzzyMatch ? AREAS[fuzzyMatch] : { x: 4.5, y: 5 })
     const id = crypto.randomUUID()
     const { error } = await supabase.from('favorite_spots').insert({
       id,

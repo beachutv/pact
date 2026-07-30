@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
-import { toStr, fmtDate, fmtHour, fmtTiny, fmtWin, txtOn, travelMin, travelMinGps, getBrowserTimezone, currentHourInTz, daysUntil, bdaySoon, AREAS, DAY_START, DAY_END } from '@/lib/utils'
+import { toStr, fmtDate, fmtHour, fmtTiny, fmtWin, txtOn, travelMin, travelMinGps, getBrowserTimezone, currentHourInTz, daysUntil, bdaySoon, AREAS, AREA_GPS, DAY_START, DAY_END } from '@/lib/utils'
 import { useLocationUpdate } from '@/lib/useLocationUpdate'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 
@@ -19,8 +19,8 @@ type Spark = {
 }
 type PactEntry = { id: string; date: string; occasion: string | null; spot_name: string; spot_area: string | null; spot_emoji: string | null; win_start: number | null; win_end: number | null; status: string }
 type FavSpot = { id: string; name: string; emoji: string; area: string; x: number; y: number }
-type OriginInfo = { name: string; color: string; x: number; y: number; area: string; label: string }
-type SpotWithTravel = { name: string; area: string; x: number; y: number; emoji: string; travelTimes: { name: string; color: string; minutes: number }[]; isFav: boolean }
+type OriginInfo = { name: string; color: string; x: number; y: number; lat: number; lng: number; area: string; label: string }
+type SpotWithTravel = { name: string; area: string; lat: number; lng: number; emoji: string; travelTimes: { name: string; color: string; minutes: number }[]; isFav: boolean }
 
 function SparkLine({ spark: sp, todayStr, onDismiss }: { spark: Spark; todayStr: string; onDismiss: () => void }) {
   const [offsetX, setOffsetX] = useState(0)
@@ -122,10 +122,10 @@ export default function CalendarPage() {
   const [dismissedSparks, setDismissedSparks] = useState<Map<string, number>>(new Map())
   const [sparkRefreshKey, setSparkRefreshKey] = useState(0)
   const [selectedWinIdx, setSelectedWinIdx] = useState(0)
-  const [selectedSpot, setSelectedSpot] = useState<{ name: string; x: number; y: number } | null>(null)
+  const [selectedSpot, setSelectedSpot] = useState<{ name: string; lat: number; lng: number } | null>(null)
   // Spot search in day view
   const [spotQuery, setSpotQuery] = useState('')
-  const [spotSearchResults, setSpotSearchResults] = useState<{ name: string; area: string; placeId: string; x: number; y: number }[]>([])
+  const [spotSearchResults, setSpotSearchResults] = useState<{ name: string; area: string; placeId: string; lat: number; lng: number }[]>([])
   const [spotSearching, setSpotSearching] = useState(false)
   const spotSearchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showWhosFree, setShowWhosFree] = useState(false)
@@ -569,6 +569,16 @@ export default function CalendarPage() {
 
     const isToday = sheetDate === todayStr
 
+    // Helper: look up GPS coords for an area name
+    function areaGps(area: string): { lat: number; lng: number } {
+      const direct = AREA_GPS[area]
+      if (direct) return direct
+      const fuzzy = Object.keys(AREA_GPS).find(a =>
+        area.toLowerCase().includes(a.split(',')[0].toLowerCase()) || a.toLowerCase().includes(area.split(',')[0].toLowerCase())
+      )
+      return fuzzy ? AREA_GPS[fuzzy] : { lat: 14.5995, lng: 120.9842 } // Metro Manila center
+    }
+
     return activeMembers.map(m => {
       let homeX = (m as any).home_x || 0
       let homeY = (m as any).home_y || 0
@@ -587,6 +597,8 @@ export default function CalendarPage() {
       // For today: use live location if recent (within 7 days), else fall back to home
       const liveArea = (m as any).live_area as string | null
       const liveUpdated = (m as any).live_updated_at as string | null
+      const liveLat = (m as any).live_lat as number | null
+      const liveLng = (m as any).live_lng as number | null
       const liveRecent = liveArea && liveUpdated && (Date.now() - new Date(liveUpdated).getTime()) < 7 * 24 * 60 * 60 * 1000
 
       // Determine current origin: live location (today only) or home
@@ -594,6 +606,15 @@ export default function CalendarPage() {
       let originY = homeY
       let originArea = homeArea
       let originLabel = `from home · ${homeArea || 'unknown'}`
+      let originLat = 0
+      let originLng = 0
+
+      // Get GPS coords for home area
+      if (homeArea) {
+        const gps = areaGps(homeArea)
+        originLat = gps.lat
+        originLng = gps.lng
+      }
 
       if (isToday && liveRecent && liveArea) {
         // Look up grid coordinates for the live area
@@ -607,6 +628,15 @@ export default function CalendarPage() {
           originY = coords.y
           originArea = liveArea
           originLabel = `currently in ${liveArea}`
+        }
+        // Use real GPS coords from live location if available
+        if (liveLat && liveLng) {
+          originLat = liveLat
+          originLng = liveLng
+        } else {
+          const gps = areaGps(liveArea)
+          originLat = gps.lat
+          originLng = gps.lng
         }
       }
 
@@ -622,17 +652,18 @@ export default function CalendarPage() {
           return {
             name: m.name.split(' ')[0],
             color: m.color,
-            x: originX,
-            y: originY,
+            x: originX, y: originY,
+            lat: originLat, lng: originLng,
             area: originArea,
             label: `currently in ${originArea} (busy till ${fmtHour(prior.end_hour)})`,
           }
         }
+        const homeGps = areaGps(homeArea)
         return {
           name: m.name.split(' ')[0],
           color: m.color,
-          x: homeX,
-          y: homeY,
+          x: homeX, y: homeY,
+          lat: homeGps.lat, lng: homeGps.lng,
           area: homeArea,
           label: `coming from ${homeArea || 'unknown'} (busy till ${fmtHour(prior.end_hour)})`,
         }
@@ -640,34 +671,54 @@ export default function CalendarPage() {
       return {
         name: m.name.split(' ')[0],
         color: m.color,
-        x: originX,
-        y: originY,
+        x: originX, y: originY,
+        lat: originLat, lng: originLng,
         area: originArea,
         label: originLabel,
       }
     }).filter(o => o.x !== 0 || o.y !== 0)
   }, [sheetDate, activeMembers, busyBlocks, selectedWinIdx, todayStr])
 
-  // Compute travel times for favorites
+  // Helper: get GPS for a favorite spot (area name lookup)
+  function favGps(f: FavSpot): { lat: number; lng: number } {
+    // If stored coords are in grid range (0-12), look up area GPS
+    if (f.area) {
+      const direct = AREA_GPS[f.area]
+      if (direct) return direct
+      const fuzzy = Object.keys(AREA_GPS).find(a =>
+        f.area.toLowerCase().includes(a.split(',')[0].toLowerCase()) || a.toLowerCase().includes(f.area.split(',')[0].toLowerCase())
+      )
+      if (fuzzy) return AREA_GPS[fuzzy]
+    }
+    // Fallback: use grid coords if they look like GPS already (>12)
+    if (f.x > 12 || f.y > 12) return { lat: f.x, lng: f.y }
+    // Convert grid to approximate GPS (very rough)
+    return { lat: 14.42 + f.y * 0.03, lng: 120.95 + f.x * 0.025 }
+  }
+
+  // Compute travel times for favorites using GPS
   const favSpotsWithTravel = useMemo((): SpotWithTravel[] => {
     if (!sheetDate || memberOrigins.length < 2) return []
-    return favSpots.filter(f => f.x && f.y).map(f => ({
-      name: f.name, area: f.area || '', x: f.x, y: f.y, emoji: f.emoji || '📍', isFav: true,
-      travelTimes: memberOrigins.map(o => ({
-        name: o.name, color: o.color,
-        minutes: travelMin({ x: o.x, y: o.y }, { x: f.x, y: f.y }),
-      })),
-    }))
+    return favSpots.filter(f => f.x || f.y || f.area).map(f => {
+      const gps = favGps(f)
+      return {
+        name: f.name, area: f.area || '', lat: gps.lat, lng: gps.lng, emoji: f.emoji || '📍', isFav: true,
+        travelTimes: memberOrigins.map(o => ({
+          name: o.name, color: o.color,
+          minutes: o.lat && o.lng ? travelMinGps({ lat: o.lat, lng: o.lng }, gps) : travelMin({ x: o.x, y: o.y }, { x: f.x, y: f.y }),
+        })),
+      }
+    })
   }, [sheetDate, memberOrigins, favSpots])
 
-  // Compute travel times for search results
+  // Compute travel times for search results using GPS
   const searchSpotsWithTravel = useMemo((): SpotWithTravel[] => {
     if (memberOrigins.length < 2) return []
-    return spotSearchResults.map(r => ({
-      name: r.name, area: r.area, x: r.x, y: r.y, emoji: '📍', isFav: false,
+    return spotSearchResults.filter(r => r.lat && r.lng).map(r => ({
+      name: r.name, area: r.area, lat: r.lat, lng: r.lng, emoji: '📍', isFav: false,
       travelTimes: memberOrigins.map(o => ({
         name: o.name, color: o.color,
-        minutes: travelMin({ x: o.x, y: o.y }, { x: r.x, y: r.y }),
+        minutes: o.lat && o.lng ? travelMinGps({ lat: o.lat, lng: o.lng }, { lat: r.lat, lng: r.lng }) : 0,
       })),
     }))
   }, [spotSearchResults, memberOrigins])
@@ -683,15 +734,13 @@ export default function CalendarPage() {
         const res = await fetch(`/api/places/autocomplete?q=${encodeURIComponent(q.trim())}`)
         if (res.ok) {
           const data = await res.json()
-          setSpotSearchResults((data.predictions || []).map((p: any) => {
-            // Try to find coordinates from area name
-            const areaText = p.secondary_text || ''
-            const areaEntry = Object.entries(AREAS).find(([name]) =>
-              areaText.toLowerCase().includes(name.split(',')[0].toLowerCase())
-            )
-            const coords = areaEntry ? AREAS[areaEntry[0]] : { x: 4.5, y: 5 }
-            return { name: p.main_text || p.description, area: areaText, placeId: p.place_id, x: coords.x, y: coords.y }
-          }))
+          setSpotSearchResults((data.predictions || []).map((p: any) => ({
+            name: p.main_text || p.description,
+            area: p.secondary_text || '',
+            placeId: p.place_id,
+            lat: p.lat || 0,
+            lng: p.lng || 0,
+          })))
         }
       } catch { }
       setSpotSearching(false)
@@ -1484,7 +1533,7 @@ export default function CalendarPage() {
                         return (
                           <div
                             key={i}
-                            onClick={() => setSelectedSpot(isSel ? null : { name: spot.name, x: spot.x, y: spot.y })}
+                            onClick={() => setSelectedSpot(isSel ? null : { name: spot.name, lat: spot.lat, lng: spot.lng })}
                             style={{
                               padding: '9px 12px', borderRadius: 12,
                               background: isSel ? 'rgba(139,176,126,0.08)' : 'var(--surface)',
@@ -1518,7 +1567,7 @@ export default function CalendarPage() {
                           return (
                             <div
                               key={i}
-                              onClick={() => setSelectedSpot(isSel ? null : { name: spot.name, x: spot.x, y: spot.y })}
+                              onClick={() => setSelectedSpot(isSel ? null : { name: spot.name, lat: spot.lat, lng: spot.lng })}
                               style={{
                                 padding: '9px 12px', borderRadius: 12,
                                 background: isSel ? 'rgba(139,176,126,0.08)' : 'var(--surface)',

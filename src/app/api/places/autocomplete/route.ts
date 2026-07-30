@@ -34,12 +34,44 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ predictions: [], error: data.error_message || data.status })
     }
 
-    const predictions = (data.predictions || []).map((p: any) => ({
-      place_id: p.place_id || '',
-      description: p.description || '',
-      main_text: p.structured_formatting?.main_text || p.description || '',
-      secondary_text: p.structured_formatting?.secondary_text || '',
-    }))
+    const rawPredictions = data.predictions || []
+
+    // Fetch Place Details for each result to get lat/lng (geometry only — cheapest tier)
+    const predictions = await Promise.all(
+      rawPredictions.slice(0, 5).map(async (p: any) => {
+        const base = {
+          place_id: p.place_id || '',
+          description: p.description || '',
+          main_text: p.structured_formatting?.main_text || p.description || '',
+          secondary_text: p.structured_formatting?.secondary_text || '',
+          lat: 0,
+          lng: 0,
+        }
+
+        if (!p.place_id) return base
+
+        try {
+          const detailParams = new URLSearchParams({
+            place_id: p.place_id,
+            key: apiKey,
+            fields: 'geometry/location',
+          })
+          const detailRes = await fetch(
+            `https://maps.googleapis.com/maps/api/place/details/json?${detailParams}`,
+            { next: { revalidate: 3600 } } // Cache for 1 hour
+          )
+          const detailData = await detailRes.json()
+          if (detailData.result?.geometry?.location) {
+            base.lat = detailData.result.geometry.location.lat
+            base.lng = detailData.result.geometry.location.lng
+          }
+        } catch {
+          // Silently fail — travel time will show as unknown
+        }
+
+        return base
+      })
+    )
 
     return NextResponse.json({ predictions })
   } catch (e: any) {
