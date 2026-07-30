@@ -3,9 +3,20 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-const CURRENT_VERSION = '13.0'
+const CURRENT_VERSION = '14.0'
 
 const CHANGELOG = [
+  {
+    version: '14.0',
+    date: 'July 30, 2026',
+    title: 'Spot Search + Calendar Overrides',
+    items: [
+      '🔎 Search any place in the day view — see travel time from each friend',
+      '📅 Override busy calendar blocks — tap to mark free (green with red border)',
+      '📱 Landscape mode now fills the full screen',
+      '📍 Spots page cleaned up — just search and favorites',
+    ],
+  },
   {
     version: '13.0',
     date: 'July 30, 2026',

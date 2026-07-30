@@ -20,73 +20,7 @@ type Spark = {
 type PactEntry = { id: string; date: string; occasion: string | null; spot_name: string; spot_area: string | null; spot_emoji: string | null; win_start: number | null; win_end: number | null; status: string }
 type FavSpot = { id: string; name: string; emoji: string; area: string; x: number; y: number }
 type OriginInfo = { name: string; color: string; x: number; y: number; area: string; label: string }
-type SpotRec = { name: string; emoji: string; area: string; travelTimes: { name: string; color: string; minutes: number }[]; avgMin: number; maxMin: number; maxWho: string; source: 'favorite' | 'venue' }
-
-// Known hangout venues in Metro Manila — diverse locations for varied recommendations
-const VENUES: { name: string; emoji: string; area: string; x: number; y: number; type: string }[] = [
-  // Restaurants — spread across Metro Manila
-  { name: 'Wildflour', emoji: '🥐', area: 'BGC, Taguig', x: 5.5, y: 3.5, type: 'food' },
-  { name: 'Manam', emoji: '🍛', area: 'Ayala, Makati', x: 4, y: 3.4, type: 'food' },
-  { name: 'Mendokoro Ramenba', emoji: '🍜', area: 'Poblacion, Makati', x: 4.2, y: 3.8, type: 'food' },
-  { name: 'Maginhawa Food Trip', emoji: '🍳', area: 'Maginhawa, QC', x: 5.2, y: 7.5, type: 'food' },
-  { name: 'Kapitolyo Food Crawl', emoji: '🌮', area: 'Kapitolyo, Pasig', x: 5.3, y: 5.3, type: 'food' },
-  { name: 'Samgyupsalamat', emoji: '🥓', area: 'Timog Ave, QC', x: 4.8, y: 7, type: 'food' },
-  { name: 'Tim Ho Wan', emoji: '🥟', area: 'Megamall, Ortigas', x: 5.4, y: 5.5, type: 'food' },
-  { name: 'Yabu', emoji: '🍱', area: 'BGC, Taguig', x: 5.6, y: 3.3, type: 'food' },
-  { name: 'Sarsa Kitchen', emoji: '🍗', area: 'Bonifacio Stopover, BGC', x: 5.4, y: 3.6, type: 'food' },
-  { name: 'Ramen Nagi', emoji: '🍜', area: 'SM North EDSA, QC', x: 4.5, y: 8.2, type: 'food' },
-  { name: 'Locavore', emoji: '🥘', area: 'Kapitolyo, Pasig', x: 5.3, y: 5.4, type: 'food' },
-  { name: 'Mesa Filipino', emoji: '🍲', area: 'Greenbelt, Makati', x: 4.1, y: 3.5, type: 'food' },
-  { name: 'Ooma', emoji: '🍣', area: 'Power Plant Mall, Makati', x: 4.3, y: 3.6, type: 'food' },
-  { name: 'Vikings Buffet', emoji: '🍖', area: 'SM MOA, Pasay', x: 3.2, y: 3.2, type: 'food' },
-  { name: 'Liliw\'s Café', emoji: '🥞', area: 'Alabang, Muntinlupa', x: 5.2, y: 1.5, type: 'food' },
-  // Cafés
-  { name: 'Kape Diem Café', emoji: '☕', area: 'Katipunan, QC', x: 6, y: 7.9, type: 'coffee' },
-  { name: 'CBTL Eastwood', emoji: '☕', area: 'Eastwood, QC', x: 6, y: 6.5, type: 'coffee' },
-  { name: 'Yardstick Coffee', emoji: '☕', area: 'Legazpi Village, Makati', x: 4.0, y: 3.3, type: 'coffee' },
-  { name: 'The Commune', emoji: '☕', area: 'Poblacion, Makati', x: 4.2, y: 3.7, type: 'coffee' },
-  // Bars & nightlife
-  { name: 'Poblacion Rooftop', emoji: '🍹', area: 'Poblacion, Makati', x: 4.2, y: 3.7, type: 'bar' },
-  { name: 'Bank Bar', emoji: '🍸', area: 'BGC, Taguig', x: 5.5, y: 3.4, type: 'bar' },
-  { name: 'Xylo at The Palace', emoji: '🍷', area: 'BGC, Taguig', x: 5.6, y: 3.5, type: 'bar' },
-  { name: 'Tipsy Pig', emoji: '🍻', area: 'Kapitolyo, Pasig', x: 5.3, y: 5.3, type: 'bar' },
-  // Desserts & sweets
-  { name: 'Café Mary Grace', emoji: '🧁', area: 'Serendra, BGC', x: 5.5, y: 3.5, type: 'dessert' },
-  { name: 'Sebastian\'s', emoji: '🍦', area: 'Aguirre Ave, BF Homes', x: 4.5, y: 1.8, type: 'dessert' },
-  { name: 'Poison Doughnuts', emoji: '🍩', area: 'Legazpi Village, Makati', x: 4.0, y: 3.3, type: 'dessert' },
-  { name: 'Bungalow', emoji: '🍰', area: 'Scout Castor, QC', x: 5.0, y: 7.2, type: 'dessert' },
-  { name: 'Early Bird Breakfast Club', emoji: '🥞', area: 'Salcedo Village, Makati', x: 4.1, y: 3.4, type: 'food' },
-  // Activities & fun
-  { name: 'Board Game Café', emoji: '🎲', area: 'Maginhawa, QC', x: 5.2, y: 7.5, type: 'activity' },
-  { name: 'Family KTV', emoji: '🎤', area: 'Timog Ave, QC', x: 4.8, y: 7, type: 'activity' },
-  { name: 'Timezone Arcade', emoji: '🕹️', area: 'Glorietta, Makati', x: 4.1, y: 3.4, type: 'activity' },
-  { name: 'B&D by Commune', emoji: '🎳', area: 'Poblacion, Makati', x: 4.2, y: 3.7, type: 'activity' },
-  { name: 'Ace Water Spa', emoji: '♨️', area: 'Kapitolyo, Pasig', x: 5.3, y: 5.4, type: 'activity' },
-  { name: 'Kidzania Manila', emoji: '🎪', area: 'BGC, Taguig', x: 5.5, y: 3.4, type: 'activity' },
-  { name: 'Art in Island Museum', emoji: '🎨', area: 'Cubao, QC', x: 5.5, y: 6.5, type: 'activity' },
-  { name: 'Escape Room PH', emoji: '🔐', area: 'BGC, Taguig', x: 5.5, y: 3.5, type: 'activity' },
-  // Coworking & chill
-  { name: 'Common Ground', emoji: '💻', area: 'Ayala, Makati', x: 4.0, y: 3.4, type: 'cowork' },
-  { name: 'WeWork Uptown', emoji: '💼', area: 'Uptown, BGC', x: 5.4, y: 3.6, type: 'cowork' },
-  { name: 'A-Space', emoji: '🖥️', area: 'Salcedo Village, Makati', x: 4.1, y: 3.5, type: 'cowork' },
-  // Nature & outdoors
-  { name: 'Luneta Park', emoji: '🌳', area: 'Ermita, Manila', x: 3.0, y: 5.0, type: 'outdoor' },
-  { name: 'La Mesa Eco Park', emoji: '🌿', area: 'Novaliches, QC', x: 5.0, y: 9.0, type: 'outdoor' },
-  { name: 'Ninoy Aquino Parks & Wildlife', emoji: '🦋', area: 'Diliman, QC', x: 5.0, y: 7.8, type: 'outdoor' },
-  // Malls & shopping
-  { name: 'UP Town Center', emoji: '🛍️', area: 'Katipunan, QC', x: 6, y: 8, type: 'mall' },
-  { name: 'SM Megamall', emoji: '🛍️', area: 'Megamall, Ortigas', x: 5.4, y: 5.5, type: 'mall' },
-  { name: 'Ayala Malls Manila Bay', emoji: '🌊', area: 'Parañaque', x: 3.5, y: 2.8, type: 'mall' },
-  { name: 'Eastwood Mall', emoji: '🛍️', area: 'Eastwood, QC', x: 6, y: 6.5, type: 'mall' },
-  { name: 'Trinoma', emoji: '🛍️', area: 'North EDSA, QC', x: 4.5, y: 8.3, type: 'mall' },
-  { name: 'Robinsons Galleria', emoji: '🛍️', area: 'Ortigas, Pasig', x: 5.4, y: 5.6, type: 'mall' },
-  { name: 'Greenbelt', emoji: '🛍️', area: 'Ayala, Makati', x: 4.1, y: 3.5, type: 'mall' },
-  { name: 'Venice Grand Canal', emoji: '🏙️', area: 'McKinley Hill, Taguig', x: 5.3, y: 3.3, type: 'mall' },
-  // Markets & food halls
-  { name: 'Mercato Centrale', emoji: '🍢', area: 'BGC, Taguig', x: 5.5, y: 3.5, type: 'food' },
-  { name: 'Legazpi Sunday Market', emoji: '🥑', area: 'Legazpi Village, Makati', x: 4.0, y: 3.3, type: 'food' },
-  { name: 'Salcedo Saturday Market', emoji: '🫒', area: 'Salcedo Village, Makati', x: 4.1, y: 3.4, type: 'food' },
-]
+type SpotWithTravel = { name: string; area: string; x: number; y: number; emoji: string; travelTimes: { name: string; color: string; minutes: number }[]; isFav: boolean }
 
 function SparkLine({ spark: sp, todayStr, onDismiss }: { spark: Spark; todayStr: string; onDismiss: () => void }) {
   const [offsetX, setOffsetX] = useState(0)
@@ -188,8 +122,12 @@ export default function CalendarPage() {
   const [dismissedSparks, setDismissedSparks] = useState<Map<string, number>>(new Map())
   const [sparkRefreshKey, setSparkRefreshKey] = useState(0)
   const [selectedWinIdx, setSelectedWinIdx] = useState(0)
-  const [selectedSpotIdx, setSelectedSpotIdx] = useState(0)
-  const [showAllSpots, setShowAllSpots] = useState(false)
+  const [selectedSpot, setSelectedSpot] = useState<{ name: string; x: number; y: number } | null>(null)
+  // Spot search in day view
+  const [spotQuery, setSpotQuery] = useState('')
+  const [spotSearchResults, setSpotSearchResults] = useState<{ name: string; area: string; placeId: string; x: number; y: number }[]>([])
+  const [spotSearching, setSpotSearching] = useState(false)
+  const spotSearchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showWhosFree, setShowWhosFree] = useState(false)
   const [whosFreeRange, setWhosFreeRange] = useState(7)
   const [pacts, setPacts] = useState<PactEntry[]>([])
@@ -197,6 +135,8 @@ export default function CalendarPage() {
   const pactLongPressTimer = useRef<NodeJS.Timeout | null>(null)
   // Track which members have connected their calendar
   const [connectedUserIds, setConnectedUserIds] = useState<Set<string>>(new Set())
+  // Hour overrides — user can mark their own calendar-busy hours as free (client-side only)
+  const [hourOverrides, setHourOverrides] = useState<Set<string>>(new Set())
 
   // Landscape detection
   const [isLandscape, setIsLandscape] = useState(false)
@@ -397,13 +337,22 @@ export default function CalendarPage() {
   // Current hour in user's timezone
   const nowHour = useMemo(() => currentHourInTz(tz), [tz])
 
-  // Helpers — past hours today count as busy for everyone
-  const isBusy = useCallback((uid: string, date: string, hour: number) => {
-    if (date === todayStr && hour < nowHour) return true
+  // Check if a block is originally busy (ignoring overrides) — for visual display
+  const isRawBusy = useCallback((uid: string, date: string, hour: number) => {
     return busyBlocks.some(b =>
       b.user_id === uid && b.date === date && b.start_hour <= hour && b.end_hour > hour
     )
-  }, [busyBlocks, todayStr, nowHour])
+  }, [busyBlocks])
+
+  // Helpers — past hours today count as busy for everyone; respects overrides for current user
+  const isBusy = useCallback((uid: string, date: string, hour: number) => {
+    if (date === todayStr && hour < nowHour) return true
+    // If user overrode this hour, treat as free
+    if (uid === user.id && hourOverrides.has(`${date}-${hour}`)) return false
+    return busyBlocks.some(b =>
+      b.user_id === uid && b.date === date && b.start_hour <= hour && b.end_hour > hour
+    )
+  }, [busyBlocks, todayStr, nowHour, hourOverrides, user.id])
 
   // Sort: current user first, then everyone else
   const activeMembers = useMemo(() =>
@@ -699,86 +648,55 @@ export default function CalendarPage() {
     }).filter(o => o.x !== 0 || o.y !== 0)
   }, [sheetDate, activeMembers, busyBlocks, selectedWinIdx, todayStr])
 
-  // Spot recommendations using ALL venues + favorites
-  const spotRecommendations = useMemo((): SpotRec[] => {
+  // Compute travel times for favorites
+  const favSpotsWithTravel = useMemo((): SpotWithTravel[] => {
     if (!sheetDate || memberOrigins.length < 2) return []
+    return favSpots.filter(f => f.x && f.y).map(f => ({
+      name: f.name, area: f.area || '', x: f.x, y: f.y, emoji: f.emoji || '📍', isFav: true,
+      travelTimes: memberOrigins.map(o => ({
+        name: o.name, color: o.color,
+        minutes: travelMin({ x: o.x, y: o.y }, { x: f.x, y: f.y }),
+      })),
+    }))
+  }, [sheetDate, memberOrigins, favSpots])
 
-    // Combine known venues with user favorites (dedup by name)
-    const seenNames = new Set<string>()
-    const allSpots: { name: string; emoji: string; area: string; x: number; y: number; type: string; isFav: boolean }[] = []
-    for (const f of favSpots) {
-      if (!f.x || !f.y) continue
-      seenNames.add(f.name)
-      allSpots.push({ ...f, type: 'food', isFav: true })
-    }
-    for (const v of VENUES) {
-      if (!seenNames.has(v.name)) {
-        allSpots.push({ ...v, isFav: false })
-      }
-    }
-    if (allSpots.length === 0) return []
+  // Compute travel times for search results
+  const searchSpotsWithTravel = useMemo((): SpotWithTravel[] => {
+    if (memberOrigins.length < 2) return []
+    return spotSearchResults.map(r => ({
+      name: r.name, area: r.area, x: r.x, y: r.y, emoji: '📍', isFav: false,
+      travelTimes: memberOrigins.map(o => ({
+        name: o.name, color: o.color,
+        minutes: travelMin({ x: o.x, y: o.y }, { x: r.x, y: r.y }),
+      })),
+    }))
+  }, [spotSearchResults, memberOrigins])
 
-    // Get current window for time-of-day bonuses
-    const wins = [
-      ...findWindows(sheetDate, activeMembers.length).map(w => ({ ...w, full: true })),
-      ...(findWindows(sheetDate, activeMembers.length).length === 0 && activeMembers.length >= 3
-        ? findWindows(sheetDate, activeMembers.length - 1, 2).map(w => ({ ...w, full: false }))
-        : []),
-    ].sort((a, b) => a.s - b.s)
-    const winStart = wins[selectedWinIdx]?.s ?? 18
-
-    const scored = allSpots.map(spot => {
-      const travelTimes = memberOrigins.map(o => ({
-        name: o.name,
-        color: o.color,
-        minutes: travelMin({ x: o.x, y: o.y }, { x: spot.x, y: spot.y }),
-      }))
-      const avgMin = Math.round(travelTimes.reduce((s, t) => s + t.minutes, 0) / travelTimes.length)
-      const maxEntry = travelTimes.reduce((a, b) => b.minutes > a.minutes ? b : a)
-
-      let score = avgMin + 0.6 * maxEntry.minutes
-      if (winStart >= 18 && ['bar', 'karaoke', 'food', 'cinema', 'arcade'].includes(spot.type)) score -= 2.5
-      if (winStart < 12 && ['coffee', 'park'].includes(spot.type)) score -= 2.5
-      if (spot.isFav) score -= 3
-
-      return {
-        name: spot.name,
-        emoji: spot.emoji,
-        area: spot.area,
-        travelTimes,
-        avgMin,
-        maxMin: maxEntry.minutes,
-        maxWho: maxEntry.name,
-        source: (spot.isFav ? 'favorite' : 'venue') as 'favorite' | 'venue',
-        score,
-        _type: spot.type,
-      }
-    }).sort((a, b) => a.score - b.score)
-
-    // Ensure variety — pick best from each type first, then fill remaining
-    const byType = new Map<string, typeof scored[0][]>()
-    scored.forEach(s => {
-      if (!byType.has(s._type)) byType.set(s._type, [])
-      byType.get(s._type)!.push(s)
-    })
-    const diverse: typeof scored = []
-    const usedNames = new Set<string>()
-    // Round-robin: one from each type
-    for (const [, items] of byType) {
-      if (diverse.length >= 10) break
-      const pick = items.find(s => !usedNames.has(s.name))
-      if (pick) { diverse.push(pick); usedNames.add(pick.name) }
-    }
-    // Fill remaining from best overall
-    for (const s of scored) {
-      if (diverse.length >= 10) break
-      if (!usedNames.has(s.name)) { diverse.push(s); usedNames.add(s.name) }
-    }
-    // Re-sort by score
-    diverse.sort((a, b) => a.score - b.score)
-
-    return diverse
-  }, [sheetDate, memberOrigins, favSpots, selectedWinIdx, activeMembers])
+  // Search spots using Google Places API
+  function searchDaySpots(q: string) {
+    setSpotQuery(q)
+    if (!q.trim()) { setSpotSearchResults([]); return }
+    if (spotSearchTimeout.current) clearTimeout(spotSearchTimeout.current)
+    spotSearchTimeout.current = setTimeout(async () => {
+      setSpotSearching(true)
+      try {
+        const res = await fetch(`/api/places/autocomplete?q=${encodeURIComponent(q.trim())}`)
+        if (res.ok) {
+          const data = await res.json()
+          setSpotSearchResults((data.predictions || []).map((p: any) => {
+            // Try to find coordinates from area name
+            const areaText = p.secondary_text || ''
+            const areaEntry = Object.entries(AREAS).find(([name]) =>
+              areaText.toLowerCase().includes(name.split(',')[0].toLowerCase())
+            )
+            const coords = areaEntry ? AREAS[areaEntry[0]] : { x: 4.5, y: 5 }
+            return { name: p.main_text || p.description, area: areaText, placeId: p.place_id, x: coords.x, y: coords.y }
+          }))
+        }
+      } catch { }
+      setSpotSearching(false)
+    }, 400)
+  }
 
   // Pact long press handlers
   function onPactTouchStart(pactId: string) {
@@ -803,19 +721,33 @@ export default function CalendarPage() {
 
   // Toggle manual busy/free for own row
   async function toggleManualHour(date: string, hour: number) {
-    const busy = isBusy(user.id, date, hour)
-    if (busy) {
-      await supabase.from('busy_blocks')
-        .delete()
+    const overrideKey = `${date}-${hour}`
+    const rawBusy = isRawBusy(user.id, date, hour)
+    const effectivelyBusy = isBusy(user.id, date, hour)
+
+    if (effectivelyBusy && rawBusy) {
+      // Block is busy — try deleting manual block first, otherwise add override
+      const { count } = await supabase.from('busy_blocks')
+        .delete({ count: 'exact' })
         .eq('user_id', user.id)
         .eq('date', date)
         .eq('source', 'manual')
         .lte('start_hour', hour)
         .gt('end_hour', hour)
-      setBusyBlocks(prev => prev.filter(b =>
-        !(b.user_id === user.id && b.date === date && b.start_hour <= hour && b.end_hour > hour)
-      ))
-    } else {
+      if (count && count > 0) {
+        // Was a manual block — remove from local state
+        setBusyBlocks(prev => prev.filter(b =>
+          !(b.user_id === user.id && b.date === date && b.start_hour <= hour && b.end_hour > hour)
+        ))
+      } else {
+        // Calendar block — add override to treat as free (green with red border)
+        setHourOverrides(prev => { const n = new Set(prev); n.add(overrideKey); return n })
+      }
+    } else if (!effectivelyBusy && hourOverrides.has(overrideKey)) {
+      // Currently overridden — remove override to go back to busy
+      setHourOverrides(prev => { const n = new Set(prev); n.delete(overrideKey); return n })
+    } else if (!effectivelyBusy) {
+      // Free block — mark as manually busy
       const { data } = await supabase.from('busy_blocks')
         .insert({ user_id: user.id, date, start_hour: hour, end_hour: hour + 1, source: 'manual' })
         .select('user_id, date, start_hour, end_hour')
@@ -1402,6 +1334,7 @@ export default function CalendarPage() {
                       const busy = isBusy(m.id, sheetDate!, h)
                       const isMe = m.id === user.id
                       const isPast = sheetDate === todayStr && h < nowHour
+                      const isOverridden = isMe && hourOverrides.has(`${sheetDate}-${h}`)
                       // Check if this hour falls within any pact's time window
                       const datePacts = sheetDate ? (pactsByDate[sheetDate] || []) : []
                       const pactAtHour = datePacts.find(p => p.win_start !== null && p.win_end !== null && h >= p.win_start! && h < p.win_end!)
@@ -1416,8 +1349,11 @@ export default function CalendarPage() {
                             height: 28, borderRadius: 4,
                             background: isPast ? 'rgba(80,80,80,0.1)'
                               : isPactHour ? (isPactConfirmed ? 'rgba(245,158,11,0.35)' : 'rgba(59,130,246,0.22)')
+                              : isOverridden ? 'rgba(139,176,126,0.25)'
                               : busy ? 'rgba(231,118,93,0.28)' : 'rgba(139,176,126,0.25)',
-                            border: isPactHour && !isPast ? `1.5px solid ${isPactConfirmed ? '#FFB854' : '#5B7B8A'}` : busy && !isPast ? '1px solid rgba(231,118,93,0.5)' : '1px solid rgba(139,176,126,0.35)',
+                            border: isPactHour && !isPast ? `1.5px solid ${isPactConfirmed ? '#FFB854' : '#5B7B8A'}`
+                              : isOverridden && !isPast ? '2px solid rgba(231,118,93,0.6)'
+                              : busy && !isPast ? '1px solid rgba(231,118,93,0.5)' : '1px solid rgba(139,176,126,0.35)',
                             cursor: isMe && !isPast ? 'pointer' : 'default',
                             opacity: isPast ? 0.4 : 1,
                           }}
@@ -1429,7 +1365,7 @@ export default function CalendarPage() {
                 })}
               </div>
               <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 5 }}>
-                🟩 free · 🟥 busy · 🟦 pending · 🟧 confirmed · ▤ not connected · tap your row to toggle
+                🟩 free · 🟥 busy · 🟩🔴 overridden · 🟦 pending · 🟧 confirmed · tap your row to toggle
               </div>
 
               {/* Pacts on this day */}
@@ -1479,7 +1415,7 @@ export default function CalendarPage() {
                   {sheetWindows.map((w, i) => (
                     <button
                       key={i}
-                      onClick={() => { setSelectedWinIdx(i); setSelectedSpotIdx(0); setShowAllSpots(false) }}
+                      onClick={() => { setSelectedWinIdx(i); setSelectedSpot(null) }}
                       style={{
                         padding: '8px 13px', borderRadius: 20, fontSize: 12.5, fontWeight: 700,
                         cursor: 'pointer',
@@ -1519,60 +1455,94 @@ export default function CalendarPage() {
                     ))}
                   </div>
 
-                  {/* Spot cards */}
-                  {spotRecommendations.length > 0 && (() => {
-                    const visibleSpots = showAllSpots ? spotRecommendations : spotRecommendations.slice(0, 3)
-                    return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {visibleSpots.map((rec, i) => {
-                          const isSel = i === selectedSpotIdx
+                  {/* Search spots */}
+                  <input
+                    type="text"
+                    placeholder="🔎 Search a spot (e.g. SM Megamall, Yabu)..."
+                    value={spotQuery}
+                    onChange={e => searchDaySpots(e.target.value)}
+                    style={{
+                      width: '100%', padding: '9px 12px', borderRadius: 10,
+                      border: '1.5px solid var(--border)', background: 'var(--surface)',
+                      color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box',
+                    }}
+                    onFocus={e => { e.target.style.borderColor = 'var(--accent)' }}
+                    onBlur={e => { e.target.style.borderColor = 'var(--border)' }}
+                  />
+
+                  {/* Search results */}
+                  {spotQuery.trim() && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                      {spotSearching && (
+                        <div style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'center', padding: 8 }}>Searching...</div>
+                      )}
+                      {!spotSearching && searchSpotsWithTravel.length === 0 && spotQuery.trim() && (
+                        <div style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'center', padding: 8 }}>No matches</div>
+                      )}
+                      {!spotSearching && searchSpotsWithTravel.map((spot, i) => {
+                        const isSel = selectedSpot?.name === spot.name
+                        return (
+                          <div
+                            key={i}
+                            onClick={() => setSelectedSpot(isSel ? null : { name: spot.name, x: spot.x, y: spot.y })}
+                            style={{
+                              padding: '9px 12px', borderRadius: 12,
+                              background: isSel ? 'rgba(139,176,126,0.08)' : 'var(--surface)',
+                              border: isSel ? '1.5px solid rgba(139,176,126,0.3)' : '1.5px solid var(--border)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>{spot.name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{spot.area}</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                              {spot.travelTimes.map((t, j) => (
+                                <span key={j} style={{ fontSize: 10.5, fontWeight: 700 }}>
+                                  <span style={{ color: t.color }}>{t.name}</span>{' '}
+                                  <span style={{ color: 'var(--text2)' }}>~{t.minutes} min</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* Favorite spots */}
+                  {favSpotsWithTravel.length > 0 && (
+                    <div style={{ marginTop: spotQuery.trim() ? 10 : 6 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 700, marginBottom: 6 }}>⭐ Your favorites</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {favSpotsWithTravel.map((spot, i) => {
+                          const isSel = selectedSpot?.name === spot.name
                           return (
                             <div
                               key={i}
-                              onClick={() => setSelectedSpotIdx(i)}
+                              onClick={() => setSelectedSpot(isSel ? null : { name: spot.name, x: spot.x, y: spot.y })}
                               style={{
-                                display: 'flex', alignItems: 'center', gap: 11,
-                                padding: '10px 12px', borderRadius: 14,
+                                padding: '9px 12px', borderRadius: 12,
                                 background: isSel ? 'rgba(139,176,126,0.08)' : 'var(--surface)',
                                 border: isSel ? '1.5px solid rgba(139,176,126,0.3)' : '1.5px solid var(--border)',
                                 cursor: 'pointer',
                               }}
                             >
-                              <div style={{
-                                fontSize: 20, width: 34, height: 34, background: 'var(--surface3)',
-                                borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                              }}>{rec.emoji}</div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 13.5, fontWeight: 700 }}>
-                                  {rec.source === 'favorite' ? '⭐ ' : ''}{rec.name}
-                                </div>
-                                <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
-                                  {rec.area} · ~{rec.avgMin.toLocaleString()} min avg
-                                </div>
-                              </div>
-                              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--green)', flexShrink: 0, textAlign: 'right', lineHeight: 1.4 }}>
-                                {rec.maxMin.toLocaleString()} min max<br />({rec.maxWho})
+                              <div style={{ fontSize: 13, fontWeight: 700 }}>⭐ {spot.name}</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                                {spot.travelTimes.map((t, j) => (
+                                  <span key={j} style={{ fontSize: 10.5, fontWeight: 700 }}>
+                                    <span style={{ color: t.color }}>{t.name}</span>{' '}
+                                    <span style={{ color: 'var(--text2)' }}>~{t.minutes} min</span>
+                                  </span>
+                                ))}
                               </div>
                             </div>
                           )
                         })}
-                        {!showAllSpots && spotRecommendations.length > 3 && (
-                          <button
-                            onClick={() => setShowAllSpots(true)}
-                            style={{
-                              padding: 8, borderRadius: 10, border: '1px solid var(--border)',
-                              background: 'var(--surface2)', color: 'var(--text2)',
-                              fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
-                            }}
-                          >
-                            Show {spotRecommendations.length - 3} more suggestions
-                          </button>
-                        )}
                       </div>
-                    )
-                  })()}
+                    </div>
+                  )}
 
-                  {/* Add favorite spot button */}
+                  {/* Add favorite spot link */}
                   <button
                     onClick={() => window.location.href = '/spots'}
                     style={{
@@ -1581,7 +1551,7 @@ export default function CalendarPage() {
                       color: 'var(--text2)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
                     }}
                   >
-                    ⭐ + Add your own favorite spot
+                    ⭐ + Add favorite spot
                   </button>
                 </div>
               )}
@@ -1599,7 +1569,7 @@ export default function CalendarPage() {
                   }}
                 >
                   💬 Suggest {fmtDate(sheetDate!).split(',')[0]}, {fmtHour((sheetWindows[selectedWinIdx] || sheetWindows[0]).s)} – {fmtHour((sheetWindows[selectedWinIdx] || sheetWindows[0]).e)}
-                  {spotRecommendations[selectedSpotIdx] ? ` · ${spotRecommendations[selectedSpotIdx].name}` : ''}
+                  {selectedSpot ? ` · ${selectedSpot.name}` : ''}
                 </button>
               )}
             </div>

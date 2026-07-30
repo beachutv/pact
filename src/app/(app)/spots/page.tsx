@@ -1,32 +1,20 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
-import { toStr, fmtShort, fmtWin, travelMin, txtOn, AREAS, DAY_START, DAY_END, getBrowserTimezone, currentHourInTz } from '@/lib/utils'
+import { AREAS } from '@/lib/utils'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import LocationPicker from '@/components/LocationPicker'
 
-type BusyBlock = { user_id: string; date: string; start_hour: number; end_hour: number }
 type FavSpot = { id: string; name: string; emoji: string; area: string; x: number; y: number; type: string; circle_id: string | null }
 type PlaceResult = { name: string; area: string; placeId: string }
-type UpcomingCard = {
-  dateStr: string
-  dayOffset: number
-  window: { s: number; e: number }
-  isFull: boolean
-  memberCount: number
-  totalActive: number
-  spot: { name: string; emoji: string; area: string; avg: number } | null
-}
 
 export default function SpotsPage() {
   const { user, activeCircle, circleMembers } = useCircle()
   const supabase = createClient()
 
-  const [busyBlocks, setBusyBlocks] = useState<BusyBlock[]>([])
-  const [activeIds, setActiveIds] = useState<Set<string>>(new Set())
   const [favSpots, setFavSpots] = useState<FavSpot[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -44,29 +32,11 @@ export default function SpotsPage() {
   const [favVisibility, setFavVisibility] = useState<'private' | 'group'>('private')
   const [savingFav, setSavingFav] = useState(false)
 
-  const tz = useMemo(() => getBrowserTimezone(), [])
-  const todayStr = useMemo(() => toStr(new Date()), [])
-  const nowHour = useMemo(() => currentHourInTz(tz), [tz])
-  const memberIdsKey = useMemo(() => circleMembers.map(m => m.id).sort().join(','), [circleMembers])
-
   // Pull to refresh
   const onRefresh = useCallback(async () => {
-    await loadBlocks()
     await loadFavSpots()
-  }, [activeCircle?.id, memberIdsKey])
+  }, [activeCircle?.id])
   const { containerRef, refreshing, pullY, indicatorText, touchHandlers } = usePullToRefresh(onRefresh)
-
-  // Load busy blocks
-  async function loadBlocks() {
-    if (!activeCircle || circleMembers.length === 0) return
-    const memberIds = circleMembers.map(m => m.id)
-    const { data: blocks } = await supabase
-      .from('busy_blocks')
-      .select('user_id, date, start_hour, end_hour')
-      .in('user_id', memberIds)
-    if (blocks) setBusyBlocks(blocks)
-    setActiveIds(new Set(memberIds))
-  }
 
   // Load favorite spots
   async function loadFavSpots() {
@@ -81,140 +51,23 @@ export default function SpotsPage() {
   useEffect(() => {
     if (!activeCircle) { setLoading(false); return }
     async function init() {
-      await Promise.all([loadBlocks(), loadFavSpots()])
+      await loadFavSpots()
       setLoading(false)
     }
     init()
-  }, [activeCircle?.id, memberIdsKey])
+  }, [activeCircle?.id])
 
   // Realtime updates
   useEffect(() => {
     if (!activeCircle) return
     const channel = supabase
       .channel('spots-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'busy_blocks' }, () => {
-        loadBlocks()
-      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'favorite_spots' }, () => {
         loadFavSpots()
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [activeCircle?.id])
-
-  // Busy check helper
-  const isBusy = useCallback((uid: string, date: string, hour: number) => {
-    if (date === todayStr && hour < nowHour) return true
-    return busyBlocks.some(b =>
-      b.user_id === uid && b.date === date && b.start_hour <= hour && b.end_hour > hour
-    )
-  }, [busyBlocks, todayStr, nowHour])
-
-  const activeMembers = useMemo(() =>
-    circleMembers.filter(m => activeIds.has(m.id))
-      .sort((a, b) => a.id === user.id ? -1 : b.id === user.id ? 1 : 0),
-    [circleMembers, activeIds, user.id]
-  )
-
-  function freeCountAt(date: string, hour: number) {
-    return activeMembers.filter(m => !isBusy(m.id, date, hour)).length
-  }
-
-  // Find free windows where minFree people are available
-  function findWindows(date: string, minFree: number, minLen = 2): { s: number; e: number; count: number }[] {
-    const wins: { s: number; e: number; count: number }[] = []
-    let s: number | null = null
-    let minCount = Infinity
-    for (let h = DAY_START; h <= DAY_END; h++) {
-      const fc = h < DAY_END ? freeCountAt(date, h) : 0
-      if (fc >= minFree) {
-        if (s === null) { s = h; minCount = fc }
-        minCount = Math.min(minCount, fc)
-      } else {
-        if (s !== null && h - s >= minLen) {
-          wins.push({ s, e: h, count: minCount })
-        }
-        s = null; minCount = Infinity
-      }
-    }
-    return wins
-  }
-
-  // Recommend spots based on travel time from each member's home
-  function recommendSpot(dateStr: string, win: { s: number; e: number }): { name: string; emoji: string; area: string; avg: number } | null {
-    if (favSpots.length === 0) return null
-    const origins = activeMembers.map(m => ({
-      x: (m as any).home_x || 0,
-      y: (m as any).home_y || 0,
-    })).filter(o => o.x !== 0 || o.y !== 0)
-    if (origins.length === 0) return null
-
-    const scored = favSpots.map(v => {
-      const times = origins.map(o => travelMin(o, v))
-      const avg = times.reduce((a, b) => a + b, 0) / times.length
-      const max = Math.max(...times)
-      let score = avg + 0.6 * max
-      // Time-of-day bonuses
-      if (win.s >= 18 && ['bar', 'karaoke', 'food', 'cinema', 'arcade'].includes(v.type)) score -= 2.5
-      if (win.s < 12 && ['coffee', 'park'].includes(v.type)) score -= 2.5
-      return { v, avg: Math.round(avg), score }
-    }).sort((a, b) => a.score - b.score)
-
-    if (scored.length === 0) return null
-    const best = scored[0]
-    return { name: best.v.name, emoji: best.v.emoji, area: best.v.area, avg: best.avg }
-  }
-
-  // Compute upcoming hangout cards
-  const upcomingCards = useMemo((): UpcomingCard[] => {
-    if (!activeCircle || activeMembers.length < 2) return []
-    const n = activeMembers.length
-    const cards: UpcomingCard[] = []
-
-    for (let i = 0; i < 14 && cards.length < 5; i++) {
-      const d = new Date()
-      d.setDate(d.getDate() + i)
-      const ds = toStr(d)
-
-      // Full windows (everyone free)
-      const fullWins = findWindows(ds, n, 2)
-      // Partial windows (n-1 free) as fallback
-      const partialWins = fullWins.length === 0 && n >= 3 ? findWindows(ds, n - 1, 2) : []
-      const wins = fullWins.length ? fullWins : partialWins
-      if (wins.length === 0) continue
-
-      const isFull = fullWins.length > 0
-      const best = wins.reduce((a, b) => (b.e - b.s) > (a.e - a.s) ? b : a)
-      const spot = recommendSpot(ds, best)
-
-      cards.push({
-        dateStr: ds,
-        dayOffset: i,
-        window: { s: best.s, e: best.e },
-        isFull,
-        memberCount: isFull ? n : n - 1,
-        totalActive: n,
-        spot,
-      })
-    }
-    return cards
-  }, [activeCircle, activeMembers, busyBlocks, favSpots, todayStr, nowHour])
-
-  // Toggle friend filter
-  function toggleFriend(id: string) {
-    setActiveIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        if (next.size <= 2) return prev
-        next.delete(id)
-      } else next.add(id)
-      return next
-    })
-  }
-
-  function selectAll() {
-    setActiveIds(new Set(circleMembers.map(m => m.id)))
-  }
 
   // Search using Google Places
   async function searchSpots(q: string) {
@@ -307,12 +160,6 @@ export default function SpotsPage() {
     setFavSpots(prev => prev.filter(f => f.id !== id))
   }
 
-  // Navigate to calendar day
-  function openDay(dateStr: string) {
-    // Use URL params to tell calendar which date to open
-    window.location.href = `/calendar?date=${dateStr}`
-  }
-
   if (!activeCircle) {
     return (
       <div style={{ padding: 20, textAlign: 'center', marginTop: 40, color: 'var(--text2)' }}>
@@ -338,9 +185,9 @@ export default function SpotsPage() {
 
       <div style={{ padding: '16px 16px 24px' }}>
         {/* Header */}
-        <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>📍 Best upcoming hangouts</h2>
+        <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>📍 Spots</h2>
         <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 3, lineHeight: 1.5 }}>
-          Windows in the next 2 weeks when everyone selected is free — with a spot that's easiest for wherever each of you is coming from that day.
+          Search for places or save your favorites for quick access when planning hangouts.
         </p>
 
         {/* Search */}
@@ -408,123 +255,6 @@ export default function SpotsPage() {
                 </div>
               )
             })}
-          </div>
-        )}
-
-        {/* Friend filter chips */}
-        {circleMembers.length > 1 && !query.trim() && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
-            <div style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600, width: '100%', marginBottom: 2 }}>
-              👥 Checking availability with
-            </div>
-            {circleMembers.map(m => {
-              const isMe = m.id === user.id
-              const on = activeIds.has(m.id)
-              return (
-                <div
-                  key={m.id}
-                  onClick={() => !isMe && toggleFriend(m.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    padding: '4px 10px 4px 4px', borderRadius: 20,
-                    background: on ? 'var(--surface3)' : 'var(--surface2)',
-                    border: `1.5px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
-                    cursor: isMe ? 'default' : 'pointer',
-                    opacity: on ? 1 : 0.5,
-                    fontSize: 12, fontWeight: 600,
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <div style={{
-                    width: 22, height: 22, borderRadius: '50%',
-                    background: m.color, color: txtOn(m.color),
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 11, fontWeight: 800,
-                  }}>
-                    {m.name?.[0]}
-                  </div>
-                  {isMe ? 'You' : m.name}
-                </div>
-              )
-            })}
-            <div
-              onClick={selectAll}
-              style={{
-                padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                background: activeIds.size === circleMembers.length ? 'var(--accent)' : 'var(--surface2)',
-                color: activeIds.size === circleMembers.length ? '#fff' : 'var(--text)',
-                border: `1.5px solid ${activeIds.size === circleMembers.length ? 'var(--accent)' : 'var(--border)'}`,
-                cursor: 'pointer', display: 'flex', alignItems: 'center',
-              }}
-            >
-              everyone
-            </div>
-          </div>
-        )}
-
-        {/* Upcoming hangout cards */}
-        {!query.trim() && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: 20, color: 'var(--text2)', fontSize: 13 }}>Loading...</div>
-            ) : upcomingCards.length === 0 ? (
-              <div style={{
-                textAlign: 'center', padding: '24px 16px', color: 'var(--text2)', fontSize: 13,
-                background: 'var(--surface2)', borderRadius: 12, lineHeight: 1.6,
-              }}>
-                {activeMembers.length < 2
-                  ? 'Select at least 2 friends above to see shared free windows.'
-                  : favSpots.length === 0
-                    ? 'No shared windows found in the next 2 weeks 😬 — save some favorite spots below to get recommendations!'
-                    : 'No shared windows in the next 2 weeks 😬 — time for someone to cancel something.'}
-              </div>
-            ) : (
-              upcomingCards.map((card, i) => (
-                <div key={i} style={{
-                  background: 'var(--surface2)', borderRadius: 14,
-                  border: '1px solid var(--border)', padding: '14px 14px 12px',
-                }}>
-                  {/* Date + window */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 14, fontWeight: 800 }}>
-                      {fmtShort(card.dateStr)}{card.dayOffset === 0 ? ' · today' : ''}
-                    </span>
-                    <span style={{
-                      fontSize: 12, fontWeight: 700,
-                      color: card.isFull ? 'var(--green)' : 'var(--text2)',
-                    }}>
-                      {fmtWin(card.window.s, card.window.e)}{!card.isFull ? ` · ${card.memberCount}/${card.totalActive}` : ''}
-                    </span>
-                  </div>
-
-                  {/* Spot recommendation */}
-                  {card.spot && (
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: 9, marginTop: 9,
-                      fontSize: 12, color: 'var(--text2)',
-                    }}>
-                      <span style={{ fontSize: 16 }}>{card.spot.emoji}</span>
-                      <span>
-                        <b style={{ color: 'var(--text)' }}>{card.spot.name}</b> · {card.spot.area} — ~{card.spot.avg} min avg
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Open day button */}
-                  <button
-                    onClick={() => openDay(card.dateStr)}
-                    style={{
-                      marginTop: 10, width: '100%', padding: '9px 0',
-                      background: 'var(--accent)', color: '#fff',
-                      border: 'none', borderRadius: 10, fontSize: 12.5, fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Open day & pick a spot
-                  </button>
-                </div>
-              ))
-            )}
           </div>
         )}
 
