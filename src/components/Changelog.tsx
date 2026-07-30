@@ -3,9 +3,20 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-const CURRENT_VERSION = '14.0'
+const CURRENT_VERSION = '15.0'
 
 const CHANGELOG = [
+  {
+    version: '15.0',
+    date: 'July 30, 2026',
+    title: 'Smarter Travel Times + Sidebar',
+    items: [
+      '📍 Travel times now use real GPS — accurate for any place',
+      '📅 Calendar event locations used as travel origins',
+      '🌐 Landscape: header becomes a compact sidebar on the left',
+      '👥 Friends in the same spot now show matching travel times',
+    ],
+  },
   {
     version: '14.0',
     date: 'July 30, 2026',

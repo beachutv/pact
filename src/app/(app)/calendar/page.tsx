@@ -227,7 +227,7 @@ export default function CalendarPage() {
     async function loadBlocks() {
       const memberIds = circleMembers.map(m => m.id)
       const [blocksRes, connRes] = await Promise.all([
-        supabase.from('busy_blocks').select('user_id, date, start_hour, end_hour').in('user_id', memberIds),
+        supabase.from('busy_blocks').select('user_id, date, start_hour, end_hour, location').in('user_id', memberIds),
         supabase.rpc('get_connected_user_ids', { p_user_ids: memberIds }),
       ])
       if (blocksRes.data) setBusyBlocks(blocksRes.data)
@@ -594,89 +594,89 @@ export default function CalendarPage() {
         homeY = fallback.y
       }
 
-      // For today: use live location if recent (within 7 days), else fall back to home
+      // Live location data
       const liveArea = (m as any).live_area as string | null
       const liveUpdated = (m as any).live_updated_at as string | null
       const liveLat = (m as any).live_lat as number | null
       const liveLng = (m as any).live_lng as number | null
       const liveRecent = liveArea && liveUpdated && (Date.now() - new Date(liveUpdated).getTime()) < 7 * 24 * 60 * 60 * 1000
 
-      // Determine current origin: live location (today only) or home
-      let originX = homeX
-      let originY = homeY
-      let originArea = homeArea
-      let originLabel = `from home · ${homeArea || 'unknown'}`
-      let originLat = 0
-      let originLng = 0
+      // Home GPS coords
+      const homeGps = homeArea ? areaGps(homeArea) : { lat: 14.5995, lng: 120.9842 }
 
-      // Get GPS coords for home area
-      if (homeArea) {
-        const gps = areaGps(homeArea)
-        originLat = gps.lat
-        originLng = gps.lng
-      }
-
-      if (isToday && liveRecent && liveArea) {
-        // Look up grid coordinates for the live area
-        const liveCoords = AREAS[liveArea]
-        const fuzzyLive = !liveCoords ? Object.keys(AREAS).find(a =>
-          liveArea.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(liveArea.toLowerCase())
-        ) : undefined
-        const coords = liveCoords || (fuzzyLive ? AREAS[fuzzyLive] : null)
-        if (coords) {
-          originX = coords.x
-          originY = coords.y
-          originArea = liveArea
-          originLabel = `currently in ${liveArea}`
-        }
-        // Use real GPS coords from live location if available
-        if (liveLat && liveLng) {
-          originLat = liveLat
-          originLng = liveLng
-        } else {
-          const gps = areaGps(liveArea)
-          originLat = gps.lat
-          originLng = gps.lng
-        }
-      }
-
-      // Find last busy block ending before or at the window start
+      // Find last busy block ending before or at the window start (within 3 hours)
       const priorBlocks = busyBlocks
         .filter(b => b.user_id === m.id && b.date === sheetDate && b.end_hour <= winStart && b.end_hour >= winStart - 3)
         .sort((a, b) => b.end_hour - a.end_hour)
       const prior = priorBlocks[0]
+      const priorLocation = (prior as any)?.location as string | null
+
+      // Priority for origin:
+      // 1. If today: use live GPS (most accurate real-time position)
+      // 2. If there's a prior busy block with a location: use that event location
+      // 3. Fall back to home area
+
+      if (isToday && liveRecent && liveLat && liveLng) {
+        // Today with live GPS — always use it
+        const label = prior
+          ? `currently in ${liveArea} (busy till ${fmtHour(prior.end_hour)})`
+          : `currently in ${liveArea}`
+        return {
+          name: m.name.split(' ')[0], color: m.color,
+          x: homeX, y: homeY,
+          lat: liveLat, lng: liveLng,
+          area: liveArea || homeArea,
+          label,
+        }
+      }
+
+      if (isToday && liveRecent && liveArea) {
+        // Today with live area but no GPS coords — use area GPS
+        const gps = areaGps(liveArea)
+        const label = prior
+          ? `currently in ${liveArea} (busy till ${fmtHour(prior.end_hour)})`
+          : `currently in ${liveArea}`
+        return {
+          name: m.name.split(' ')[0], color: m.color,
+          x: homeX, y: homeY,
+          lat: gps.lat, lng: gps.lng,
+          area: liveArea,
+          label,
+        }
+      }
+
+      if (prior && priorLocation) {
+        // Prior calendar event has a location — use it as origin
+        const locGps = areaGps(priorLocation)
+        return {
+          name: m.name.split(' ')[0], color: m.color,
+          x: homeX, y: homeY,
+          lat: locGps.lat, lng: locGps.lng,
+          area: priorLocation,
+          label: `coming from ${priorLocation} (busy till ${fmtHour(prior.end_hour)})`,
+        }
+      }
 
       if (prior) {
-        // If today with live location, use live coords but mention busy block
-        if (isToday && liveRecent && liveArea && originArea !== homeArea) {
-          return {
-            name: m.name.split(' ')[0],
-            color: m.color,
-            x: originX, y: originY,
-            lat: originLat, lng: originLng,
-            area: originArea,
-            label: `currently in ${originArea} (busy till ${fmtHour(prior.end_hour)})`,
-          }
-        }
-        const homeGps = areaGps(homeArea)
+        // Prior busy block but no location — use home
         return {
-          name: m.name.split(' ')[0],
-          color: m.color,
+          name: m.name.split(' ')[0], color: m.color,
           x: homeX, y: homeY,
           lat: homeGps.lat, lng: homeGps.lng,
           area: homeArea,
           label: `coming from ${homeArea || 'unknown'} (busy till ${fmtHour(prior.end_hour)})`,
         }
       }
+
+      // No prior block, not today/no live — use home
       return {
-        name: m.name.split(' ')[0],
-        color: m.color,
-        x: originX, y: originY,
-        lat: originLat, lng: originLng,
-        area: originArea,
-        label: originLabel,
+        name: m.name.split(' ')[0], color: m.color,
+        x: homeX, y: homeY,
+        lat: homeGps.lat, lng: homeGps.lng,
+        area: homeArea,
+        label: `from home · ${homeArea || 'unknown'}`,
       }
-    }).filter(o => o.x !== 0 || o.y !== 0)
+    }).filter(o => o.lat !== 0 || o.lng !== 0)
   }, [sheetDate, activeMembers, busyBlocks, selectedWinIdx, todayStr])
 
   // Helper: get GPS for a favorite spot (area name lookup)
