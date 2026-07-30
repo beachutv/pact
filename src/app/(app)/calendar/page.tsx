@@ -569,14 +569,39 @@ export default function CalendarPage() {
 
     const isToday = sheetDate === todayStr
 
-    // Helper: look up GPS coords for an area name
-    function areaGps(area: string): { lat: number; lng: number } {
+    // Helper: look up GPS coords for an area name (multi-strategy fuzzy matching)
+    function areaGps(area: string): { lat: number; lng: number } | null {
+      if (!area) return null
       const direct = AREA_GPS[area]
       if (direct) return direct
-      const fuzzy = Object.keys(AREA_GPS).find(a =>
-        area.toLowerCase().includes(a.split(',')[0].toLowerCase()) || a.toLowerCase().includes(area.split(',')[0].toLowerCase())
+      const lo = area.toLowerCase()
+      // Strategy 1: area contains an AREA_GPS key prefix, or key contains area prefix
+      const fuzzy1 = Object.keys(AREA_GPS).find(a =>
+        lo.includes(a.split(',')[0].toLowerCase()) || a.toLowerCase().includes(lo.split(',')[0].toLowerCase())
       )
-      return fuzzy ? AREA_GPS[fuzzy] : { lat: 14.5995, lng: 120.9842 } // Metro Manila center
+      if (fuzzy1) return AREA_GPS[fuzzy1]
+      // Strategy 2: check if any city/district word from AREA_GPS keys appears in the area string
+      // e.g. "The Grove by Rockwell, Tower D" → check "Rockwell" → might match nearby areas
+      const areaWords = lo.split(/[\s,/]+/).filter(w => w.length > 3)
+      const fuzzy2 = Object.keys(AREA_GPS).find(a => {
+        const keyWords = a.toLowerCase().split(/[\s,/]+/)
+        return areaWords.some(w => keyWords.some(kw => kw.includes(w) || w.includes(kw)))
+      })
+      if (fuzzy2) return AREA_GPS[fuzzy2]
+      // Strategy 3: check common city names in the string
+      const cityMap: Record<string, string> = {
+        'pasig': 'Kapitolyo, Pasig', 'makati': 'Poblacion, Makati', 'taguig': 'BGC, Taguig',
+        'manila': 'Ermita, Manila', 'quezon': 'Diliman, QC', 'mandaluyong': 'Mandaluyong',
+        'san juan': 'San Juan', 'marikina': 'Marikina', 'parañaque': 'BF Homes, Parañaque',
+        'paranaque': 'BF Homes, Parañaque', 'muntinlupa': 'Alabang, Muntinlupa',
+        'alabang': 'Alabang, Muntinlupa', 'rockwell': 'Kapitolyo, Pasig',
+        'grove': 'C5/Bagong Ilog, Pasig', 'eastwood': 'Eastwood, QC',
+        'ortigas': 'Ortigas, Pasig', 'bgc': 'BGC, Taguig', 'uptown': 'Uptown, Taguig',
+      }
+      for (const [keyword, areaKey] of Object.entries(cityMap)) {
+        if (lo.includes(keyword)) return AREA_GPS[areaKey] || null
+      }
+      return null // No match — caller should use fallback
     }
 
     return activeMembers.map(m => {
@@ -601,8 +626,11 @@ export default function CalendarPage() {
       const liveLng = (m as any).live_lng as number | null
       const liveRecent = liveArea && liveUpdated && (Date.now() - new Date(liveUpdated).getTime()) < 7 * 24 * 60 * 60 * 1000
 
-      // Home GPS coords
-      const homeGps = homeArea ? areaGps(homeArea) : { lat: 14.5995, lng: 120.9842 }
+      // Home GPS coords — try area matching, fall back to live GPS, then Manila center
+      const homeGpsMatch = homeArea ? areaGps(homeArea) : null
+      const homeGps = homeGpsMatch
+        || (liveLat && liveLng ? { lat: liveLat, lng: liveLng } : null)
+        || { lat: 14.5995, lng: 120.9842 }
 
       // Find last busy block ending before or at the window start (within 3 hours)
       const priorBlocks = busyBlocks
@@ -614,10 +642,9 @@ export default function CalendarPage() {
       // Priority for origin:
       // 1. If today: use live GPS (most accurate real-time position)
       // 2. If there's a prior busy block with a location: use that event location
-      // 3. Fall back to home area
+      // 3. Fall back to home area (with live GPS fallback if area name unresolvable)
 
       if (isToday && liveRecent && liveLat && liveLng) {
-        // Today with live GPS — always use it
         const label = prior
           ? `currently in ${liveArea} (busy till ${fmtHour(prior.end_hour)})`
           : `currently in ${liveArea}`
@@ -631,8 +658,7 @@ export default function CalendarPage() {
       }
 
       if (isToday && liveRecent && liveArea) {
-        // Today with live area but no GPS coords — use area GPS
-        const gps = areaGps(liveArea)
+        const gps = areaGps(liveArea) || homeGps
         const label = prior
           ? `currently in ${liveArea} (busy till ${fmtHour(prior.end_hour)})`
           : `currently in ${liveArea}`
@@ -646,8 +672,7 @@ export default function CalendarPage() {
       }
 
       if (prior && priorLocation) {
-        // Prior calendar event has a location — use it as origin
-        const locGps = areaGps(priorLocation)
+        const locGps = areaGps(priorLocation) || homeGps
         return {
           name: m.name.split(' ')[0], color: m.color,
           x: homeX, y: homeY,
@@ -658,7 +683,6 @@ export default function CalendarPage() {
       }
 
       if (prior) {
-        // Prior busy block but no location — use home
         return {
           name: m.name.split(' ')[0], color: m.color,
           x: homeX, y: homeY,
@@ -668,7 +692,6 @@ export default function CalendarPage() {
         }
       }
 
-      // No prior block, not today/no live — use home
       return {
         name: m.name.split(' ')[0], color: m.color,
         x: homeX, y: homeY,
