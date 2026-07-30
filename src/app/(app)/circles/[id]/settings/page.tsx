@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useCircle, type UserProfile } from '@/components/AppShell'
 import { txtOn } from '@/lib/utils'
 
+type Friend = { id: string; name: string; color: string; avatar_url: string | null }
+
 export default function CircleSettingsPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
@@ -28,6 +30,13 @@ export default function CircleSettingsPage() {
 
   // Member action state
   const [actionMember, setActionMember] = useState<string | null>(null)
+
+  // Add friends state
+  const [showAddFriends, setShowAddFriends] = useState(false)
+  const [friends, setFriends] = useState<Friend[]>([])
+  const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set())
+  const [friendsLoading, setFriendsLoading] = useState(false)
+  const [addingFriends, setAddingFriends] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -59,6 +68,92 @@ export default function CircleSettingsPage() {
   }, [id])
 
   const isAdmin = members.find(m => m.id === user.id)?.role === 'admin'
+
+  async function loadFriends() {
+    setFriendsLoading(true)
+    setShowAddFriends(true)
+
+    // Get all circles the user is in
+    const { data: myCircles } = await supabase
+      .from('circle_members')
+      .select('circle_id')
+      .eq('user_id', user.id)
+
+    if (!myCircles?.length) { setFriendsLoading(false); return }
+
+    const circleIds = myCircles.map(c => c.circle_id).filter(cid => cid !== id)
+    if (!circleIds.length) { setFriendsLoading(false); return }
+
+    // Get all members of those circles (excluding self)
+    const { data: mates } = await supabase
+      .from('circle_members')
+      .select('user_id, users(id, name, color, avatar_url)')
+      .in('circle_id', circleIds)
+      .neq('user_id', user.id)
+
+    if (!mates?.length) { setFriendsLoading(false); return }
+
+    // Exclude people already in this circle
+    const memberIds = new Set(members.map(m => m.id))
+
+    const seen = new Set<string>()
+    const friendList: Friend[] = []
+    for (const m of mates) {
+      const u = (m as any).users as Friend
+      if (u && !seen.has(u.id) && !memberIds.has(u.id)) {
+        seen.add(u.id)
+        friendList.push(u)
+      }
+    }
+
+    friendList.sort((a, b) => a.name.localeCompare(b.name))
+    setFriends(friendList)
+    setFriendsLoading(false)
+  }
+
+  function toggleFriend(fid: string) {
+    setSelectedFriends(prev => {
+      const next = new Set(prev)
+      if (next.has(fid)) next.delete(fid)
+      else next.add(fid)
+      return next
+    })
+  }
+
+  async function handleAddFriends() {
+    if (selectedFriends.size === 0) return
+    setAddingFriends(true)
+
+    const inserts = Array.from(selectedFriends).map(userId => ({
+      circle_id: id,
+      user_id: userId,
+      role: 'member' as const,
+    }))
+
+    const { error } = await supabase.from('circle_members').insert(inserts)
+    if (error) {
+      console.error('Add friends error:', error)
+      setAddingFriends(false)
+      return
+    }
+
+    // Add to local members list
+    const newMembers = friends
+      .filter(f => selectedFriends.has(f.id))
+      .map(f => ({
+        ...f,
+        role: 'member',
+        email: '', home_area: '', home_x: 0, home_y: 0,
+        birthday: null, theme: 'dark', precise_loc: false,
+        live_lat: null, live_lng: null, live_area: null,
+        live_updated_at: null, last_seen_at: null,
+      } as UserProfile & { role: string }))
+
+    setMembers(prev => [...prev, ...newMembers])
+    setShowAddFriends(false)
+    setSelectedFriends(new Set())
+    setAddingFriends(false)
+  }
 
   function copyInviteLink() {
     if (!circle) return
@@ -169,11 +264,7 @@ export default function CircleSettingsPage() {
             <input
               type="text"
               value={newEmoji}
-              onChange={e => {
-                // Only keep the last emoji character(s) entered
-                const val = e.target.value
-                setNewEmoji(val)
-              }}
+              onChange={e => setNewEmoji(e.target.value)}
               autoFocus
               style={{
                 width: 60, height: 50, fontSize: 36, textAlign: 'center',
@@ -254,6 +345,13 @@ export default function CircleSettingsPage() {
           <button className="btn-primary" onClick={copyInviteLink} style={{ width: '100%' }}>
             {copied ? '✓ Copied!' : '🔗 Copy invite link'}
           </button>
+          <button
+            className="btn-secondary"
+            onClick={loadFriends}
+            style={{ width: '100%' }}
+          >
+            👥 Add from your other circles
+          </button>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
             background: 'var(--surface2)', borderRadius: 10, padding: '8px 12px',
@@ -274,6 +372,89 @@ export default function CircleSettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Add friends overlay */}
+      {showAddFriends && (
+        <div className="card" style={{ border: '1.5px solid var(--accent)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <p style={{ fontSize: 13, fontWeight: 800 }}>Add from other circles</p>
+            <button
+              onClick={() => { setShowAddFriends(false); setSelectedFriends(new Set()) }}
+              style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 16, cursor: 'pointer' }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {friendsLoading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 16 }}>
+              <div className="spinner" />
+            </div>
+          ) : friends.length === 0 ? (
+            <p style={{ fontSize: 13, color: 'var(--text2)', textAlign: 'center', padding: 12 }}>
+              Everyone from your other circles is already here!
+            </p>
+          ) : (
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 240, overflowY: 'auto' }}>
+                {friends.map(f => {
+                  const selected = selectedFriends.has(f.id)
+                  return (
+                    <div
+                      key={f.id}
+                      onClick={() => toggleFriend(f.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 10px', borderRadius: 10, cursor: 'pointer',
+                        background: selected ? 'var(--accent-soft)' : 'transparent',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <div className="avatar" style={{
+                        background: f.color, color: txtOn(f.color), position: 'relative',
+                        width: 28, height: 28, fontSize: 11,
+                      }}>
+                        {f.avatar_url && (
+                          <img
+                            src={f.avatar_url}
+                            alt=""
+                            style={{
+                              position: 'absolute', inset: 0, borderRadius: '50%',
+                              width: '100%', height: '100%', objectFit: 'cover',
+                            }}
+                            onError={e => (e.currentTarget.style.display = 'none')}
+                          />
+                        )}
+                        {f.name[0]}
+                      </div>
+                      <p style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{f.name}</p>
+                      <div style={{
+                        width: 20, height: 20, borderRadius: 5,
+                        border: selected ? '2px solid var(--accent)' : '2px solid var(--border)',
+                        background: selected ? 'var(--accent)' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 11, color: '#fff', fontWeight: 700,
+                      }}>
+                        {selected && '✓'}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              {selectedFriends.size > 0 && (
+                <button
+                  className="btn-primary"
+                  onClick={handleAddFriends}
+                  disabled={addingFriends}
+                  style={{ marginTop: 10 }}
+                >
+                  {addingFriends ? 'Adding...' : `Add ${selectedFriends.size} friend${selectedFriends.size > 1 ? 's' : ''}`}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Members — own profile first */}
       <div className="card">
@@ -300,6 +481,17 @@ export default function CircleSettingsPage() {
                 }}
               >
                 <div className="avatar" style={{ background: m.color, color: txtOn(m.color) }}>
+                  {m.avatar_url && (
+                    <img
+                      src={m.avatar_url}
+                      alt=""
+                      style={{
+                        position: 'absolute', inset: 0, borderRadius: '50%',
+                        width: '100%', height: '100%', objectFit: 'cover',
+                      }}
+                      onError={e => (e.currentTarget.style.display = 'none')}
+                    />
+                  )}
                   {m.name[0]}
                 </div>
                 <div style={{ flex: 1 }}>

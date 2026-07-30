@@ -3,9 +3,20 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-const CURRENT_VERSION = '15.0'
+const CURRENT_VERSION = '16.0'
 
 const CHANGELOG = [
+  {
+    version: '16.0',
+    date: 'July 30, 2026',
+    title: 'Add Friends to Circles',
+    items: [
+      '👥 Add friends from your other circles when creating a new circle',
+      '👥 Add members to existing circles from circle settings',
+      '📍 Home area now geocoded via Google for accurate travel times',
+      '📍 Smarter origin priority — live GPS used more often',
+    ],
+  },
   {
     version: '15.0',
     date: 'July 30, 2026',
