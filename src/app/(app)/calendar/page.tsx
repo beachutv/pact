@@ -167,6 +167,13 @@ export default function CalendarPage() {
     loadFavs()
   }, [activeCircle?.id])
 
+  // Geocode current user's home area (once, if home_lat is null)
+  useEffect(() => {
+    if (user.home_area && !(user as any).home_lat) {
+      fetch('/api/geocode', { method: 'POST' }).catch(() => {})
+    }
+  }, [user.home_area, (user as any).home_lat])
+
   // Auto-sync tracking
   const hasAutoSynced = useRef(false)
 
@@ -626,9 +633,11 @@ export default function CalendarPage() {
       const liveLng = (m as any).live_lng as number | null
       const liveRecent = liveArea && liveUpdated && (Date.now() - new Date(liveUpdated).getTime()) < 7 * 24 * 60 * 60 * 1000
 
-      // Home GPS coords — try area matching, fall back to live GPS, then Manila center
-      const homeGpsMatch = homeArea ? areaGps(homeArea) : null
-      const homeGps = homeGpsMatch
+      // Home GPS — prefer DB-stored geocoded coords, then area matching, then live GPS fallback
+      const dbHomeLat = (m as any).home_lat as number | null
+      const dbHomeLng = (m as any).home_lng as number | null
+      const homeGps = (dbHomeLat && dbHomeLng) ? { lat: dbHomeLat, lng: dbHomeLng }
+        : (homeArea ? areaGps(homeArea) : null)
         || (liveLat && liveLng ? { lat: liveLat, lng: liveLng } : null)
         || { lat: 14.5995, lng: 120.9842 }
 
@@ -639,66 +648,44 @@ export default function CalendarPage() {
       const prior = priorBlocks[0]
       const priorLocation = (prior as any)?.location as string | null
 
-      // Priority for origin:
-      // 1. If today: use live GPS (most accurate real-time position)
-      // 2. If there's a prior busy block with a location: use that event location
-      // 3. Fall back to home area (with live GPS fallback if area name unresolvable)
+      // Origin priority:
+      // 1. Today: always use live GPS
+      // 2. Prior busy block WITH location tag: use that event location
+      // 3. No prior block: use live GPS (they're probably still where they are now)
+      // 4. Prior block WITHOUT location: fall back to home area
+      const name = m.name.split(' ')[0]
 
+      // 1. Today — live GPS is most accurate
       if (isToday && liveRecent && liveLat && liveLng) {
         const label = prior
           ? `currently in ${liveArea} (busy till ${fmtHour(prior.end_hour)})`
           : `currently in ${liveArea}`
-        return {
-          name: m.name.split(' ')[0], color: m.color,
-          x: homeX, y: homeY,
-          lat: liveLat, lng: liveLng,
-          area: liveArea || homeArea,
-          label,
-        }
+        return { name, color: m.color, x: homeX, y: homeY, lat: liveLat, lng: liveLng, area: liveArea || homeArea, label }
       }
-
       if (isToday && liveRecent && liveArea) {
         const gps = areaGps(liveArea) || homeGps
         const label = prior
           ? `currently in ${liveArea} (busy till ${fmtHour(prior.end_hour)})`
           : `currently in ${liveArea}`
-        return {
-          name: m.name.split(' ')[0], color: m.color,
-          x: homeX, y: homeY,
-          lat: gps.lat, lng: gps.lng,
-          area: liveArea,
-          label,
-        }
+        return { name, color: m.color, x: homeX, y: homeY, lat: gps.lat, lng: gps.lng, area: liveArea, label }
       }
 
+      // 2. Prior block with tagged location — use it as origin
       if (prior && priorLocation) {
         const locGps = areaGps(priorLocation) || homeGps
-        return {
-          name: m.name.split(' ')[0], color: m.color,
-          x: homeX, y: homeY,
-          lat: locGps.lat, lng: locGps.lng,
-          area: priorLocation,
-          label: `coming from ${priorLocation} (busy till ${fmtHour(prior.end_hour)})`,
-        }
+        return { name, color: m.color, x: homeX, y: homeY, lat: locGps.lat, lng: locGps.lng, area: priorLocation, label: `coming from ${priorLocation} (busy till ${fmtHour(prior.end_hour)})` }
       }
 
-      if (prior) {
-        return {
-          name: m.name.split(' ')[0], color: m.color,
-          x: homeX, y: homeY,
-          lat: homeGps.lat, lng: homeGps.lng,
-          area: homeArea,
-          label: `coming from ${homeArea || 'unknown'} (busy till ${fmtHour(prior.end_hour)})`,
-        }
+      // 3. No prior block at all — use live GPS if recent (they're probably still around there)
+      if (!prior && liveRecent && liveLat && liveLng) {
+        return { name, color: m.color, x: homeX, y: homeY, lat: liveLat, lng: liveLng, area: liveArea || homeArea, label: `near ${liveArea || homeArea}` }
       }
 
-      return {
-        name: m.name.split(' ')[0], color: m.color,
-        x: homeX, y: homeY,
-        lat: homeGps.lat, lng: homeGps.lng,
-        area: homeArea,
-        label: `from home · ${homeArea || 'unknown'}`,
-      }
+      // 4. Prior block without location, or no live GPS — fall back to home
+      const label = prior
+        ? `coming from ${homeArea || 'unknown'} (busy till ${fmtHour(prior.end_hour)})`
+        : `from home · ${homeArea || 'unknown'}`
+      return { name, color: m.color, x: homeX, y: homeY, lat: homeGps.lat, lng: homeGps.lng, area: homeArea, label }
     }).filter(o => o.lat !== 0 || o.lng !== 0)
   }, [sheetDate, activeMembers, busyBlocks, selectedWinIdx, todayStr])
 
