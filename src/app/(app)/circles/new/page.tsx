@@ -27,11 +27,11 @@ export default function NewCirclePage() {
   const [friendsLoading, setFriendsLoading] = useState(false)
   const [addingFriends, setAddingFriends] = useState(false)
 
-  // Load friends from other circles
-  async function loadFriends(circleId: string) {
+  // Load friends from other circles — returns the list directly
+  async function loadFriends(circleId: string): Promise<Friend[]> {
     setFriendsLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setFriendsLoading(false); return }
+    if (!user) { setFriendsLoading(false); return [] }
 
     // Get all circles the user is in
     const { data: myCircles } = await supabase
@@ -39,10 +39,10 @@ export default function NewCirclePage() {
       .select('circle_id')
       .eq('user_id', user.id)
 
-    if (!myCircles?.length) { setFriendsLoading(false); return }
+    if (!myCircles?.length) { setFriendsLoading(false); return [] }
 
     const circleIds = myCircles.map(c => c.circle_id).filter(cid => cid !== circleId)
-    if (!circleIds.length) { setFriendsLoading(false); return }
+    if (!circleIds.length) { setFriendsLoading(false); return [] }
 
     // Get all members of those circles (excluding self)
     const { data: mates } = await supabase
@@ -51,7 +51,7 @@ export default function NewCirclePage() {
       .in('circle_id', circleIds)
       .neq('user_id', user.id)
 
-    if (!mates?.length) { setFriendsLoading(false); return }
+    if (!mates?.length) { setFriendsLoading(false); return [] }
 
     // Get members already in new circle
     const { data: existing } = await supabase
@@ -75,6 +75,7 @@ export default function NewCirclePage() {
     friendList.sort((a, b) => a.name.localeCompare(b.name))
     setFriends(friendList)
     setFriendsLoading(false)
+    return friendList
   }
 
   function toggleFriend(id: string) {
@@ -90,13 +91,11 @@ export default function NewCirclePage() {
     if (!createdCircleId || selectedFriends.size === 0) return
     setAddingFriends(true)
 
-    const inserts = Array.from(selectedFriends).map(userId => ({
-      circle_id: createdCircleId,
-      user_id: userId,
-      role: 'member' as const,
-    }))
-
-    await supabase.from('circle_members').insert(inserts)
+    // Use RPC to bypass RLS (can't insert rows for other users directly)
+    const promises = Array.from(selectedFriends).map(userId =>
+      supabase.rpc('add_circle_member', { p_circle_id: createdCircleId, p_user_id: userId })
+    )
+    await Promise.all(promises)
     window.location.href = '/calendar'
   }
 
@@ -129,21 +128,13 @@ export default function NewCirclePage() {
     // Check if user has friends in other circles
     setCreatedCircleId(circle.id)
     setLoading(false)
-    await loadFriends(circle.id)
-    if (friends.length > 0 || friendsLoading) {
+    const foundFriends = await loadFriends(circle.id)
+    if (foundFriends.length > 0) {
       setMode('add-friends')
     } else {
-      // No friends to add — go straight to calendar
       window.location.href = '/calendar'
     }
   }
-
-  // After loadFriends completes, if we were transitioning to add-friends mode
-  useEffect(() => {
-    if (mode === 'add-friends' && !friendsLoading && friends.length === 0 && createdCircleId) {
-      window.location.href = '/calendar'
-    }
-  }, [mode, friendsLoading, friends.length, createdCircleId])
 
   async function handleJoin() {
     if (!inviteCode.trim()) return

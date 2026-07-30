@@ -124,13 +124,13 @@ export default function CircleSettingsPage() {
     if (selectedFriends.size === 0) return
     setAddingFriends(true)
 
-    const inserts = Array.from(selectedFriends).map(userId => ({
-      circle_id: id,
-      user_id: userId,
-      role: 'member' as const,
-    }))
-
-    const { error } = await supabase.from('circle_members').insert(inserts)
+    // Use RPC to bypass RLS (can't insert rows for other users directly)
+    const results = await Promise.all(
+      Array.from(selectedFriends).map(userId =>
+        supabase.rpc('add_circle_member', { p_circle_id: id, p_user_id: userId })
+      )
+    )
+    const error = results.find(r => r.error)?.error
     if (error) {
       console.error('Add friends error:', error)
       setAddingFriends(false)
