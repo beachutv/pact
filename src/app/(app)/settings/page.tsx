@@ -45,13 +45,15 @@ export default function SettingsPage() {
   useEffect(() => {
     // Check calendar connection
     async function checkCal() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('calendar_connections')
         .select('id, created_at')
         .eq('user_id', user.id)
-        .limit(1)
-      setCalConnected(!!(data && data.length > 0))
-      if (data && data.length > 0) setLastSynced(data[0].created_at)
+        .eq('provider', 'google')
+        .maybeSingle()
+      if (error) console.error('Cal check error:', error)
+      setCalConnected(!!data)
+      if (data) setLastSynced(data.created_at)
       setCalLoading(false)
     }
     checkCal()
