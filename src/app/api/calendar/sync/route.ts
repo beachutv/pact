@@ -119,7 +119,7 @@ export async function POST(request: Request) {
 
   // If user deselected all calendars, clear their busy blocks
   if (calendarIds.length === 0) {
-    await supabase.from('busy_blocks').delete().eq('user_id', user.id).eq('source', 'google')
+    await supabase.from('busy_blocks').delete().eq('user_id', user.id)
     return NextResponse.json({ synced: 0, message: 'No calendars selected — busy blocks cleared' })
   }
 

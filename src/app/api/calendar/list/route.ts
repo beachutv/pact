@@ -79,9 +79,9 @@ export async function POST(req: Request) {
     .eq('user_id', user.id)
     .eq('provider', 'google')
 
-  // If no calendars selected, immediately clear busy blocks
+  // If no calendars selected, immediately clear ALL busy blocks for this user
   if (selectedIds.length === 0) {
-    await supabase.from('busy_blocks').delete().eq('user_id', user.id).eq('source', 'google')
+    await supabase.from('busy_blocks').delete().eq('user_id', user.id)
   }
 
   return NextResponse.json({ ok: true })

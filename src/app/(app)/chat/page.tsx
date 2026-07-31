@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { txtOn, fmtDate, fmtHour, AVATAR_COLORS } from '@/lib/utils'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { sendPushNotification } from '@/lib/push'
+import SlideToConfirm from '@/components/SlideToConfirm'
 
 type Thread = {
   id: string
@@ -1173,11 +1174,28 @@ export default function ChatPage() {
                     {inCount === 0 && (
                       <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 6 }}>0 in so far</div>
                     )}
-                    <button onClick={(e) => { e.stopPropagation(); handleRsvp(msg.id) }} style={{
-                      marginTop: 8, width: '100%', padding: '8px 0', borderRadius: 10, border: 'none',
-                      background: myRsvp ? (isPactLinked ? 'var(--green-soft)' : 'var(--accent)') : 'var(--surface2)',
-                      color: myRsvp ? (isPactLinked ? 'var(--green)' : '#fff') : 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                    }}>{myRsvp ? "✓ You're in" : "👍 I'm in"}</button>
+                    {!myRsvp ? (
+                      isPactLinked ? (
+                        <div style={{ marginTop: 8 }} onClick={e => e.stopPropagation()}>
+                          <SlideToConfirm
+                            label="Slide to lock in"
+                            onConfirm={() => handleRsvp(msg.id)}
+                            height={38}
+                          />
+                        </div>
+                      ) : (
+                        <button onClick={(e) => { e.stopPropagation(); handleRsvp(msg.id) }} style={{
+                          marginTop: 8, width: '100%', padding: '8px 0', borderRadius: 10, border: 'none',
+                          background: 'var(--surface2)', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                        }}>I&apos;m in</button>
+                      )
+                    ) : (
+                      <button onClick={(e) => { e.stopPropagation(); handleRsvp(msg.id) }} style={{
+                        marginTop: 8, width: '100%', padding: '8px 0', borderRadius: 10, border: 'none',
+                        background: isPactLinked ? 'var(--green-soft)' : 'var(--accent)',
+                        color: isPactLinked ? 'var(--green)' : '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                      }}>Locked in ✓</button>
+                    )}
                   </div>
                 </div>
               </div>

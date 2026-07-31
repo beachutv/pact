@@ -3,9 +3,25 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-const CURRENT_VERSION = '17.0'
+const CURRENT_VERSION = '18.0'
 
 const CHANGELOG = [
+  {
+    version: '18.0',
+    date: 'August 1, 2026',
+    title: 'Commitment, Notifications & Background Sync',
+    items: [
+      'Slide to lock in — committing to a pact now requires an intentional swipe gesture, both in Plans and in Chat',
+      'Can\'t make it — decline pacts with a tap, everyone in the pact gets notified',
+      'Full notification flow — every pact action (create, join, decline, break) notifies all members via push + in-app',
+      'Background sync — calendars sync every 2 hours even when you\'re offline, so availability stays accurate',
+      'Settings page — consolidated calendar, permissions, theme, and account settings in one place',
+      'SVG icons — replaced all system emojis with consistent icons across the app',
+      'Extended hours — calendar and pact times now go up to 2:00 AM for night owls',
+      '30-minute time slots — pick 7:30 PM, 10:30 PM, etc. when creating pacts',
+      'Spark improvements — situation-based dismissals, 15-min cap, persistent across refresh',
+    ],
+  },
   {
     version: '17.0',
     date: 'July 31, 2026',

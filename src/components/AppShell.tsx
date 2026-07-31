@@ -304,26 +304,23 @@ export default function AppShell({
   }, [])
 
   async function saveCalendarSelection() {
-    const res = await fetch('/api/calendar/list', {
+    await fetch('/api/calendar/list', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ selectedIds: selectedCals }),
     })
     setShowCalModal(false)
 
-    if (selectedCals.length === 0) {
-      // No calendars selected — busy blocks are already cleared by the API
-      // Force reload to reflect the change
-      window.location.reload()
-      return
+    if (selectedCals.length > 0) {
+      // Sync with new selection
+      await fetch('/api/calendar/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
+      }).catch(() => {})
     }
-
-    // Trigger a sync after saving
-    await fetch('/api/calendar/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
-    }).catch(() => {})
+    // Always reload to reflect changes
+    window.location.reload()
   }
 
   async function disconnectCalendar() {
@@ -922,7 +919,9 @@ export default function AppShell({
           <div style={{
             position: 'fixed', left: 12, right: 12, top: 90, zIndex: 9999,
             background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 16, maxHeight: '70vh', overflowY: 'auto',
+            borderRadius: 16,
+            maxHeight: 'calc(70vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
+            overflowY: 'auto', WebkitOverflowScrolling: 'touch',
             boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
           }}>
             {/* Active circle header with actions */}
