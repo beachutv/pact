@@ -8,6 +8,7 @@ import { fmtDate, fmtHour, fmtWin, txtOn } from '@/lib/utils'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { sendPushNotification } from '@/lib/push'
 import LocationPicker from '@/components/LocationPicker'
+import SlideToConfirm from '@/components/SlideToConfirm'
 
 type Pact = {
   id: string
@@ -243,9 +244,9 @@ export default function PlansPage() {
 
   async function joinPact(pactId: string) {
     await supabase.from('pact_members').insert({ pact_id: pactId, user_id: user.id })
-    // Push event to Google Calendar with smart title
     const pact = pacts.find(p => p.id === pactId)
     if (pact) {
+      // Push event to Google Calendar
       const otherMembers = pact.members
         .filter(m => m.user_id !== user.id)
         .map(m => getMember(m.user_id)?.name.split(' ')[0])
@@ -271,19 +272,30 @@ export default function PlansPage() {
           pactMemberCount: newMemberCount,
         }),
       }).catch(() => {})
+
+      // Notify ALL existing pact members (not just creator)
+      const pactTitle = pact.occasion || fmtDate(pact.date)
+      const allOtherIds = pact.members.filter(m => m.user_id !== user.id).map(m => m.user_id)
+      if (allOtherIds.length > 0) {
+        for (const uid of allOtherIds) {
+          await supabase.from('notifications').insert({
+            user_id: uid,
+            type: 'pact_change',
+            title: `${user.name?.split(' ')[0] || 'Someone'} is in`,
+            body: `Committed to ${pactTitle}`,
+            link: '/plans',
+          })
+        }
+        sendPushNotification({
+          userIds: allOtherIds,
+          title: `${user.name?.split(' ')[0] || 'Someone'} is in`,
+          body: `Committed to ${pactTitle}`,
+          url: '/plans',
+          tag: `join-${pactId}`,
+        })
+      }
     }
     await loadPacts()
-
-    // Push notification to pact creator about RSVP
-    if (pact && pact.created_by && pact.created_by !== user.id) {
-      sendPushNotification({
-        userIds: [pact.created_by as string],
-        title: 'Pact Update',
-        body: `${user.name?.split(' ')[0] || 'Someone'} is in for ${pact.occasion || fmtDate(pact.date)}`,
-        url: '/plans',
-        tag: `rsvp-${pactId}`,
-      })
-    }
   }
 
   async function leavePact(pactId: string) {
@@ -672,42 +684,43 @@ export default function PlansPage() {
                     </div>
                   )}
 
-                  {/* Join / Decline buttons — only if not already in */}
+                  {/* Slide to commit / Decline — only if not already in */}
                   {!isIn && (
-                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                      <button
-                        onClick={() => joinPact(p.id)}
-                        style={{
-                          flex: 2, padding: '10px 0', borderRadius: 10, border: 'none',
-                          background: 'var(--accent)', color: '#fff',
-                          fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                        }}
-                      >
-                        I&apos;m in!
-                      </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                      <SlideToConfirm
+                        label="Slide to lock in"
+                        onConfirm={() => joinPact(p.id)}
+                        height={44}
+                      />
                       <button
                         onClick={async () => {
-                          // Notify the pact creator that this user can't make it
-                          if (p.created_by && p.created_by !== user.id) {
+                          const pactTitle = p.occasion || fmtDate(p.date)
+                          const allOtherIds = p.members.map(m => m.user_id).filter(id => id !== user.id)
+                          if (p.created_by && !allOtherIds.includes(p.created_by) && p.created_by !== user.id) {
+                            allOtherIds.push(p.created_by)
+                          }
+                          for (const uid of allOtherIds) {
                             await supabase.from('notifications').insert({
-                              user_id: p.created_by,
+                              user_id: uid,
                               type: 'pact_change',
                               title: `${user.name?.split(' ')[0] || 'Someone'} can't make it`,
-                              body: `They declined ${p.occasion || fmtDate(p.date)}`,
+                              body: `Declined ${pactTitle}`,
                               link: '/plans',
                             })
+                          }
+                          if (allOtherIds.length > 0) {
                             sendPushNotification({
-                              userIds: [p.created_by],
+                              userIds: allOtherIds,
                               title: `${user.name?.split(' ')[0] || 'Someone'} can't make it`,
-                              body: `They declined ${p.occasion || fmtDate(p.date)}`,
+                              body: `Declined ${pactTitle}`,
                               url: '/plans',
                               tag: `decline-${p.id}`,
                             })
                           }
-                          showToast('Noted — the group has been informed')
+                          showToast('The group has been informed')
                         }}
                         style={{
-                          flex: 1, padding: '10px 0', borderRadius: 10,
+                          padding: '10px 0', borderRadius: 10, width: '100%',
                           border: '1px solid var(--border)', background: 'var(--surface2)',
                           color: 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
                         }}
