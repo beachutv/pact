@@ -433,39 +433,49 @@ export default function CalendarPage() {
   const [sparkStatus, setSparkStatus] = useState<string>('')
 
   // Persist dismissed sparks in localStorage by date — resets daily
-  const [dismissedSparks, setDismissedSparks] = useState<Map<string, number>>(() => {
-    if (typeof window === 'undefined') return new Map()
+  // Key format: "memberId:windowStart:nearBucket" — so a new window or
+  // significantly closer distance triggers a fresh spark
+  const [dismissedSparks, setDismissedSparks] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
     try {
       const saved = localStorage.getItem('pact_sparks_dismissed')
       if (saved) {
         const parsed = JSON.parse(saved)
-        // Only keep today's dismissals
         if (parsed.date === todayStr) {
-          return new Map(Object.entries(parsed.map as Record<string, number>))
+          return new Set(parsed.keys as string[])
         }
       }
     } catch {}
-    return new Map()
+    return new Set()
   })
   const [sparkRefreshKey, setSparkRefreshKey] = useState(0)
-  const [sparkScanMode, setSparkScanMode] = useState(false) // true = manual scan ignores dismissals
+  const [sparkScanMode, setSparkScanMode] = useState(false)
 
   // Save dismissals to localStorage
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const obj: Record<string, number> = {}
-    dismissedSparks.forEach((v, k) => { obj[k] = v })
-    localStorage.setItem('pact_sparks_dismissed', JSON.stringify({ date: todayStr, map: obj }))
+    localStorage.setItem('pact_sparks_dismissed', JSON.stringify({
+      date: todayStr,
+      keys: Array.from(dismissedSparks),
+    }))
   }, [dismissedSparks, todayStr])
 
-  const SPARK_MAX_TRAVEL = 15 // Only spark for friends ≤15 min away
-  const LIVE_LOC_STALENESS = 12 * 3600000 // Use live location up to 12 hours old
+  // Spark dismissal key: encodes the situation, not just the person
+  // - memberId: who
+  // - windowStart: when (new free window = new spark)
+  // - nearBucket: how close (5-min buckets — getting much closer = new spark)
+  function sparkKey(memberId: string, windowStart: number, travelMin: number): string {
+    const nearBucket = Math.floor(travelMin / 5) // 0-4 = "very close", 5-9 = "close", 10-14 = "nearby"
+    return `${memberId}:${windowStart}:${nearBucket}`
+  }
+
+  const SPARK_MAX_TRAVEL = 15
+  const LIVE_LOC_STALENESS = 12 * 3600000
 
   const sparks = useMemo((): Spark[] => {
     if (!activeCircle) { setSparkStatus('no circle'); return [] }
     if (!connectedUserIds.has(user.id)) { setSparkStatus('your calendar is not connected'); return [] }
 
-    // Use live GPS if available and not too stale
     const myLive = (user as any).live_lat && (user as any).live_lng && (user as any).live_updated_at &&
       (Date.now() - new Date((user as any).live_updated_at).getTime()) < LIVE_LOC_STALENESS
       ? { lat: (user as any).live_lat as number, lng: (user as any).live_lng as number } : null
@@ -477,14 +487,8 @@ export default function CalendarPage() {
 
     for (const m of circleMembers) {
       if (m.id === user.id) continue
-      // In normal mode, respect dismissals. In scan mode, show everything.
-      if (!sparkScanMode) {
-        const dismissedAt = dismissedSparks.get(m.id)
-        if (dismissedAt && Date.now() - dismissedAt < 8 * 3600000) continue // dismissed for 8 hours
-      }
       if (!connectedUserIds.has(m.id)) { debugSkips.noCal++; continue }
 
-      // Use live GPS with extended staleness window
       const theirLive = m.live_lat && m.live_lng && m.live_updated_at &&
         (Date.now() - new Date(m.live_updated_at).getTime()) < LIVE_LOC_STALENESS
         ? { lat: m.live_lat, lng: m.live_lng } : null
@@ -513,6 +517,11 @@ export default function CalendarPage() {
         }
       }
       if (!best) { debugSkips.noWindow++; continue }
+
+      // Check dismissal by situation — not by person
+      const key = sparkKey(m.id, best.s, t)
+      if (!sparkScanMode && dismissedSparks.has(key)) continue
+
       result.push({
         member: m,
         travelTime: t,
@@ -535,13 +544,13 @@ export default function CalendarPage() {
     return result.sort((a, b) => a.travelTime - b.travelTime)
   }, [activeCircle, circleMembers, busyBlocks, dismissedSparks, todayStr, nowHour, user.id, connectedUserIds, sparkRefreshKey, sparkScanMode])
 
-  function dismissSpark(memberId: string) {
-    setDismissedSparks(prev => new Map(prev).set(memberId, Date.now()))
+  function dismissSpark(memberId: string, windowStart: number, travelTime: number) {
+    const key = sparkKey(memberId, windowStart, travelTime)
+    setDismissedSparks(prev => new Set(prev).add(key))
     setSparkScanMode(false)
   }
 
   function refreshSparks() {
-    // Scan mode: temporarily ignore all dismissals to show full results
     setSparkScanMode(true)
     setSparkRefreshKey(k => k + 1)
   }
@@ -1164,7 +1173,7 @@ export default function CalendarPage() {
         {sparks.length > 0 && (
           <div style={{ marginBottom: 14, maxHeight: sparks.length > 2 ? 120 : undefined, overflowY: sparks.length > 2 ? 'auto' : undefined, overflowX: 'hidden' }}>
             {sparks.map(sp => (
-              <SparkLine key={sp.member.id} spark={sp} todayStr={todayStr} onDismiss={() => dismissSpark(sp.member.id)} />
+              <SparkLine key={sp.member.id} spark={sp} todayStr={todayStr} onDismiss={() => dismissSpark(sp.member.id, sp.window.s, sp.travelTime)} />
             ))}
           </div>
         )}
