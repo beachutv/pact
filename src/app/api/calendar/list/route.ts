@@ -58,7 +58,7 @@ export async function GET() {
   }))
 
   // Return current selection too
-  const selectedIds = conn.selected_calendars || ['primary']
+  const selectedIds = conn.selected_calendars ?? [] // don't default to primary — user must opt in
 
   return NextResponse.json({ calendars, selectedIds })
 }

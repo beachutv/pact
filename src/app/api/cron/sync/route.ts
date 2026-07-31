@@ -42,9 +42,9 @@ export async function GET(request: Request) {
   for (const conn of connections) {
     try {
       // Skip if no calendars selected
-      const calendarIds: string[] = conn.selected_calendars === null || conn.selected_calendars === undefined
-        ? ['primary']
-        : conn.selected_calendars
+      const calendarIds: string[] = (conn.selected_calendars && Array.isArray(conn.selected_calendars))
+        ? conn.selected_calendars
+        : [] // never configured — don't sync (privacy first)
 
       if (calendarIds.length === 0) {
         // No calendars — clear any stale data

@@ -265,7 +265,7 @@ export default function AppShell({
       if (res.ok) {
         const data = await res.json()
         setGcals(data.calendars || [])
-        setSelectedCals(data.selectedIds || ['primary'])
+        setSelectedCals(data.selectedIds || [])
         setShowCalModal(true)
       } else {
         const err = await res.json().catch(() => ({ error: 'Unknown error' }))

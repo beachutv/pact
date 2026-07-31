@@ -112,10 +112,10 @@ export async function POST(request: Request) {
     if (body?.timezone) timezone = body.timezone
   } catch {}
 
-  // Use selected calendars, defaulting to primary only if never configured
-  const calendarIds: string[] = conn.selected_calendars === null || conn.selected_calendars === undefined
-    ? ['primary'] // never configured — use primary as default
-    : conn.selected_calendars // user explicitly chose (could be empty)
+  // Only sync calendars the user has explicitly selected — never default to primary
+  const calendarIds: string[] = (conn.selected_calendars && Array.isArray(conn.selected_calendars))
+    ? conn.selected_calendars
+    : [] // never configured — don't sync anything (privacy first)
 
   // If user deselected all calendars, clear their busy blocks
   if (calendarIds.length === 0) {

@@ -14,7 +14,7 @@ const CHANGELOG = [
       'Slide to lock in — committing to a pact now requires an intentional swipe gesture, both in Plans and in Chat',
       'Can\'t make it — decline pacts with a tap, everyone in the pact gets notified',
       'Full notification flow — every pact action (create, join, decline, break) notifies all members via push + in-app',
-      'Background sync — calendars sync every 2 hours even when you\'re offline, so availability stays accurate',
+      'Background sync — calendars auto-sync daily so availability stays accurate',
       'Settings page — consolidated calendar, permissions, theme, and account settings in one place',
       'SVG icons — replaced all system emojis with consistent icons across the app',
       'Extended hours — calendar and pact times now go up to 2:00 AM for night owls',
