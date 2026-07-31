@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { txtOn } from '@/lib/utils'
+import { IconBell, IconPin, IconCalendar, IconRefresh, IconSmartphone, IconZap, IconSun, IconMoon } from '@/components/Icons'
 
 type PermState = 'granted' | 'denied' | 'prompt' | 'unsupported'
 
@@ -44,16 +45,18 @@ export default function SettingsPage() {
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 2200) }
 
   useEffect(() => {
-    // Check calendar connection via API (bypasses RLS)
+    // Check calendar connection — same client-side query as profile page
     async function checkCal() {
-      try {
-        const res = await fetch('/api/calendar/status')
-        const json = await res.json()
-        setCalConnected(json.connected === true)
-        if (json.createdAt) setLastSynced(json.createdAt)
-        if (json.selectedCalendars) setSelectedCals(json.selectedCalendars)
-      } catch (e) {
-        console.error('Cal status check failed:', e)
+      const { data: conn } = await supabase
+        .from('calendar_connections')
+        .select('id, created_at, selected_calendars')
+        .eq('user_id', user.id)
+        .eq('provider', 'google')
+        .single()
+      setCalConnected(!!conn)
+      if (conn) {
+        setLastSynced(conn.created_at)
+        setSelectedCals(conn.selected_calendars)
       }
       setCalLoading(false)
     }
@@ -271,10 +274,10 @@ export default function SettingsPage() {
     setSyncing(false)
   }
 
-  const themeOptions = [
-    { key: 'dark', label: '🌙 Dark' },
-    { key: 'light', label: '☀️ Light' },
-    { key: 'system', label: '🔄 System' },
+  const themeOptions: { key: string; label: string; icon: React.ReactNode }[] = [
+    { key: 'dark', label: 'Dark', icon: <IconMoon size={14} color={theme === 'dark' ? '#fff' : 'var(--text2)'} /> },
+    { key: 'light', label: 'Light', icon: <IconSun size={14} color={theme === 'light' ? '#fff' : 'var(--text2)'} /> },
+    { key: 'system', label: 'System', icon: <IconRefresh size={14} color={theme === 'system' ? '#fff' : 'var(--text2)'} /> },
   ]
 
   return (
@@ -370,27 +373,39 @@ export default function SettingsPage() {
       {/* Permissions */}
       <Section title="Permissions">
         <PermRow
-          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>}
+          icon={<IconBell size={20} color="var(--accent)" />}
           title="Notifications"
           description={pushSubscribed
             ? "You'll get notified for messages, new pacts, and sparks."
-            : "Get alerted when friends message you or make plans. Without this, you'll only see updates when you open the app."}
+            : notifPerm === 'unsupported'
+              ? "Your browser doesn't support notifications. Add Pact to your home screen first — notifications require Safari on iOS or Chrome on Android."
+              : "Get alerted when friends message you or make plans. Without this, you'll only see updates when you open the app."}
           on={pushSubscribed}
           onToggle={handleNotificationToggle}
           blocked={notifPerm === 'denied'}
         />
         {pushSubscribed && (
           <button onClick={sendTestNotification} style={{
-            padding: '8px 0', border: 'none', background: 'transparent',
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '10px 0', border: 'none', background: 'transparent',
             color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer', textAlign: 'left',
-            borderBottom: '1px solid var(--border)',
+            borderBottom: '1px solid var(--border)', width: '100%',
           }}>
-            Send test notification →
+            <IconBell size={14} color="var(--accent)" />
+            Send test notification
           </button>
+        )}
+        {notifPerm === 'unsupported' && (
+          <div style={{
+            margin: '8px 0', padding: '8px 12px', borderRadius: 10,
+            background: 'var(--accent-soft)', fontSize: 12, color: 'var(--text)', lineHeight: 1.5,
+          }}>
+            <b>To enable:</b> Add Pact to your home screen first. Notifications require <b>Safari on iOS</b> or <b>Chrome on Android</b>.
+          </div>
         )}
         <div style={{ height: 4 }} />
         <PermRow
-          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>}
+          icon={<IconPin size={20} color="var(--accent)" />}
           title="Location"
           description={locPerm === 'granted'
             ? "Sparks and spot travel times use your live location."
@@ -410,8 +425,9 @@ export default function SettingsPage() {
               background: theme === t.key ? 'var(--accent)' : 'var(--surface2)',
               color: theme === t.key ? '#fff' : 'var(--text2)',
               fontSize: 12, fontWeight: 700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
-              {t.label}
+              {t.icon} {t.label}
             </button>
           ))}
         </div>
@@ -475,18 +491,35 @@ export default function SettingsPage() {
             <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>Add Pact to Home Screen</p>
             {isiOS ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <Step n={1} text="Tap the share button ↑ at the bottom of Safari" />
-                <Step n={2} text='Scroll down and tap "Add to Home Screen"' />
-                <Step n={3} text='Tap "Add" in the top right' />
-                <p style={{ fontSize: 12, color: 'var(--accent)', lineHeight: 1.5, padding: '8px 12px', background: 'var(--accent-soft)', borderRadius: 10 }}>
-                  iOS requires adding to Home Screen for push notifications.
-                </p>
+                <div style={{
+                  padding: '8px 12px', borderRadius: 10,
+                  background: 'var(--accent-soft)', fontSize: 12, color: 'var(--text)', lineHeight: 1.5,
+                }}>
+                  <b>Important:</b> You must use <b>Safari</b> for this. Other browsers on iOS (Chrome, Arc, Firefox) don&apos;t support Add to Home Screen.
+                </div>
+                <Step n={1} text="Open this page in Safari" />
+                <Step n={2} text="Tap the share button at the bottom of Safari (square with arrow ↑)" />
+                <Step n={3} text='Scroll down and tap "Add to Home Screen"' />
+                <Step n={4} text='Tap "Add" in the top right' />
+                <div style={{
+                  padding: '8px 12px', borderRadius: 10,
+                  background: 'var(--amber-soft)', fontSize: 12, color: 'var(--text)', lineHeight: 1.5,
+                }}>
+                  Push notifications on iOS <b>only work</b> when Pact is added to your home screen via Safari. This is an Apple requirement.
+                </div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <Step n={1} text="Tap the ⋮ menu at the top right of your browser" />
-                <Step n={2} text='Tap "Add to Home Screen" or "Install app"' />
-                <Step n={3} text='Tap "Install" to confirm' />
+                <div style={{
+                  padding: '8px 12px', borderRadius: 10,
+                  background: 'var(--accent-soft)', fontSize: 12, color: 'var(--text)', lineHeight: 1.5,
+                }}>
+                  <b>Best with Chrome.</b> Other browsers may also work, but Chrome gives the most reliable experience.
+                </div>
+                <Step n={1} text="Open this page in Chrome" />
+                <Step n={2} text='Tap the three-dot menu ⋮ at the top right' />
+                <Step n={3} text='Tap "Add to Home Screen" or "Install app"' />
+                <Step n={4} text='Tap "Install" to confirm' />
               </div>
             )}
             <button onClick={() => setShowA2HS(false)} style={{ ...primaryBtn, marginTop: 16 }}>Got it</button>
