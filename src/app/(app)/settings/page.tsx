@@ -45,18 +45,28 @@ export default function SettingsPage() {
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 2200) }
 
   useEffect(() => {
-    // Check calendar connection — same client-side query as profile page
+    // Check calendar connection using the list API (known to work)
     async function checkCal() {
-      const { data: conn } = await supabase
-        .from('calendar_connections')
-        .select('id, created_at, selected_calendars')
-        .eq('user_id', user.id)
-        .eq('provider', 'google')
-        .single()
-      setCalConnected(!!conn)
-      if (conn) {
-        setLastSynced(conn.created_at)
-        setSelectedCals(conn.selected_calendars)
+      try {
+        const res = await fetch('/api/calendar/list')
+        if (res.ok) {
+          const json = await res.json()
+          setCalConnected(true)
+          setSelectedCals(json.selected || [])
+          // Get creation date from a separate check
+          const { data: conn } = await supabase
+            .from('calendar_connections')
+            .select('created_at')
+            .eq('user_id', user.id)
+            .eq('provider', 'google')
+            .single()
+          if (conn) setLastSynced(conn.created_at)
+        } else {
+          // 400 = no calendar connected, which is fine
+          setCalConnected(false)
+        }
+      } catch {
+        setCalConnected(false)
       }
       setCalLoading(false)
     }

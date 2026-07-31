@@ -1,15 +1,17 @@
-/** Format hour number to "9 AM" / "12 PM" style */
+/** Format hour number to "9 AM" / "12 PM" style. Handles h > 24 as next-day hours. */
 export function fmtHour(h: number): string {
-  if (h === 0 || h === 24) return '12 MN'
-  if (h === 12) return '12 PM'
-  return h < 12 ? `${h} AM` : `${h - 12} PM`
+  const n = h % 24
+  if (n === 0) return '12 MN'
+  if (n === 12) return '12 PM'
+  return n < 12 ? `${n} AM` : `${n - 12} PM`
 }
 
-/** Short format: "9a" / "12p" */
+/** Short format: "9a" / "12p". Handles h > 24. */
 export function fmtTiny(h: number): string {
-  if (h === 0 || h === 24) return '12mn'
-  if (h === 12) return '12p'
-  return h < 12 ? `${h}a` : `${h - 12}p`
+  const n = h % 24
+  if (n === 0) return '12mn'
+  if (n === 12) return '12p'
+  return n < 12 ? `${n}a` : `${n - 12}p`
 }
 
 /** Format a time window */
@@ -193,7 +195,7 @@ export function currentHourInTz(tz: string): number {
 }
 
 export const DAY_START = 8
-export const DAY_END = 24
+export const DAY_END = 26 // 2 AM next day — for night owls
 
 /** Real GPS coordinates for Metro Manila areas (for live location matching) */
 export const AREA_GPS: Record<string, { lat: number; lng: number }> = {
