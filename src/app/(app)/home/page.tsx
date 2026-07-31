@@ -287,7 +287,7 @@ export default function HomePage() {
       {pacts.length > 0 && (
         <>
           <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px' }}>
-            📌 Upcoming Pacts
+            Upcoming Pacts
           </p>
           {pacts.map(p => {
             const du = daysUntil(p.date)
@@ -327,12 +327,12 @@ export default function HomePage() {
                       display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                       background: 'transparent', fontSize: 13, fontWeight: 600,
                       color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                    }}>✏️ Edit</button>
+                    }}>Edit</button>
                     <button onClick={() => { setLongPressPactId(null); router.push('/chat') }} style={{
                       display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                       background: 'transparent', fontSize: 13, fontWeight: 600,
                       color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                    }}>💬 Discuss</button>
+                    }}>Discuss</button>
                     <button onClick={() => deletePact(p.id)} style={{
                       display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                       background: 'transparent', fontSize: 13, fontWeight: 600,

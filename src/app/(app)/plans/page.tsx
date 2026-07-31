@@ -208,7 +208,7 @@ export default function PlansPage() {
     })
     setSharing(false)
     setSharePactId(null)
-    showToast('📤 Pact shared to chat!')
+    showToast('Pact shared to chat')
   }
 
   const onRefresh = useCallback(async () => {
@@ -421,7 +421,7 @@ export default function PlansPage() {
 
   if (!activeCircle) {
     return <div style={{ padding: 20, textAlign: 'center', marginTop: 40, color: 'var(--text2)' }}>
-      <p style={{ fontSize: 40, marginBottom: 8 }}>📌</p>
+      <p style={{ marginBottom: 8 }}><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></p>
       <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Plans</p>
       <p style={{ fontSize: 13 }}>Join a circle first.</p>
     </div>
@@ -459,7 +459,7 @@ export default function PlansPage() {
 
       {pacts.length === 0 ? (
         <div style={{ textAlign: 'center', marginTop: 30, color: 'var(--text2)' }}>
-          <p style={{ fontSize: 40, marginBottom: 8 }}>📌</p>
+          <p style={{ marginBottom: 8 }}><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></p>
           <p style={{ fontSize: 13 }}>
             No plans yet. Tap a free slot in the Calendar to propose one!
           </p>
@@ -578,7 +578,7 @@ export default function PlansPage() {
                         <p style={{ fontSize: 12, color: 'var(--text2)' }}>
                           {p.spot_name !== 'TBD'
                             ? `${p.spot_emoji || '📍'} ${p.spot_name}${p.spot_area ? ` — ${p.spot_area}` : ''}`
-                            : '📍 To be set'}
+                            : 'To be set'}
                         </p>
                       </div>
                       {editable && (
@@ -588,7 +588,7 @@ export default function PlansPage() {
                             padding: '4px 10px', fontSize: 11, fontWeight: 700,
                             color: 'var(--text2)', cursor: 'pointer',
                           }}>
-                          ✏️ Edit
+                          Edit
                         </button>
                       )}
                     </div>
@@ -654,7 +654,7 @@ export default function PlansPage() {
                             color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
                           }}
                         >
-                          📤 Send to Chat
+                          Send to Chat
                         </button>
                         {isIn && (
                           <button
@@ -716,28 +716,28 @@ export default function PlansPage() {
                       display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                       background: 'transparent', fontSize: 13, fontWeight: 600,
                       color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                    }}>✏️ Edit</button>
+                    }}>Edit</button>
                   )}
                   <button onClick={() => { setLongPressPactId(null); router.push('/chat') }} style={{
                     display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                     background: 'transparent', fontSize: 13, fontWeight: 600,
                     color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                  }}>💬 Discuss</button>
+                  }}>Discuss</button>
                   <button onClick={() => openShareModal(p.id)} style={{
                     display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                     background: 'transparent', fontSize: 13, fontWeight: 600,
                     color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                  }}>📤 Send to chat</button>
+                  }}>Send to chat</button>
                   <button onClick={() => { setLongPressPactId(null); deletePact(p.id) }} style={{
                     display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                     background: 'transparent', fontSize: 13, fontWeight: 600,
                     color: 'var(--red)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                  }}>{p.status === 'confirmed' ? '🚫 Cancel Pact' : '🗑 Delete'}</button>
+                  }}>{p.status === 'confirmed' ? 'Cancel Pact' : 'Delete'}</button>
                   <button onClick={() => setLongPressPactId(null)} style={{
                     display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                     background: 'transparent', fontSize: 13, fontWeight: 600,
                     color: 'var(--text2)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                  }}>✕ Cancel</button>
+                  }}>Cancel</button>
                 </div>
               )}
             </div>
@@ -834,7 +834,7 @@ export default function PlansPage() {
                     fontSize: 13, fontWeight: 600, color: 'var(--text)', cursor: 'pointer', textAlign: 'left',
                   }}
                 >
-                  💬 {t.name}
+                  {t.name}
                 </button>
               ))
             )}

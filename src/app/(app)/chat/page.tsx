@@ -725,7 +725,7 @@ export default function ChatPage() {
   if (!activeCircle) {
     return (
       <div style={{ padding: 20, textAlign: 'center', marginTop: 40, color: 'var(--text2)' }}>
-        <p style={{ fontSize: 40, marginBottom: 8 }}>💬</p>
+        <p style={{ marginBottom: 8 }}><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></p>
         <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Chat</p>
         <p style={{ fontSize: 13 }}>Join a circle to start chatting.</p>
       </div>
@@ -738,13 +738,13 @@ export default function ChatPage() {
   if (threads.length === 0 && !activeThreadId) {
     return (
       <div style={{ padding: 20, textAlign: 'center', marginTop: 40 }}>
-        <p style={{ fontSize: 40, marginBottom: 8 }}>💬</p>
+        <p style={{ marginBottom: 8 }}><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></p>
         <p style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Start chatting</p>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
           Create the group chat for {activeCircle.name} or message someone directly.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 260, margin: '0 auto' }}>
-          <button className="btn-primary" onClick={createGroupChat}>💬 Create group chat</button>
+          <button className="btn-primary" onClick={createGroupChat}>Create group chat</button>
           <button className="btn-secondary" onClick={() => setShowNewChat(true)}>+ New message</button>
         </div>
         {renderNewChatModal()}
@@ -1105,7 +1105,7 @@ export default function ChatPage() {
           background: 'var(--surface2)', border: 'none', borderRadius: 10,
           width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 14, cursor: 'pointer',
-        }}>⚙️</button>
+        }}>Settings</button>
       </div>
 
       {/* Messages */}
@@ -1146,10 +1146,10 @@ export default function ChatPage() {
                   {!isMe && <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 3, fontWeight: 600 }}>{sender?.name || 'Unknown'}</div>}
                   <div style={{ background: 'var(--surface)', border: `1.5px solid ${isPactLinked ? 'var(--green)' : 'var(--accent)'}`, borderRadius: 16, padding: '12px 14px' }}>
                     <div style={{ fontSize: 10, fontWeight: 800, color: isPactLinked ? 'var(--green)' : 'var(--accent)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      {isPactLinked ? '📌 Pact' : '📅 Proposed hangout'}
+                      {isPactLinked ? 'Pact' : 'Proposed hangout'}
                     </div>
                     <div style={{ fontSize: 15, fontWeight: 800, marginTop: 6 }}>{fmtDate(msg.date_card)}</div>
-                    <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>⏰ {fmtHour(msg.win_start!)} – {fmtHour(msg.win_end!)}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>{fmtHour(msg.win_start!)} – {fmtHour(msg.win_end!)}</div>
                     {msg.spot_name && <div style={{ fontSize: 13, marginTop: 4 }}>{msg.spot_emoji || '📍'} <b>{msg.spot_name}</b>{msg.spot_area && ` · ${msg.spot_area}`}</div>}
                     {/* Member avatars */}
                     {inCount > 0 && (
@@ -1253,7 +1253,7 @@ export default function ChatPage() {
                   }}>
                     <span style={{ fontWeight: 700 }}>{replySender?.name?.split(' ')[0] || 'Unknown'}</span>
                     <br />
-                    <span style={{ opacity: 0.8 }}>{replyMsg.text?.slice(0, 60) || '📅 Date card'}{(replyMsg.text?.length || 0) > 60 ? '...' : ''}</span>
+                    <span style={{ opacity: 0.8 }}>{replyMsg.text?.slice(0, 60) || 'Date card'}{(replyMsg.text?.length || 0) > 60 ? '...' : ''}</span>
                   </div>
                 )}
 
@@ -1336,7 +1336,7 @@ export default function ChatPage() {
               Replying to {getMember(replyTo.from_user)?.name?.split(' ')[0] || 'Unknown'}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {replyTo.text?.slice(0, 50) || '📅 Date card'}
+              {replyTo.text?.slice(0, 50) || 'Date card'}
             </div>
           </div>
           <button onClick={() => setReplyTo(null)} style={{
@@ -1470,7 +1470,7 @@ export default function ChatPage() {
                   display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12,
                   border: 'none', background: 'transparent', color: 'var(--red)',
                   fontSize: 14, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
-                }}>🗑 Delete</button>
+                }}>Delete</button>
               )}
               <button onClick={() => { setMsgSelectMode(true); setSelectedMsgs(new Set([quickActionMsg.id])); setQuickActionMsg(null) }} style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12,

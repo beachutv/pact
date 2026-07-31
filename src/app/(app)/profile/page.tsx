@@ -281,7 +281,7 @@ export default function ProfilePage() {
                 color: editSharePhone === v ? '#fff' : 'var(--text2)',
                 border: 'none', fontWeight: 600,
               }}>
-                {v === 'nobody' ? '🔒 Hidden' : '👥 Circle mates'}
+                {v === 'nobody' ? 'Hidden' : 'Circle mates'}
               </button>
             ))}
           </div>
@@ -304,7 +304,7 @@ export default function ProfilePage() {
                 color: editShareAddress === v ? '#fff' : 'var(--text2)',
                 border: 'none', fontWeight: 600,
               }}>
-                {v === 'nobody' ? '🔒 Hidden' : '👥 Circle mates'}
+                {v === 'nobody' ? 'Hidden' : 'Circle mates'}
               </button>
             ))}
           </div>
@@ -372,23 +372,23 @@ export default function ProfilePage() {
       <h2 style={{ fontSize: 20, fontWeight: 800 }}>{profile.name}</h2>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center', maxWidth: 280 }}>
-        <p style={{ fontSize: 12, color: 'var(--text2)' }}>📍 {profile.home_area}</p>
+        <p style={{ fontSize: 12, color: 'var(--text2)' }}>{profile.home_area}</p>
 
         {profile.birthday && bday >= 0 && (
           <p style={{ fontSize: 12, color: 'var(--amber)' }}>
-            🎂 Birthday {bday === 0 ? 'today!' : bday === 1 ? 'tomorrow' : `in ${bday} days`}
+            Birthday {bday === 0 ? 'today!' : bday === 1 ? 'tomorrow' : `in ${bday} days`}
           </p>
         )}
 
         {canSeePhone && profile.phone && (
-          <p style={{ fontSize: 12, color: 'var(--text2)' }}>📱 {profile.phone}</p>
+          <p style={{ fontSize: 12, color: 'var(--text2)' }}>{profile.phone}</p>
         )}
 
         {canSeeAddress && profile.address && (
           <p style={{
             fontSize: 12, color: 'var(--text2)', textAlign: 'center',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%',
-          }} title={profile.address}>🏠 {profile.address}</p>
+          }} title={profile.address}>{profile.address}</p>
         )}
 
         {!isOwn && !canSeePhone && (
@@ -406,7 +406,7 @@ export default function ProfilePage() {
       {isOwn && calConnected !== null && (
         <div style={{ width: '100%', maxWidth: 280, marginTop: 12 }}>
           <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
-            📅 Calendar
+            Calendar
           </p>
           {calConnected ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -414,7 +414,7 @@ export default function ProfilePage() {
                 🔗 My Calendars
               </button>
               <button className="btn-secondary" onClick={syncCalendar} disabled={syncing} style={{ width: '100%' }}>
-                {syncing ? '⟳ Syncing...' : '⟳ Sync now'}
+                {syncing ? 'Syncing...' : 'Sync'}
               </button>
             </div>
           ) : (

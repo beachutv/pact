@@ -112,10 +112,16 @@ export async function POST(request: Request) {
     if (body?.timezone) timezone = body.timezone
   } catch {}
 
-  // Use selected calendars, defaulting to primary
-  const calendarIds: string[] = conn.selected_calendars?.length
-    ? conn.selected_calendars
-    : ['primary']
+  // Use selected calendars, defaulting to primary only if never configured
+  const calendarIds: string[] = conn.selected_calendars === null || conn.selected_calendars === undefined
+    ? ['primary'] // never configured — use primary as default
+    : conn.selected_calendars // user explicitly chose (could be empty)
+
+  // If user deselected all calendars, clear their busy blocks
+  if (calendarIds.length === 0) {
+    await supabase.from('busy_blocks').delete().eq('user_id', user.id).eq('source', 'google')
+    return NextResponse.json({ synced: 0, message: 'No calendars selected — busy blocks cleared' })
+  }
 
   // Calculate time range
   const now = new Date()

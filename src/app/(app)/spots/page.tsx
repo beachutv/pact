@@ -185,7 +185,7 @@ export default function SpotsPage() {
 
       <div style={{ padding: '16px 16px 24px' }}>
         {/* Header */}
-        <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>📍 Spots</h2>
+        <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Spots</h2>
         <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 3, lineHeight: 1.5 }}>
           Search for places or save your favorites for quick access when planning hangouts.
         </p>
@@ -194,7 +194,7 @@ export default function SpotsPage() {
         <div style={{ marginTop: 12 }}>
           <input
             type="text"
-            placeholder="🔎 Search spots: cafe, restaurant, area..."
+            placeholder="Search spots: cafe, restaurant, area..."
             value={query}
             onChange={e => searchSpots(e.target.value)}
             style={{
@@ -250,7 +250,7 @@ export default function SpotsPage() {
                       color: '#fff', cursor: 'pointer', flexShrink: 0,
                     }}
                   >
-                    {saved ? '✓ Saved' : '⭐ Save'}
+                    {saved ? '✓ Saved' : 'Save'}
                   </button>
                 </div>
               )
@@ -261,7 +261,7 @@ export default function SpotsPage() {
         {/* Favorite spots section */}
         {!query.trim() && (
           <div style={{ marginTop: 20 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 800, margin: '0 0 8px' }}>⭐ Your favorite spots</h3>
+            <h3 style={{ fontSize: 14, fontWeight: 800, margin: '0 0 8px' }}>Your favorites</h3>
             {favSpots.length === 0 ? (
               <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>
                 Save spots to get personalized recommendations based on where your friends are coming from. Search above or add your own below.
@@ -279,7 +279,7 @@ export default function SpotsPage() {
                       borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                     }}>{f.emoji}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>⭐ {f.name}</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>{f.name}</div>
                       <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>{f.area}</div>
                     </div>
                     <button
@@ -303,7 +303,7 @@ export default function SpotsPage() {
                 fontSize: 13, fontWeight: 700, cursor: 'pointer',
               }}
             >
-              ⭐ ＋ Add your own favorite spot
+              + Add favorite spot
             </button>
           </div>
         )}
@@ -324,7 +324,7 @@ export default function SpotsPage() {
             width: '100%', maxWidth: 360, maxHeight: '80vh', overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
           }}>
-            <h3 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>⭐ Add a favorite spot</h3>
+            <h3 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>Add a favorite spot</h3>
             <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4, lineHeight: 1.5 }}>
               Your own picks join the recommendations — favorites float to the top when they{"'"}re convenient for the group.
             </p>
@@ -377,7 +377,7 @@ export default function SpotsPage() {
                     fontSize: 12, fontWeight: 700, cursor: 'pointer',
                   }}
                 >
-                  {v === 'private' ? '🔒 Just me' : `👥 ${activeCircle?.name || 'Group'}`}
+                  {v === 'private' ? 'Just me' : `${activeCircle?.name || 'Group'}`}
                 </button>
               ))}
             </div>

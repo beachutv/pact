@@ -330,7 +330,7 @@ export default function CircleSettingsPage() {
             title={isAdmin ? 'Tap to rename' : undefined}
           >
             {circle.name}
-            {isAdmin && <span style={{ fontSize: 12, color: 'var(--text2)', marginLeft: 6 }}>✏️</span>}
+            {isAdmin && <span style={{ fontSize: 12, color: 'var(--text2)', marginLeft: 6 }}></span>}
           </h2>
         )}
         <p style={{ fontSize: 13, color: 'var(--text2)' }}>{members.length} members</p>
@@ -350,7 +350,7 @@ export default function CircleSettingsPage() {
             onClick={loadFriends}
             style={{ width: '100%' }}
           >
-            👥 Add from your other circles
+            Add from your other circles
           </button>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,

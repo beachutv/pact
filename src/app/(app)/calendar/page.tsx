@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toStr, fmtDate, fmtHour, fmtTiny, fmtWin, txtOn, readableColor, travelMin, travelMinGps, getBrowserTimezone, currentHourInTz, daysUntil, bdaySoon, AREAS, AREA_GPS, DAY_START, DAY_END } from '@/lib/utils'
 import { useLocationUpdate } from '@/lib/useLocationUpdate'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
+import { IconZap, IconPin, IconClock, IconStar, IconCalendar, IconEdit, IconEye, IconSearch, IconGift, IconCheck, IconRefresh, IconUsers } from '@/components/Icons'
 
 type BusyBlock = { user_id: string; date: string; start_hour: number; end_hour: number }
 type Win = { s: number; e: number; count: number }
@@ -78,7 +79,7 @@ function SparkLine({ spark: sp, todayStr, onDismiss }: { spark: Spark; todayStr:
       }}
     >
       <div style={{ flex: 1, fontSize: 12, lineHeight: 1.35, minWidth: 0 }}>
-        <span style={{ color: 'var(--accent)', fontWeight: 800, fontSize: 10 }}>⚡</span>{' '}
+        <IconZap size={12} color='var(--accent)' />{' '}
         ~{sp.travelTime} min from <b style={{ color: readableColor(sp.member.color) }}>{sp.member.name.split(' ')[0]}</b>{' '}
         &amp; both free <b>{fmtWin(sp.window.s, sp.window.e)}</b> today
       </div>
@@ -931,11 +932,11 @@ export default function CalendarPage() {
       for (const p of datePacts) {
         if (p.occasion) {
           const occ = p.occasion.toLowerCase()
-          if (occ.includes('birthday') || occ.includes('bday')) occasionIcons.push('🎂')
-          else if (occ.includes('anniversary')) occasionIcons.push('💍')
-          else if (occ.includes('wedding')) occasionIcons.push('💒')
-          else if (occ.includes('graduation')) occasionIcons.push('🎓')
-          else if (occ.includes('holiday') || occ.includes('christmas') || occ.includes('new year')) occasionIcons.push('🎄')
+          if (occ.includes('birthday') || occ.includes('bday')) occasionIcons.push('bday')
+          else if (occ.includes('anniversary')) occasionIcons.push('anniv')
+          else if (occ.includes('wedding')) occasionIcons.push('wedding')
+          else if (occ.includes('graduation')) occasionIcons.push('grad')
+          else if (occ.includes('holiday') || occ.includes('christmas') || occ.includes('new year')) occasionIcons.push('holiday')
           // no fallback icon — only special occasions get icons
         }
       }
@@ -962,8 +963,13 @@ export default function CalendarPage() {
             <span style={{ position: 'absolute', top: 3, right: 3, width: 5, height: 5, borderRadius: '50%', background: 'var(--green)' }} />
           )}
           {occasionIcons.length > 0 && (
-            <span style={{ position: 'absolute', top: 1, left: 2, fontSize: 8, lineHeight: 1 }}>
-              {occasionIcons.slice(0, 2).join('')}
+            <span style={{ position: 'absolute', top: 2, left: 3, display: 'flex', gap: 1 }}>
+              {occasionIcons.slice(0, 2).map((type, i) => (
+                <span key={i} style={{
+                  width: 5, height: 5, borderRadius: '50%',
+                  background: type === 'bday' ? 'var(--red)' : type === 'anniv' || type === 'wedding' ? 'var(--lavender)' : 'var(--amber)',
+                }} />
+              ))}
             </span>
           )}
           <span style={{
@@ -995,7 +1001,7 @@ export default function CalendarPage() {
     return (
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="card" style={{ textAlign: 'center' }}>
-          <p style={{ fontSize: 40, marginBottom: 8 }}>📅</p>
+          <p style={{ fontSize: 40, marginBottom: 8 }}><IconCalendar size={40} color='var(--text2)' /></p>
           <p style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Calendar</p>
           <p style={{ fontSize: 13, color: 'var(--text2)' }}>
             Connect your Google Calendar to see when everyone in {activeCircle.name} is free.
@@ -1060,7 +1066,7 @@ export default function CalendarPage() {
           return weekPacts.length > 0 ? (
           <div style={{ marginBottom: 14 }}>
             <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
-              📌 This week
+              This week
             </p>
             {weekPacts.slice(0, 3).map(p => {
               const du = daysUntil(p.date)
@@ -1110,7 +1116,7 @@ export default function CalendarPage() {
                         display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                         background: 'transparent', fontSize: 13, fontWeight: 600,
                         color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                      }}>✏️ Edit</button>
+                      }}>Edit</button>
                       <button onClick={() => { setLongPressPactId(null); router.push('/chat') }} style={{
                         display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                         background: 'transparent', fontSize: 13, fontWeight: 600,
@@ -1151,7 +1157,7 @@ export default function CalendarPage() {
         {upcomingBirthdays.length > 0 && (
           <div className="card" style={{ marginBottom: 14 }}>
             <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
-              🎂 Birthdays coming up
+              Birthdays coming up
             </p>
             {upcomingBirthdays.map(m => (
               <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
@@ -1189,7 +1195,7 @@ export default function CalendarPage() {
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
           >
-            👀 Who{"'"}s free?
+            Who{"'"}s free?
             <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text2)' }}>next 7 days at a glance</span>
           </button>
         )}
@@ -1289,7 +1295,7 @@ export default function CalendarPage() {
             <i style={{ width: 9, height: 9, background: 'rgba(245,158,11,0.3)', borderRadius: 3, display: 'inline-block' }} /> confirmed
           </span>
           <span style={{ fontSize: 10, color: 'var(--text2)' }}>
-            🎂 event
+            event
           </span>
         </div>
 
@@ -1298,7 +1304,7 @@ export default function CalendarPage() {
           marginTop: 14, background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 16, padding: '12px 14px', fontSize: 12, color: 'var(--text2)', lineHeight: 1.5,
         }}>
-          ⏰ <b style={{ color: 'var(--text)' }}>Auto-synced.</b> Calendar syncs every time you open this page.
+          <b style={{ color: 'var(--text)' }}>Auto-synced.</b> Calendar syncs every time you open this page.
           Tap any day for busy blocks, shared free windows, and to propose a plan.
           Friends only see <i>when</i> you're busy, never what your events are.
         </div>
@@ -1327,7 +1333,7 @@ export default function CalendarPage() {
             }}
             title="Check for sparks"
           >
-            ⚡
+            <IconZap size={22} color="#fff" />
           </button>
         </div>
       )}
@@ -1389,7 +1395,7 @@ export default function CalendarPage() {
                       cursor: 'pointer', flexShrink: 0,
                     }}
                   >
-                    Make it a pact 📌
+                    Make it a pact
                   </button>
                 </div>
               ))}
@@ -1427,7 +1433,7 @@ export default function CalendarPage() {
                       fontSize: 10.5, fontWeight: 700, color: readableColor(m.color),
                       paddingRight: 4, whiteSpace: 'nowrap', overflow: 'hidden',
                     }}>
-                      {m.name.split(' ')[0]}{m.id === user.id ? ' ✏️' : ''}
+                      {m.name.split(' ')[0]}{m.id === user.id ? '' : ''}
                     </div>
                     {!isConnected ? (
                       <div style={{
@@ -1474,14 +1480,25 @@ export default function CalendarPage() {
                 })}
               </div>
               <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 5 }}>
-                🟩 free · 🟥 busy · 🟩🔴 overridden · 🟦 pending · 🟧 confirmed · tap your row to toggle
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text2)' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--green-soft)', border: '1px solid var(--green)', display: 'inline-block' }} /> free
+                  {' · '}
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--red-soft)', border: '1px solid var(--red)', display: 'inline-block' }} /> busy
+                  {' · '}
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--green-soft)', border: '1px solid var(--red)', display: 'inline-block' }} /> overridden
+                  {' · '}
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'rgba(59,130,246,0.25)', border: '1px solid rgba(59,130,246,0.5)', display: 'inline-block' }} /> pending
+                  {' · '}
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--accent-soft)', border: '1px solid var(--accent)', display: 'inline-block' }} /> confirmed
+                  {' · tap your row to toggle'}
+                </span>
               </div>
 
               {/* Pacts on this day */}
               {sheetDate && (pactsByDate[sheetDate] || []).length > 0 && (
                 <div style={{ marginTop: 12 }}>
                   <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text2)', marginBottom: 6 }}>
-                    📌 Pacts on this day
+                    Pacts on this day
                   </div>
                   {(pactsByDate[sheetDate] || []).map(p => {
                     const isConfirmed = p.status === 'confirmed'
@@ -1506,7 +1523,7 @@ export default function CalendarPage() {
                       )}
                       {p.spot_area && (
                         <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
-                          📍 {p.spot_area}
+                          {p.spot_area}
                         </div>
                       )}
                     </div>
@@ -1517,7 +1534,7 @@ export default function CalendarPage() {
 
               {/* Windows */}
               <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text2)', margin: '16px 0 8px' }}>
-                ⏰ {sheetWindows.length && sheetWindows[0].full ? 'Windows when everyone is free' : 'Best windows'}
+                {sheetWindows.length && sheetWindows[0].full ? 'Windows when everyone is free' : 'Best windows'}
               </div>
               {sheetWindows.length > 0 ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -1552,7 +1569,7 @@ export default function CalendarPage() {
               {sheetWindows.length > 0 && memberOrigins.length >= 2 && (
                 <div style={{ marginTop: 16 }}>
                   <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text2)', marginBottom: 8 }}>
-                    📍 Spots for {fmtHour(sheetWindows[selectedWinIdx]?.s ?? 18)} – {fmtHour(sheetWindows[selectedWinIdx]?.e ?? 22)} — based on where everyone{"'"}s coming from
+                    Spots for {fmtHour(sheetWindows[selectedWinIdx]?.s ?? 18)} – {fmtHour(sheetWindows[selectedWinIdx]?.e ?? 22)} — based on where everyone{"'"}s coming from
                   </div>
 
                   {/* Per-member origin info */}
@@ -1567,7 +1584,7 @@ export default function CalendarPage() {
                   {/* Search spots */}
                   <input
                     type="text"
-                    placeholder="🔎 Search a spot (e.g. SM Megamall, Yabu)..."
+                    placeholder="Search a spot (e.g. SM Megamall, Yabu)..."
                     value={spotQuery}
                     onChange={e => searchDaySpots(e.target.value)}
                     style={{
@@ -1620,7 +1637,7 @@ export default function CalendarPage() {
                   {/* Favorite spots */}
                   {favSpotsWithTravel.length > 0 && (
                     <div style={{ marginTop: spotQuery.trim() ? 10 : 6 }}>
-                      <div style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 700, marginBottom: 6 }}>⭐ Your favorites</div>
+                      <div style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 700, marginBottom: 6 }}>Your favorites</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {favSpotsWithTravel.map((spot, i) => {
                           const isSel = selectedSpot?.name === spot.name
@@ -1635,7 +1652,7 @@ export default function CalendarPage() {
                                 cursor: 'pointer',
                               }}
                             >
-                              <div style={{ fontSize: 13, fontWeight: 700 }}>⭐ {spot.name}</div>
+                              <div style={{ fontSize: 13, fontWeight: 700 }}>{spot.name}</div>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
                                 {spot.travelTimes.map((t, j) => (
                                   <span key={j} style={{ fontSize: 10.5, fontWeight: 700 }}>
@@ -1660,7 +1677,7 @@ export default function CalendarPage() {
                       color: 'var(--text2)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
                     }}
                   >
-                    ⭐ + Add favorite spot
+                    + Add favorite spot
                   </button>
                 </div>
               )}
@@ -1718,7 +1735,7 @@ export default function CalendarPage() {
             }}>
               <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '12px auto 10px' }} />
               <div style={{ padding: '0 18px 20px', overflowY: 'auto' }}>
-                <h3 style={{ fontSize: 16, fontWeight: 700 }}>👀 Who{"'"}s free?</h3>
+                <h3 style={{ fontSize: 16, fontWeight: 700 }}>Who{"'"}s free?</h3>
                 <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   {[1, 3, 5, 7].map(r => (
                     <button

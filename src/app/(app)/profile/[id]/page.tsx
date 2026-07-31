@@ -281,7 +281,7 @@ export default function ProfilePage() {
                 color: editSharePhone === v ? '#fff' : 'var(--text2)',
                 border: 'none', fontWeight: 600,
               }}>
-                {v === 'nobody' ? '🔒 Hidden' : '👥 Circle mates'}
+                {v === 'nobody' ? 'Hidden' : 'Circle mates'}
               </button>
             ))}
           </div>
@@ -304,7 +304,7 @@ export default function ProfilePage() {
                 color: editShareAddress === v ? '#fff' : 'var(--text2)',
                 border: 'none', fontWeight: 600,
               }}>
-                {v === 'nobody' ? '🔒 Hidden' : '👥 Circle mates'}
+                {v === 'nobody' ? 'Hidden' : 'Circle mates'}
               </button>
             ))}
           </div>
@@ -372,23 +372,16 @@ export default function ProfilePage() {
       <h2 style={{ fontSize: 20, fontWeight: 800 }}>{profile.name}</h2>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center', maxWidth: 280 }}>
-        <p style={{ fontSize: 12, color: 'var(--text2)' }}>📍 {profile.home_area}</p>
+        <p style={{ fontSize: 12, color: 'var(--text2)' }}>{profile.home_area}</p>
 
         {profile.birthday && bday >= 0 && (
           <p style={{ fontSize: 12, color: 'var(--amber)' }}>
-            🎂 Birthday {bday === 0 ? 'today!' : bday === 1 ? 'tomorrow' : `in ${bday} days`}
+            Birthday {bday === 0 ? 'today!' : bday === 1 ? 'tomorrow' : `in ${bday} days`}
           </p>
         )}
 
         {canSeePhone && profile.phone && (
-          <p style={{ fontSize: 12, color: 'var(--text2)' }}>📱 {profile.phone}</p>
-        )}
-
-        {canSeeAddress && profile.address && (
-          <p style={{
-            fontSize: 12, color: 'var(--text2)', textAlign: 'center',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%',
-          }} title={profile.address}>🏠 {profile.address}</p>
+          <p style={{ fontSize: 12, color: 'var(--text2)' }}>{profile.phone}</p>
         )}
 
         {!isOwn && !canSeePhone && (
@@ -406,15 +399,16 @@ export default function ProfilePage() {
       {isOwn && calConnected !== null && (
         <div style={{ width: '100%', maxWidth: 280, marginTop: 12 }}>
           <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
-            📅 Calendar
+            Calendar
           </p>
           {calConnected ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button className="btn-secondary" onClick={openCalendarModal} style={{ width: '100%' }}>
-                🔗 My Calendars
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-secondary" onClick={openCalendarModal} style={{ flex: 1 }}>
+                My Calendars
               </button>
-              <button className="btn-secondary" onClick={syncCalendar} disabled={syncing} style={{ width: '100%' }}>
-                {syncing ? '⟳ Syncing...' : '⟳ Sync now'}
+              <button className="btn-secondary" onClick={syncCalendar} disabled={syncing} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={syncing ? { animation: 'spin 1s linear infinite' } : undefined}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                {syncing ? 'Syncing' : 'Sync'}
               </button>
             </div>
           ) : (
@@ -427,51 +421,20 @@ export default function ProfilePage() {
 
       {/* Calendar modal is now handled by AppShell via pact-open-cal-selector event */}
 
-      {/* Account actions — own profile only */}
+      {/* Link to full settings */}
       {isOwn && (
-        <div style={{ width: '100%', maxWidth: 280, marginTop: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>
-            Account
-          </p>
-
-          <button
-            onClick={handleSignOut}
-            disabled={signingOut}
-            style={{
-              width: '100%', padding: 12, borderRadius: 12, border: 'none',
-              background: 'var(--surface2)', color: 'var(--text)',
-              fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            }}
-          >
-            {signingOut ? 'Signing out...' : 'Sign out'}
-          </button>
-
-          {activeCircle && (
-            <button
-              onClick={handleLeaveCircle}
-              style={{
-                width: '100%', padding: 12, borderRadius: 12, border: 'none',
-                background: 'var(--surface2)', color: 'var(--red)',
-                fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              Leave {activeCircle.name}
-            </button>
-          )}
-
-          <button
-            onClick={handleDeleteAccount}
-            disabled={deletingAccount}
-            style={{
-              width: '100%', padding: 12, borderRadius: 12, border: 'none',
-              background: confirmDeleteAccount ? 'var(--red)' : 'transparent',
-              color: confirmDeleteAccount ? '#fff' : 'var(--red)',
-              fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            }}
-          >
-            {deletingAccount ? 'Deleting...' : confirmDeleteAccount ? 'Tap again to confirm delete' : 'Delete account'}
-          </button>
-        </div>
+        <button
+          onClick={() => router.push('/settings')}
+          style={{
+            width: '100%', maxWidth: 280, marginTop: 16, padding: 12, borderRadius: 12,
+            border: '1px solid var(--border)', background: 'var(--surface)',
+            color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}
+        >
+          All settings
+          <span style={{ color: 'var(--text2)' }}>›</span>
+        </button>
       )}
     </div>
   )

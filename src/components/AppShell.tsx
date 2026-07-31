@@ -1307,7 +1307,7 @@ export default function AppShell({
 
             {welcomeStep === 'location' && (
               <>
-                <p style={{ fontSize: 28, marginBottom: 8 }}>📍</p>
+                <div style={{ marginBottom: 8 }}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
                 <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>Enable location?</p>
                 <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 16 }}>
                   This lets Pact calculate travel times from where you actually are, and detect when you&apos;re near a friend with shared free time (Sparks). Without it, travel times use your home area instead — still works, just less accurate.
@@ -1329,7 +1329,7 @@ export default function AppShell({
 
             {welcomeStep === 'notifications' && (
               <>
-                <p style={{ fontSize: 28, marginBottom: 8 }}>🔔</p>
+                <div style={{ marginBottom: 8 }}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
                 <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>Turn on notifications?</p>
                 <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 16 }}>
                   Get alerted when friends message you, make plans, or when a Spark detects you&apos;re near someone free. Without this, you&apos;ll only see updates when you open the app.
@@ -1351,7 +1351,7 @@ export default function AppShell({
 
             {welcomeStep === 'homescreen' && (
               <>
-                <p style={{ fontSize: 28, marginBottom: 8 }}>📱</p>
+                <div style={{ marginBottom: 8 }}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></div>
                 <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>Add Pact to your home screen</p>
                 <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 16 }}>
                   This makes Pact open full-screen like a native app, load faster, and is required for push notifications on iOS.
