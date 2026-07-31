@@ -409,11 +409,13 @@ function NewPlanContent() {
       )}
 
       {/* Slide to confirm */}
-      <SlideToConfirm
-        disabled={sending || !date}
-        label={sending ? 'Creating...' : 'Slide to make a pact'}
-        onConfirm={createPlan}
-      />
+      <div style={{ marginBottom: 80 }}>
+        <SlideToConfirm
+          disabled={sending || !date}
+          label={sending ? 'Creating...' : 'Slide to make a pact'}
+          onConfirm={createPlan}
+        />
+      </div>
 
       {/* Toast notification */}
       {toast && (

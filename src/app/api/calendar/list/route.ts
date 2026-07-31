@@ -70,14 +70,19 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const { selectedIds } = await req.json()
-  if (!Array.isArray(selectedIds) || selectedIds.length === 0) {
-    return NextResponse.json({ error: 'Select at least one calendar' }, { status: 400 })
+  if (!Array.isArray(selectedIds)) {
+    return NextResponse.json({ error: 'selectedIds must be an array' }, { status: 400 })
   }
 
   await supabase.from('calendar_connections')
     .update({ selected_calendars: selectedIds })
     .eq('user_id', user.id)
     .eq('provider', 'google')
+
+  // If no calendars selected, immediately clear busy blocks
+  if (selectedIds.length === 0) {
+    await supabase.from('busy_blocks').delete().eq('user_id', user.id).eq('source', 'google')
+  }
 
   return NextResponse.json({ ok: true })
 }

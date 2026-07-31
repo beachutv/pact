@@ -99,8 +99,8 @@ export default function LocationPicker({ onSelect, initialValue, placeholder }: 
     <div ref={wrapRef} style={{ position: 'relative' }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
-        background: 'var(--surface2)', borderRadius: 12,
-        padding: '0 12px', border: '1px solid var(--border)',
+        background: 'var(--surface)', borderRadius: 12,
+        padding: '0 14px', border: '1px solid var(--border)',
       }}>
         {/* Search icon */}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2.5" strokeLinecap="round">

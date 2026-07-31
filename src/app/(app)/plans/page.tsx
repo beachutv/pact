@@ -686,7 +686,26 @@ export default function PlansPage() {
                         I&apos;m in!
                       </button>
                       <button
-                        onClick={() => showToast('Noted — marked as unavailable')}
+                        onClick={async () => {
+                          // Notify the pact creator that this user can't make it
+                          if (p.created_by && p.created_by !== user.id) {
+                            await supabase.from('notifications').insert({
+                              user_id: p.created_by,
+                              type: 'pact_change',
+                              title: `${user.name?.split(' ')[0] || 'Someone'} can't make it`,
+                              body: `They declined ${p.occasion || fmtDate(p.date)}`,
+                              link: '/plans',
+                            })
+                            sendPushNotification({
+                              userIds: [p.created_by],
+                              title: `${user.name?.split(' ')[0] || 'Someone'} can't make it`,
+                              body: `They declined ${p.occasion || fmtDate(p.date)}`,
+                              url: '/plans',
+                              tag: `decline-${p.id}`,
+                            })
+                          }
+                          showToast('Noted — the group has been informed')
+                        }}
                         style={{
                           flex: 1, padding: '10px 0', borderRadius: 10,
                           border: '1px solid var(--border)', background: 'var(--surface2)',

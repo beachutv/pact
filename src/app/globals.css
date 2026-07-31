@@ -152,6 +152,7 @@ select.input {
 .card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 14px 16px;
+  word-wrap: break-word; overflow-wrap: break-word;
 }
 
 .chip {

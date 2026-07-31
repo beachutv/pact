@@ -1,9 +1,10 @@
-/** Format hour number to "9 AM" / "12 PM" style. Handles h > 24 as next-day hours. */
+/** Format hour number to "9:00 AM" / "12:00 PM" style. Handles h > 24. */
 export function fmtHour(h: number): string {
   const n = h % 24
-  if (n === 0) return '12 MN'
-  if (n === 12) return '12 PM'
-  return n < 12 ? `${n} AM` : `${n - 12} PM`
+  const min = h % 1 === 0.5 ? ':30' : ':00'
+  if (n === 0) return `12${min} MN`
+  if (n === 12) return `12${min} PM`
+  return n < 12 ? `${n}${min} AM` : `${n - 12}${min} PM`
 }
 
 /** Short format: "9a" / "12p". Handles h > 24. */

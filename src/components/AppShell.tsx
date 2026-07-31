@@ -304,14 +304,22 @@ export default function AppShell({
   }, [])
 
   async function saveCalendarSelection() {
-    await fetch('/api/calendar/list', {
+    const res = await fetch('/api/calendar/list', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ selectedIds: selectedCals }),
     })
     setShowCalModal(false)
+
+    if (selectedCals.length === 0) {
+      // No calendars selected — busy blocks are already cleared by the API
+      // Force reload to reflect the change
+      window.location.reload()
+      return
+    }
+
     // Trigger a sync after saving
-    fetch('/api/calendar/sync', {
+    await fetch('/api/calendar/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
