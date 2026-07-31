@@ -63,6 +63,9 @@ export default function PlansPage() {
 
   // Expandable pact cards
   const [expandedPactId, setExpandedPactId] = useState<string | null>(null)
+  
+  // Track locally declined pacts (user tapped "Can't make it")
+  const [declinedPacts, setDeclinedPacts] = useState<Set<string>>(new Set())
 
   // Hold-to-break pact
   const [breakPactId, setBreakPactId] = useState<string | null>(null)
@@ -685,7 +688,26 @@ export default function PlansPage() {
                   )}
 
                   {/* Slide to commit / Decline — only if not already in */}
-                  {!isIn && (
+                  {!isIn && declinedPacts.has(p.id) && (
+                    <div style={{
+                      marginTop: 8, padding: '10px 14px', borderRadius: 10,
+                      background: 'var(--surface2)', textAlign: 'center',
+                    }}>
+                      <p style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600 }}>
+                        You declined this pact
+                      </p>
+                      <button
+                        onClick={() => setDeclinedPacts(prev => { const n = new Set(prev); n.delete(p.id); return n })}
+                        style={{
+                          marginTop: 6, padding: '6px 16px', borderRadius: 8, border: '1px solid var(--border)',
+                          background: 'transparent', color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                        }}
+                      >
+                        Changed my mind
+                      </button>
+                    </div>
+                  )}
+                  {!isIn && !declinedPacts.has(p.id) && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                       <SlideToConfirm
                         label="Slide to lock in"
@@ -699,6 +721,8 @@ export default function PlansPage() {
                           if (p.created_by && !allOtherIds.includes(p.created_by) && p.created_by !== user.id) {
                             allOtherIds.push(p.created_by)
                           }
+                          // Mark as declined locally
+                          setDeclinedPacts(prev => new Set([...prev, p.id]))
                           for (const uid of allOtherIds) {
                             await supabase.from('notifications').insert({
                               user_id: uid,
@@ -721,7 +745,7 @@ export default function PlansPage() {
                         }}
                         style={{
                           padding: '10px 0', borderRadius: 10, width: '100%',
-                          border: '1px solid var(--border)', background: 'var(--surface2)',
+                          border: '1px solid var(--border)', background: 'transparent',
                           color: 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
                         }}
                       >

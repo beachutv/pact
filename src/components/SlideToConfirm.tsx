@@ -21,7 +21,7 @@ export default function SlideToConfirm({
   const [confirmed, setConfirmed] = useState(false)
   const startX = useRef(0)
   const trackWidth = useRef(0)
-  const HANDLE = height - 4
+  const HANDLE = height - 6
   const THRESHOLD = 0.85
 
   function onPointerDown(e: React.PointerEvent) {
@@ -29,7 +29,7 @@ export default function SlideToConfirm({
     e.preventDefault()
     const track = trackRef.current
     if (!track) return
-    trackWidth.current = track.getBoundingClientRect().width - HANDLE
+    trackWidth.current = track.getBoundingClientRect().width - HANDLE - 6
     startX.current = e.clientX
     setDragging(true)
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
@@ -62,21 +62,38 @@ export default function SlideToConfirm({
       ref={trackRef}
       style={{
         position: 'relative', height, borderRadius: height / 2,
-        background: confirmed
-          ? 'var(--green)'
-          : `linear-gradient(90deg, ${color} ${pct * 100}%, var(--surface2) ${pct * 100}%)`,
+        background: confirmed ? 'var(--green)' : 'var(--surface2)',
         overflow: 'hidden', opacity: disabled ? 0.4 : 1,
         touchAction: 'none', userSelect: 'none',
-        border: '1px solid var(--border)',
       }}
     >
+      {/* Fill track */}
+      {!confirmed && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, bottom: 0,
+          width: `${pct * 100}%`, borderRadius: height / 2,
+          background: color, opacity: 0.2,
+          transition: dragging ? 'none' : 'width 0.3s cubic-bezier(.32,.72,.25,1)',
+        }} />
+      )}
       <div style={{
         position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 13, fontWeight: 700, color: pct > 0.4 ? '#fff' : 'var(--text2)',
-        pointerEvents: 'none',
+        fontSize: 13, fontWeight: 700,
+        color: confirmed ? '#fff' : 'var(--text2)',
+        pointerEvents: 'none', letterSpacing: 0.3,
       }}>
         {confirmed ? '✓ Locked in!' : label}
       </div>
+      {/* Shimmer hint */}
+      {!confirmed && !dragging && pct === 0 && (
+        <div style={{
+          position: 'absolute', top: 0, left: HANDLE + 8, bottom: 0,
+          display: 'flex', alignItems: 'center',
+          color: 'var(--text2)', fontSize: 11, opacity: 0.5, pointerEvents: 'none',
+        }}>
+          {'›››'}
+        </div>
+      )}
       {!confirmed && (
         <div
           onPointerDown={onPointerDown}
@@ -84,13 +101,13 @@ export default function SlideToConfirm({
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           style={{
-            position: 'absolute', top: 2, left: 2 + dragX,
+            position: 'absolute', top: 3, left: 3 + dragX,
             width: HANDLE, height: HANDLE, borderRadius: '50%',
             background: color, color: '#fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, cursor: disabled ? 'default' : 'grab',
+            fontSize: 18, cursor: disabled ? 'default' : 'grab',
             transition: dragging ? 'none' : 'left 0.3s cubic-bezier(.32,.72,.25,1)',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
           }}
         >
           →
