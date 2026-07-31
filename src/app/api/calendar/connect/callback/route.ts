@@ -7,7 +7,11 @@ export async function GET(request: Request) {
   const error = searchParams.get('error')
 
   if (error || !code) {
-    return NextResponse.redirect(`${origin}/home?error=calendar-denied`)
+    // If from onboarding flow, redirect back there with error
+    const state = searchParams.get('state') || ''
+    const dest = state.includes('/onboarding') ? state : '/onboarding'
+    const sep = dest.includes('?') ? '&' : '?'
+    return NextResponse.redirect(`${origin}${dest}${sep}error=calendar-denied`)
   }
 
   // Exchange code for tokens
@@ -26,7 +30,10 @@ export async function GET(request: Request) {
   const tokens = await tokenRes.json()
 
   if (!tokens.access_token) {
-    return NextResponse.redirect(`${origin}/home?error=token-exchange`)
+    const state = searchParams.get('state') || ''
+    const dest = state.includes('/onboarding') ? state : '/onboarding'
+    const sep = dest.includes('?') ? '&' : '?'
+    return NextResponse.redirect(`${origin}${dest}${sep}error=token-exchange`)
   }
 
   const supabase = await createClient()
