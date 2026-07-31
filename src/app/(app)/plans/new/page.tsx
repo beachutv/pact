@@ -17,6 +17,7 @@ function NewPlanContent() {
   const date = params.get('date') || ''
   const hour = parseInt(params.get('hour') || '12')
   const endParam = parseInt(params.get('end') || '0')
+  const withParam = params.get('with') // specific member from spark
 
   const [title, setTitle] = useState('')
   const [spotName, setSpotName] = useState('')
@@ -30,12 +31,17 @@ function NewPlanContent() {
   // Selected members for the pact (creator always included)
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
 
-  // Initialize selected members to all circle members
+  // Initialize selected members — if 'with' param exists, only select that person + creator
   useEffect(() => {
     if (circleMembers.length > 0) {
-      setSelectedMemberIds(new Set(circleMembers.map(m => m.id)))
+      if (withParam) {
+        // From a spark — just the creator + the spark friend
+        setSelectedMemberIds(new Set([user.id, withParam]))
+      } else {
+        setSelectedMemberIds(new Set(circleMembers.map(m => m.id)))
+      }
     }
-  }, [circleMembers])
+  }, [circleMembers, withParam, user.id])
 
   function toggleMember(id: string) {
     // Creator is always included

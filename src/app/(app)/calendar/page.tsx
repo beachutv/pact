@@ -83,7 +83,7 @@ function SparkLine({ spark: sp, todayStr, onDismiss }: { spark: Spark; todayStr:
         &amp; both free <b>{fmtWin(sp.window.s, sp.window.e)}</b> today
       </div>
       <button
-        onClick={() => window.location.href = `/plans/new?date=${todayStr}&hour=${sp.window.s}&end=${sp.window.e}`}
+        onClick={() => window.location.href = `/plans/new?date=${todayStr}&hour=${sp.window.s}&end=${sp.window.e}&with=${sp.member.id}`}
         style={{
           padding: '6px 10px', border: 'none', borderRadius: 14,
           background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 800,
@@ -547,7 +547,7 @@ export default function CalendarPage() {
   function dismissSpark(memberId: string, windowStart: number, travelTime: number) {
     const key = sparkKey(memberId, windowStart, travelTime)
     setDismissedSparks(prev => new Set(prev).add(key))
-    setSparkScanMode(false)
+    // Don't exit scan mode — only the dismissed spark should disappear
   }
 
   function refreshSparks() {

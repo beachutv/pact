@@ -19,6 +19,7 @@ export default function SettingsPage() {
   const [calEmail, setCalEmail] = useState('')
   const [lastSynced, setLastSynced] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [selectedCals, setSelectedCals] = useState<string[] | null>(null)
 
   // Permissions
   const [notifPerm, setNotifPerm] = useState<PermState>('prompt')
@@ -48,8 +49,9 @@ export default function SettingsPage() {
       try {
         const res = await fetch('/api/calendar/status')
         const json = await res.json()
-        setCalConnected(json.connected)
+        setCalConnected(json.connected === true)
         if (json.createdAt) setLastSynced(json.createdAt)
+        if (json.selectedCalendars) setSelectedCals(json.selectedCalendars)
       } catch (e) {
         console.error('Cal status check failed:', e)
       }
@@ -57,19 +59,26 @@ export default function SettingsPage() {
     }
     checkCal()
 
-    // Check notification permission
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setNotifPerm(Notification.permission as PermState)
-    } else {
+    // Check notification permission — guard for contexts where Notification is undefined
+    try {
+      if (typeof window !== 'undefined' && typeof Notification !== 'undefined') {
+        setNotifPerm(Notification.permission as PermState)
+      } else {
+        setNotifPerm('unsupported')
+      }
+    } catch {
       setNotifPerm('unsupported')
     }
 
     // Register service worker + check push subscription
-    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then(() => {
         return navigator.serviceWorker.ready
       }).then(reg => {
-        return reg.pushManager.getSubscription()
+        if ('pushManager' in reg) {
+          return reg.pushManager.getSubscription()
+        }
+        return null
       }).then(sub => {
         setPushSubscribed(!!sub)
       }).catch(e => console.error('SW/Push check error:', e))
@@ -98,6 +107,10 @@ export default function SettingsPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleNotificationToggle() {
+    if (notifPerm === 'unsupported') {
+      showToast('Notifications not supported — try adding Pact to your home screen')
+      return
+    }
     if (notifPerm === 'denied') {
       showToast('Blocked by browser. Open browser settings to enable.')
       return
@@ -306,6 +319,15 @@ export default function SettingsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             <Row label="Status" right={<Pill color="var(--green)">Connected</Pill>} />
             {calEmail && <Row label="Account" right={<span style={{ fontSize: 12, color: 'var(--text2)' }}>{calEmail}</span>} />}
+            {selectedCals && selectedCals.length === 0 && (
+              <div style={{
+                margin: '8px 0', padding: '8px 12px', borderRadius: 10,
+                background: 'var(--amber-soft)', border: '1px solid rgba(255,184,84,0.3)',
+                fontSize: 12, color: 'var(--amber)', fontWeight: 600, lineHeight: 1.4,
+              }}>
+                No calendars selected — your availability won&apos;t show up. Tap &quot;Select calendars&quot; to pick which ones to share.
+              </div>
+            )}
             <Row label="Last synced" right={
               <span style={{ fontSize: 12, color: 'var(--text2)' }}>
                 {lastSynced ? new Date(lastSynced).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Not yet'}
