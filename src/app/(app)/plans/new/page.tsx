@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
+import { Suspense, useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
@@ -386,14 +386,12 @@ function NewPlanContent() {
         </div>
       )}
 
-      <button
-        className="btn-primary"
+      {/* Slide to confirm */}
+      <SlideToConfirm
         disabled={sending || !date}
-        onClick={createPlan}
-        style={{ marginTop: 8 }}
-      >
-        {sending ? 'Creating...' : 'Propose Plan'}
-      </button>
+        label={sending ? 'Creating...' : 'Slide to make a pact'}
+        onConfirm={createPlan}
+      />
 
       {/* Toast notification */}
       {toast && (
@@ -405,6 +403,92 @@ function NewPlanContent() {
           animation: 'fadeIn 0.3s ease',
         }}>
           🎉 {toast}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SlideToConfirm({ disabled, label, onConfirm }: { disabled: boolean; label: string; onConfirm: () => void }) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const [dragX, setDragX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
+  const startX = useRef(0)
+  const trackWidth = useRef(0)
+  const HANDLE_SIZE = 48
+  const THRESHOLD = 0.85
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (disabled || confirmed) return
+    e.preventDefault()
+    const track = trackRef.current
+    if (!track) return
+    trackWidth.current = track.getBoundingClientRect().width - HANDLE_SIZE
+    startX.current = e.clientX
+    setDragging(true)
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!dragging || disabled) return
+    const dx = Math.max(0, Math.min(e.clientX - startX.current, trackWidth.current))
+    setDragX(dx)
+  }
+
+  function onPointerUp() {
+    if (!dragging) return
+    setDragging(false)
+    const pct = dragX / (trackWidth.current || 1)
+    if (pct >= THRESHOLD) {
+      setConfirmed(true)
+      setDragX(trackWidth.current)
+      try { navigator.vibrate?.(50) } catch {}
+      onConfirm()
+    } else {
+      setDragX(0)
+    }
+  }
+
+  const pct = trackWidth.current ? dragX / trackWidth.current : 0
+
+  return (
+    <div
+      ref={trackRef}
+      style={{
+        position: 'relative', height: 52, borderRadius: 26,
+        background: confirmed ? 'var(--green)' : `linear-gradient(90deg, var(--accent) ${pct * 100}%, var(--surface2) ${pct * 100}%)`,
+        marginTop: 8, overflow: 'hidden', opacity: disabled ? 0.4 : 1,
+        touchAction: 'none', userSelect: 'none',
+        border: '1px solid var(--border)',
+      }}
+    >
+      {/* Label */}
+      <div style={{
+        position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 14, fontWeight: 700, color: pct > 0.4 ? '#fff' : 'var(--text2)',
+        pointerEvents: 'none', transition: confirmed ? 'color 0.2s' : undefined,
+      }}>
+        {confirmed ? '✓ Pact made!' : label}
+      </div>
+      {/* Handle */}
+      {!confirmed && (
+        <div
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          style={{
+            position: 'absolute', top: 2, left: 2 + dragX,
+            width: HANDLE_SIZE, height: HANDLE_SIZE, borderRadius: '50%',
+            background: 'var(--accent)', color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18, cursor: disabled ? 'default' : 'grab',
+            transition: dragging ? 'none' : 'left 0.3s cubic-bezier(.32,.72,.25,1)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          }}
+        >
+          →
         </div>
       )}
     </div>

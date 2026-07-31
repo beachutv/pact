@@ -53,6 +53,100 @@ export default function PlansPage() {
   const [shareThreads, setShareThreads] = useState<{ id: string; name: string }[]>([])
   const [sharing, setSharing] = useState(false)
 
+  // Expandable pact cards
+  const [expandedPactId, setExpandedPactId] = useState<string | null>(null)
+
+  // Hold-to-break pact
+  const [breakPactId, setBreakPactId] = useState<string | null>(null)
+  const [holdProgress, setHoldProgress] = useState(0)
+  const holdTimer = useRef<NodeJS.Timeout | null>(null)
+  const holdStart = useRef<number>(0)
+  const holdRaf = useRef<number>(0)
+
+  function startHoldBreak(pactId: string) {
+    setBreakPactId(pactId)
+    setHoldProgress(0)
+  }
+
+  function onHoldPointerDown() {
+    holdStart.current = Date.now()
+    const tick = () => {
+      const elapsed = Date.now() - holdStart.current
+      const pct = Math.min(elapsed / 2000, 1)
+      setHoldProgress(pct)
+      if (pct >= 1) {
+        // Complete
+        try { navigator.vibrate?.(50) } catch {}
+        doBreakPact()
+        return
+      }
+      holdRaf.current = requestAnimationFrame(tick)
+    }
+    holdRaf.current = requestAnimationFrame(tick)
+  }
+
+  function onHoldPointerUp() {
+    cancelAnimationFrame(holdRaf.current)
+    if (holdProgress < 1) setHoldProgress(0)
+  }
+
+  async function doBreakPact() {
+    if (!breakPactId) return
+    const pact = pacts.find(p => p.id === breakPactId)
+    setBreakPactId(null)
+    setHoldProgress(0)
+    if (!pact) return
+
+    // Remove self from pact
+    await supabase.from('pact_members').delete().eq('pact_id', breakPactId).eq('user_id', user.id)
+    await supabase.from('busy_blocks').delete().eq('pact_id', breakPactId).eq('user_id', user.id)
+    fetch('/api/calendar/delete-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pactId: breakPactId }),
+    }).catch(() => {})
+
+    // Notify remaining members
+    const otherMembers = pact.members.filter(m => m.user_id !== user.id)
+    const pactTitle = pact.occasion || fmtDate(pact.date)
+    for (const m of otherMembers) {
+      await supabase.from('notifications').insert({
+        user_id: m.user_id,
+        type: 'pact_change',
+        title: `${user.name?.split(' ')[0] || 'Someone'} broke their pact`,
+        body: `They left the pact for ${pactTitle}`,
+        link: '/plans',
+      })
+    }
+
+    // Push notification
+    sendPushNotification({
+      userIds: otherMembers.map(m => m.user_id),
+      title: `${user.name?.split(' ')[0] || 'Someone'} broke their pact`,
+      body: `They left the pact for ${pactTitle}`,
+      url: '/plans',
+      tag: `break-${breakPactId}`,
+    })
+
+    // If only 1 member left, auto-cancel
+    if (otherMembers.length <= 1) {
+      if (otherMembers.length === 1) {
+        await supabase.from('notifications').insert({
+          user_id: otherMembers[0].user_id,
+          type: 'pact_change',
+          title: 'Pact cancelled',
+          body: `The pact for ${pactTitle} was auto-cancelled — not enough people left`,
+          link: '/plans',
+        })
+      }
+      await supabase.from('busy_blocks').delete().eq('pact_id', breakPactId)
+      await supabase.from('pact_members').delete().eq('pact_id', breakPactId)
+      await supabase.from('pacts').delete().eq('id', breakPactId)
+    }
+
+    await loadPacts()
+  }
+
   function onPactLongPressStart(pid: string) {
     longPressTimerRef.current = setTimeout(() => setLongPressPactId(pid), 500)
   }
@@ -456,70 +550,146 @@ export default function PlansPage() {
               ) : (
                 /* ─── View mode ─── */
                 <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: 14, fontWeight: 800 }}>
-                        {p.occasion || (() => {
-                          const others = p.members
-                            .filter(m => m.user_id !== user.id)
-                            .map(m => getMember(m.user_id)?.name.split(' ')[0])
-                            .filter(Boolean)
-                          return others.length > 0 ? `Pact with ${others.join(', ')}` : 'Pact'
-                        })()}
-                      </p>
-                      <p style={{ fontSize: 12, color: 'var(--text2)' }}>
-                        {fmtDate(p.date)} · {fmtWin(p.win_start, p.win_end)}
-                      </p>
-                      <p style={{ fontSize: 12, color: 'var(--text2)' }}>
-                        {p.spot_name !== 'TBD'
-                          ? `${p.spot_emoji || '📍'} ${p.spot_name}${p.spot_area ? ` — ${p.spot_area}` : ''}`
-                          : '📍 To be set'}
-                      </p>
-                    </div>
-                    {editable && (
-                      <button onClick={() => startEditing(p)}
-                        style={{
-                          background: 'var(--surface2)', border: 'none', borderRadius: 8,
-                          padding: '4px 10px', fontSize: 11, fontWeight: 700,
-                          color: 'var(--text2)', cursor: 'pointer',
-                        }}>
-                        ✏️ Edit
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Who's in */}
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                    {p.members.map(pm => {
-                      const m = getMember(pm.user_id)
-                      if (!m) return null
-                      return (
-                        <div key={m.id} style={{
-                          width: 26, height: 26, borderRadius: '50%', background: m.color,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 10, fontWeight: 800, color: txtOn(m.color),
-                        }}>
-                          {m.name[0]}
-                        </div>
-                      )
-                    })}
-                    <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 4 }}>
-                      {p.members.length}/{circleMembers.length} in
-                    </span>
-                  </div>
-
-                  {/* RSVP button */}
-                  <button
-                    onClick={() => isIn ? leavePact(p.id) : joinPact(p.id)}
-                    style={{
-                      padding: '8px 0', borderRadius: 10, border: 'none',
-                      background: isIn ? 'var(--surface2)' : 'var(--accent)',
-                      color: isIn ? 'var(--text2)' : '#fff',
-                      fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                    }}
+                  <div
+                    onClick={() => setExpandedPactId(expandedPactId === p.id ? null : p.id)}
+                    style={{ cursor: 'pointer' }}
                   >
-                    {isIn ? "I'm out" : "I'm in!"}
-                  </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: 14, fontWeight: 800 }}>
+                          {p.occasion || (() => {
+                            const others = p.members
+                              .filter(m => m.user_id !== user.id)
+                              .map(m => getMember(m.user_id)?.name.split(' ')[0])
+                              .filter(Boolean)
+                            return others.length > 0 ? `Pact with ${others.join(', ')}` : 'Pact'
+                          })()}
+                        </p>
+                        <p style={{ fontSize: 12, color: 'var(--text2)' }}>
+                          {fmtDate(p.date)} · {fmtWin(p.win_start, p.win_end)}
+                        </p>
+                        <p style={{ fontSize: 12, color: 'var(--text2)' }}>
+                          {p.spot_name !== 'TBD'
+                            ? `${p.spot_emoji || '📍'} ${p.spot_name}${p.spot_area ? ` — ${p.spot_area}` : ''}`
+                            : '📍 To be set'}
+                        </p>
+                      </div>
+                      {editable && (
+                        <button onClick={(e) => { e.stopPropagation(); startEditing(p) }}
+                          style={{
+                            background: 'var(--surface2)', border: 'none', borderRadius: 8,
+                            padding: '4px 10px', fontSize: 11, fontWeight: 700,
+                            color: 'var(--text2)', cursor: 'pointer',
+                          }}>
+                          ✏️ Edit
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Who's in — always visible */}
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
+                      {p.members.map(pm => {
+                        const m = getMember(pm.user_id)
+                        if (!m) return null
+                        return (
+                          <div key={m.id} style={{
+                            width: 26, height: 26, borderRadius: '50%', background: m.color,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 10, fontWeight: 800, color: txtOn(m.color),
+                          }}>
+                            {m.name[0]}
+                          </div>
+                        )
+                      })}
+                      <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 4 }}>
+                        {p.members.length}/{circleMembers.length} in
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 'auto' }}>
+                        {expandedPactId === p.id ? '▲' : '▼'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Expanded details */}
+                  {expandedPactId === p.id && (
+                    <div style={{
+                      marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
+                      display: 'flex', flexDirection: 'column', gap: 8,
+                    }}>
+                      {/* Member list with names */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {p.members.map(pm => {
+                          const m = getMember(pm.user_id)
+                          if (!m) return null
+                          return (
+                            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                              <div style={{
+                                width: 20, height: 20, borderRadius: '50%', background: m.color,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 8, fontWeight: 800, color: txtOn(m.color), flexShrink: 0,
+                              }}>
+                                {m.name[0]}
+                              </div>
+                              <span style={{ fontWeight: 600 }}>{m.name}{m.id === user.id ? ' (you)' : ''}</span>
+                              <span style={{ color: 'var(--green)', marginLeft: 'auto', fontSize: 11, fontWeight: 700 }}>✓ In</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                        <button
+                          onClick={() => openShareModal(p.id)}
+                          style={{
+                            flex: 1, padding: '8px 0', borderRadius: 10,
+                            border: '1px solid var(--border)', background: 'var(--surface2)',
+                            color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                          }}
+                        >
+                          📤 Send to Chat
+                        </button>
+                        {isIn && (
+                          <button
+                            onClick={() => startHoldBreak(p.id)}
+                            style={{
+                              flex: 1, padding: '8px 0', borderRadius: 10,
+                              border: '1px solid var(--border)', background: 'var(--red-soft)',
+                              color: 'var(--red)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                            }}
+                          >
+                            I&apos;m out
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Join button — only if not already in (visible collapsed) */}
+                  {!isIn && expandedPactId !== p.id && (
+                    <button
+                      onClick={() => joinPact(p.id)}
+                      style={{
+                        marginTop: 8, padding: '8px 0', borderRadius: 10, border: 'none',
+                        background: 'var(--accent)', color: '#fff',
+                        fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                      }}
+                    >
+                      I&apos;m in!
+                    </button>
+                  )}
+                  {!isIn && expandedPactId === p.id && (
+                    <button
+                      onClick={() => joinPact(p.id)}
+                      style={{
+                        padding: '8px 0', borderRadius: 10, border: 'none',
+                        background: 'var(--accent)', color: '#fff',
+                        fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                      }}
+                    >
+                      I&apos;m in!
+                    </button>
+                  )}
                 </>
               )}
 
@@ -567,6 +737,64 @@ export default function PlansPage() {
             </div>
           )
         })
+      )}
+
+      {/* Hold-to-break pact modal */}
+      {breakPactId && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) { setBreakPactId(null); setHoldProgress(0) } }}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+            zIndex: 40, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          }}
+        >
+          <div style={{
+            background: 'var(--surface2)', borderRadius: '20px 20px 0 0',
+            padding: '20px 20px calc(20px + env(safe-area-inset-bottom))', width: '100%', maxWidth: 440,
+          }}>
+            <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 16px' }} />
+            <p style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Break this pact?</p>
+            <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 20 }}>
+              Everyone in this pact will be notified that you left. Hold the button below for 2 seconds to confirm.
+            </p>
+            <div
+              onPointerDown={onHoldPointerDown}
+              onPointerUp={onHoldPointerUp}
+              onPointerCancel={onHoldPointerUp}
+              onPointerLeave={onHoldPointerUp}
+              style={{
+                position: 'relative', width: '100%', height: 48, borderRadius: 12,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                overflow: 'hidden', cursor: 'pointer', touchAction: 'none', userSelect: 'none',
+              }}
+            >
+              {/* Progress fill */}
+              <div style={{
+                position: 'absolute', top: 0, left: 0, bottom: 0,
+                width: `${holdProgress * 100}%`,
+                background: holdProgress >= 1 ? 'var(--red)' : 'var(--red-soft)',
+                transition: holdProgress === 0 ? 'width 0.2s' : 'none',
+              }} />
+              {/* Label */}
+              <div style={{
+                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 13, fontWeight: 700, color: holdProgress > 0.5 ? 'var(--red)' : 'var(--text2)',
+                pointerEvents: 'none',
+              }}>
+                {holdProgress >= 1 ? 'Breaking...' : 'Hold to break pact'}
+              </div>
+            </div>
+            <button
+              onClick={() => { setBreakPactId(null); setHoldProgress(0) }}
+              style={{
+                marginTop: 12, width: '100%', padding: 12, border: 'none', borderRadius: 12,
+                background: 'transparent', color: 'var(--text2)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Never mind
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Share pact to chat modal */}
