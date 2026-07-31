@@ -29,7 +29,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <h1 style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-1px' }}>
-            <span style={{ color: 'var(--accent)' }}>P</span>act
+            Pact<span style={{ color: 'var(--accent)' }}>.</span>
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4 }}>
             plans that actually happen

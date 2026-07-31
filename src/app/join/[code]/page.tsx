@@ -67,7 +67,7 @@ export default function JoinPage() {
     <div id="app-shell" style={{ justifyContent: 'center', padding: '0 24px' }}>
       <div style={{ maxWidth: 340, width: '100%', margin: '0 auto', textAlign: 'center' }}>
         <h1 style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-1px', marginBottom: 8 }}>
-          <span style={{ color: 'var(--accent)' }}>P</span>act
+          Pact<span style={{ color: 'var(--accent)' }}>.</span>
         </h1>
         {status === 'loading' && (
           <p style={{ fontSize: 14, color: 'var(--text2)' }}>Checking your account...</p>
