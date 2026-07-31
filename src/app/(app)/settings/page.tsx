@@ -43,17 +43,16 @@ export default function SettingsPage() {
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 2200) }
 
   useEffect(() => {
-    // Check calendar connection
+    // Check calendar connection via API (bypasses RLS)
     async function checkCal() {
-      const { data, error } = await supabase
-        .from('calendar_connections')
-        .select('id, created_at')
-        .eq('user_id', user.id)
-        .eq('provider', 'google')
-        .maybeSingle()
-      if (error) console.error('Cal check error:', error)
-      setCalConnected(!!data)
-      if (data) setLastSynced(data.created_at)
+      try {
+        const res = await fetch('/api/calendar/status')
+        const json = await res.json()
+        setCalConnected(json.connected)
+        if (json.createdAt) setLastSynced(json.createdAt)
+      } catch (e) {
+        console.error('Cal status check failed:', e)
+      }
       setCalLoading(false)
     }
     checkCal()
@@ -65,13 +64,15 @@ export default function SettingsPage() {
       setNotifPerm('unsupported')
     }
 
-    // Check push subscription
+    // Register service worker + check push subscription
     if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
-      navigator.serviceWorker.ready.then(reg => {
-        reg.pushManager.getSubscription().then(sub => {
-          setPushSubscribed(!!sub)
-        })
-      }).catch(() => {})
+      navigator.serviceWorker.register('/sw.js').then(() => {
+        return navigator.serviceWorker.ready
+      }).then(reg => {
+        return reg.pushManager.getSubscription()
+      }).then(sub => {
+        setPushSubscribed(!!sub)
+      }).catch(e => console.error('SW/Push check error:', e))
     }
 
     // Check location permission
@@ -144,9 +145,18 @@ export default function SettingsPage() {
         })
         setPushSubscribed(true)
         showToast('Notifications on ✓')
-      } catch (e) {
+      } catch (e: any) {
         console.error('Push failed:', e)
-        showToast('Failed — check browser settings')
+        const msg = e?.message || ''
+        if (msg.includes('Registration failed')) {
+          showToast('Service worker failed — try refreshing')
+        } else if (msg.includes('permission')) {
+          showToast('Permission blocked — check browser settings')
+        } else if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+          showToast('VAPID keys not set — redeploy Vercel')
+        } else {
+          showToast('Failed: ' + (msg.slice(0, 60) || 'check browser settings'))
+        }
       }
     }
   }
@@ -176,7 +186,7 @@ export default function SettingsPage() {
 
   function handleLocationToggle() {
     if (locPerm === 'denied') {
-      showToast('Blocked by browser. Open browser settings to enable.')
+      showToast('Open browser settings → Site settings → Location → Allow')
       return
     }
     navigator.geolocation.getCurrentPosition(
@@ -338,7 +348,7 @@ export default function SettingsPage() {
       {/* Permissions */}
       <Section title="Permissions">
         <PermRow
-          icon="🔔"
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>}
           title="Notifications"
           description={pushSubscribed
             ? "You'll get notified for messages, new pacts, and sparks."
@@ -358,7 +368,7 @@ export default function SettingsPage() {
         )}
         <div style={{ height: 4 }} />
         <PermRow
-          icon="📍"
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>}
           title="Location"
           description={locPerm === 'granted'
             ? "Sparks and spot travel times use your live location."
@@ -508,13 +518,13 @@ function Pill({ color, children }: { color: string; children: React.ReactNode })
 }
 
 function PermRow({ icon, title, description, on, onToggle, blocked }: {
-  icon: string; title: string; description: string;
+  icon: React.ReactNode; title: string; description: string;
   on: boolean; onToggle: () => void; blocked?: boolean
 }) {
   return (
     <div style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        <span style={{ fontSize: 20, flexShrink: 0, marginTop: 2 }}>{icon}</span>
+        <span style={{ flexShrink: 0, marginTop: 2, display: 'flex' }}>{icon}</span>
         <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
           <p style={{ fontSize: 14, fontWeight: 700 }}>{title}</p>
           <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4, lineHeight: 1.5 }}>{description}</p>
