@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
-import { toStr, fmtDate, fmtHour, fmtTiny, fmtWin, txtOn, travelMin, travelMinGps, getBrowserTimezone, currentHourInTz, daysUntil, bdaySoon, AREAS, AREA_GPS, DAY_START, DAY_END } from '@/lib/utils'
+import { toStr, fmtDate, fmtHour, fmtTiny, fmtWin, txtOn, readableColor, travelMin, travelMinGps, getBrowserTimezone, currentHourInTz, daysUntil, bdaySoon, AREAS, AREA_GPS, DAY_START, DAY_END } from '@/lib/utils'
 import { useLocationUpdate } from '@/lib/useLocationUpdate'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 
@@ -79,7 +79,7 @@ function SparkLine({ spark: sp, todayStr, onDismiss }: { spark: Spark; todayStr:
     >
       <div style={{ flex: 1, fontSize: 12, lineHeight: 1.35, minWidth: 0 }}>
         <span style={{ color: 'var(--accent)', fontWeight: 800, fontSize: 10 }}>⚡</span>{' '}
-        ~{sp.travelTime} min from <b style={{ color: sp.member.color }}>{sp.member.name.split(' ')[0]}</b>{' '}
+        ~{sp.travelTime} min from <b style={{ color: readableColor(sp.member.color) }}>{sp.member.name.split(' ')[0]}</b>{' '}
         &amp; both free <b>{fmtWin(sp.window.s, sp.window.e)}</b> today
       </div>
       <button
@@ -1384,7 +1384,7 @@ export default function CalendarPage() {
                     gap: 2, marginBottom: 3,
                   }}>
                     <div style={{
-                      fontSize: 10.5, fontWeight: 700, color: m.color,
+                      fontSize: 10.5, fontWeight: 700, color: readableColor(m.color),
                       paddingRight: 4, whiteSpace: 'nowrap', overflow: 'hidden',
                     }}>
                       {m.name.split(' ')[0]}{m.id === user.id ? ' ✏️' : ''}

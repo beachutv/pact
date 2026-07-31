@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
@@ -18,6 +18,7 @@ export default function SettingsPage() {
   const [calLoading, setCalLoading] = useState(true)
   const [calEmail, setCalEmail] = useState('')
   const [lastSynced, setLastSynced] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
 
   // Permissions
   const [notifPerm, setNotifPerm] = useState<PermState>('prompt')
@@ -49,23 +50,21 @@ export default function SettingsPage() {
         .select('id, created_at')
         .eq('user_id', user.id)
         .limit(1)
-      if (data && data.length > 0) {
-        setCalConnected(true)
-        setLastSynced(data[0].created_at)
-      }
+      setCalConnected(!!(data && data.length > 0))
+      if (data && data.length > 0) setLastSynced(data[0].created_at)
       setCalLoading(false)
     }
     checkCal()
 
     // Check notification permission
-    if (typeof Notification !== 'undefined') {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
       setNotifPerm(Notification.permission as PermState)
     } else {
       setNotifPerm('unsupported')
     }
 
     // Check push subscription
-    if ('serviceWorker' in navigator) {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
       navigator.serviceWorker.ready.then(reg => {
         reg.pushManager.getSubscription().then(sub => {
           setPushSubscribed(!!sub)
@@ -74,20 +73,20 @@ export default function SettingsPage() {
     }
 
     // Check location permission
-    if (navigator.permissions) {
+    if (typeof navigator !== 'undefined' && navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then(result => {
         setLocPerm(result.state as PermState)
         result.addEventListener('change', () => setLocPerm(result.state as PermState))
-      }).catch(() => setLocPerm('unsupported'))
-    } else if (!navigator.geolocation) {
-      setLocPerm('unsupported')
+      }).catch(() => {})
     }
 
     // Check standalone mode
-    const standalone = window.matchMedia('(display-mode: standalone)').matches
-      || (navigator as any).standalone === true
-    setIsStandalone(standalone)
-    setIsiOS(/iPad|iPhone|iPod/.test(navigator.userAgent))
+    if (typeof window !== 'undefined') {
+      const standalone = window.matchMedia('(display-mode: standalone)').matches
+        || (navigator as any).standalone === true
+      setIsStandalone(standalone)
+      setIsiOS(/iPad|iPhone|iPod/.test(navigator.userAgent))
+    }
 
     // Get email
     supabase.auth.getUser().then(({ data }) => {
@@ -97,39 +96,40 @@ export default function SettingsPage() {
 
   async function handleNotificationToggle() {
     if (notifPerm === 'denied') {
-      showToast('Notifications are blocked. Enable them in your browser settings.')
-      return
-    }
-    if (notifPerm === 'unsupported') {
-      showToast('Notifications aren\'t supported on this browser.')
+      showToast('Blocked by browser. Open browser settings to enable.')
       return
     }
 
     if (pushSubscribed) {
       // Unsubscribe
-      const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.getSubscription()
-      if (sub) {
-        await sub.unsubscribe()
-        await fetch('/api/push/subscribe', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ endpoint: sub.endpoint }),
-        })
-      }
-      setPushSubscribed(false)
-      showToast('Notifications turned off')
+      try {
+        const reg = await navigator.serviceWorker.ready
+        const sub = await reg.pushManager.getSubscription()
+        if (sub) {
+          await sub.unsubscribe()
+          await fetch('/api/push/subscribe', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          })
+        }
+        setPushSubscribed(false)
+        showToast('Notifications off')
+      } catch { showToast('Something went wrong') }
     } else {
       // Subscribe
       try {
         const permission = await Notification.requestPermission()
         setNotifPerm(permission as PermState)
         if (permission !== 'granted') {
-          showToast('Permission denied. Check your browser settings.')
+          showToast('Permission denied')
           return
         }
         const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-        if (!vapidKey) { showToast('Push not configured yet'); return }
+        if (!vapidKey) {
+          showToast('Push not configured — tell Bea to add VAPID keys')
+          return
+        }
         const reg = await navigator.serviceWorker.ready
         const subscription = await reg.pushManager.subscribe({
           userVisibleOnly: true,
@@ -141,32 +141,47 @@ export default function SettingsPage() {
           body: JSON.stringify({ subscription: subscription.toJSON() }),
         })
         setPushSubscribed(true)
-        showToast('Notifications turned on ✓')
+        showToast('Notifications on ✓')
       } catch (e) {
-        console.error('Push subscription failed:', e)
-        showToast('Something went wrong. Try again.')
+        console.error('Push failed:', e)
+        showToast('Failed — check browser settings')
       }
     }
   }
 
-  async function handleLocationToggle() {
+  async function sendTestNotification() {
+    if (!pushSubscribed) {
+      showToast('Turn on notifications first')
+      return
+    }
+    try {
+      await fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_ids: [user.id],
+          title: 'Pact Test 🎉',
+          body: 'Notifications are working!',
+          url: '/settings',
+          tag: 'test',
+        }),
+      })
+      showToast('Test sent — check your notifications')
+    } catch {
+      showToast('Failed to send test')
+    }
+  }
+
+  function handleLocationToggle() {
     if (locPerm === 'denied') {
-      showToast('Location is blocked. Enable it in your browser settings.')
+      showToast('Blocked by browser. Open browser settings to enable.')
       return
     }
-    if (locPerm === 'unsupported') {
-      showToast('Location isn\'t supported on this browser.')
-      return
-    }
-    // Request permission
     navigator.geolocation.getCurrentPosition(
-      () => {
-        setLocPerm('granted')
-        showToast('Location enabled ✓')
-      },
+      () => { setLocPerm('granted'); showToast('Location enabled ✓') },
       (err) => {
-        if (err.code === 1) setLocPerm('denied')
-        showToast('Location permission denied.')
+        if (err.code === 1) { setLocPerm('denied'); showToast('Permission denied') }
+        else showToast('Location unavailable')
       },
       { timeout: 10000 }
     )
@@ -197,11 +212,11 @@ export default function SettingsPage() {
     setDeletingAccount(true)
     try {
       const { error } = await supabase.rpc('delete_user_account')
-      if (error) { showToast('Failed to delete account'); setDeletingAccount(false); return }
+      if (error) { showToast('Failed to delete'); setDeletingAccount(false); return }
       try { await supabase.auth.signOut() } catch {}
       window.location.href = '/'
     } catch {
-      showToast('Failed to delete account')
+      showToast('Failed to delete')
       setDeletingAccount(false)
     }
   }
@@ -213,6 +228,7 @@ export default function SettingsPage() {
   }
 
   async function disconnectCalendar() {
+    if (!confirm('Disconnect Google Calendar?')) return
     await supabase.from('calendar_connections').delete().eq('user_id', user.id).eq('provider', 'google')
     await supabase.from('busy_blocks').delete().eq('user_id', user.id)
     setCalConnected(false)
@@ -220,15 +236,13 @@ export default function SettingsPage() {
   }
 
   async function syncCalendar() {
-    setCalLoading(true)
+    setSyncing(true)
     try {
       await fetch('/api/calendar/sync', { method: 'POST' })
       setLastSynced(new Date().toISOString())
-      showToast('Calendar synced ✓')
-    } catch {
-      showToast('Sync failed')
-    }
-    setCalLoading(false)
+      showToast('Synced ✓')
+    } catch { showToast('Sync failed') }
+    setSyncing(false)
   }
 
   const themeOptions = [
@@ -238,10 +252,10 @@ export default function SettingsPage() {
   ]
 
   return (
-    <div style={{ padding: '12px 16px 100px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ padding: '12px 16px 100px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <p style={{ fontSize: 18, fontWeight: 800 }}>Settings</p>
 
-      {/* Profile link */}
+      {/* Profile card */}
       <button
         onClick={() => router.push(`/profile/${user.id}`)}
         style={{
@@ -266,39 +280,49 @@ export default function SettingsPage() {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: 15, fontWeight: 700 }}>{user.name}</p>
-          <p style={{ fontSize: 12, color: 'var(--text2)' }}>{calEmail || 'Edit profile →'}</p>
+          <p style={{ fontSize: 12, color: 'var(--text2)' }}>Edit profile →</p>
         </div>
-        <span style={{ color: 'var(--text2)', fontSize: 16 }}>›</span>
+        <span style={{ color: 'var(--text2)', fontSize: 18 }}>›</span>
       </button>
 
       {/* Google Calendar */}
       <Section title="Google Calendar">
         {calLoading ? (
-          <Row label="Loading..." />
+          <p style={{ fontSize: 13, color: 'var(--text2)', padding: '8px 0' }}>Checking...</p>
         ) : calConnected ? (
-          <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             <Row label="Status" right={<Pill color="var(--green)">Connected</Pill>} />
             {calEmail && <Row label="Account" right={<span style={{ fontSize: 12, color: 'var(--text2)' }}>{calEmail}</span>} />}
             <Row label="Last synced" right={
               <span style={{ fontSize: 12, color: 'var(--text2)' }}>
-                {lastSynced ? new Date(lastSynced).toLocaleDateString() : 'Not yet'}
+                {lastSynced ? new Date(lastSynced).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Not yet'}
               </span>
             } />
-            <button onClick={() => {
-              window.dispatchEvent(new CustomEvent('pact-open-cal-selector'))
-            }} style={linkBtn}>
-              Select calendars
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button onClick={() => window.dispatchEvent(new CustomEvent('pact-open-cal-selector'))} style={{
+                flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid var(--border)',
+                background: 'var(--surface2)', color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}>
+                Select calendars
+              </button>
+              <button onClick={syncCalendar} disabled={syncing} style={{
+                flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid var(--border)',
+                background: 'var(--surface2)', color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                opacity: syncing ? 0.5 : 1,
+              }}>
+                {syncing ? 'Syncing...' : 'Sync now'}
+              </button>
+            </div>
+            <button onClick={disconnectCalendar} style={{
+              marginTop: 8, padding: '8px 0', border: 'none', background: 'transparent',
+              color: 'var(--red)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+            }}>
+              Disconnect calendar
             </button>
-            <button onClick={syncCalendar} disabled={calLoading} style={linkBtn}>
-              {calLoading ? 'Syncing...' : 'Sync now'}
-            </button>
-            <button onClick={disconnectCalendar} style={{ ...linkBtn, color: 'var(--red)' }}>
-              Disconnect
-            </button>
-          </>
+          </div>
         ) : (
           <>
-            <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 8 }}>
+            <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 10 }}>
               Connect your Google Calendar so Pact can find times when your group is free. We only read busy/free — never event details.
             </p>
             <button onClick={connectCalendar} style={primaryBtn}>
@@ -310,41 +334,36 @@ export default function SettingsPage() {
 
       {/* Permissions */}
       <Section title="Permissions">
-        {/* Notifications */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-          <div>
-            <p style={{ fontSize: 13, fontWeight: 700 }}>Notifications</p>
-            <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2, lineHeight: 1.4 }}>
-              {pushSubscribed
-                ? 'You\'ll get notified for messages, pacts, and sparks.'
-                : 'Get alerted when friends message you or make plans. Without this, you\'ll only see updates when you open the app.'}
-            </p>
-          </div>
-          <ToggleSwitch on={pushSubscribed} onToggle={handleNotificationToggle} disabled={notifPerm === 'unsupported'} />
-        </div>
-        {notifPerm === 'denied' && (
-          <p style={{ fontSize: 11, color: 'var(--red)', padding: '6px 0' }}>
-            Notifications are blocked by your browser. Open your browser settings to enable them.
-          </p>
+        <PermRow
+          icon="🔔"
+          title="Notifications"
+          description={pushSubscribed
+            ? "You'll get notified for messages, new pacts, and sparks."
+            : "Get alerted when friends message you or make plans. Without this, you'll only see updates when you open the app."}
+          on={pushSubscribed}
+          onToggle={handleNotificationToggle}
+          blocked={notifPerm === 'denied'}
+        />
+        {pushSubscribed && (
+          <button onClick={sendTestNotification} style={{
+            padding: '8px 0', border: 'none', background: 'transparent',
+            color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer', textAlign: 'left',
+            borderBottom: '1px solid var(--border)',
+          }}>
+            Send test notification →
+          </button>
         )}
-
-        {/* Location */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0' }}>
-          <div>
-            <p style={{ fontSize: 13, fontWeight: 700 }}>Location</p>
-            <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2, lineHeight: 1.4 }}>
-              {locPerm === 'granted'
-                ? 'Sparks and spot travel times use your live location for accuracy.'
-                : 'Lets Pact calculate travel times from where you are now and detect nearby friends (Sparks). Without this, travel times use your home area instead.'}
-            </p>
-          </div>
-          <ToggleSwitch on={locPerm === 'granted'} onToggle={handleLocationToggle} disabled={locPerm === 'unsupported'} />
-        </div>
-        {locPerm === 'denied' && (
-          <p style={{ fontSize: 11, color: 'var(--red)', padding: '0 0 6px' }}>
-            Location is blocked by your browser. Open your browser settings to enable it.
-          </p>
-        )}
+        <div style={{ height: 4 }} />
+        <PermRow
+          icon="📍"
+          title="Location"
+          description={locPerm === 'granted'
+            ? "Sparks and spot travel times use your live location."
+            : "Lets Pact calculate real travel times and detect nearby friends (Sparks). Without this, travel times use your home area — still works, just less accurate."}
+          on={locPerm === 'granted'}
+          onToggle={handleLocationToggle}
+          blocked={locPerm === 'denied'}
+        />
       </Section>
 
       {/* Appearance */}
@@ -367,10 +386,10 @@ export default function SettingsPage() {
       {!isStandalone && (
         <Section title="Add to Home Screen">
           <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 10 }}>
-            Installing Pact to your home screen gives you a full-screen experience, faster loading, and push notifications on iOS.
+            Full-screen experience, faster loading, and push notifications on iOS.
           </p>
           <button onClick={() => setShowA2HS(true)} style={primaryBtn}>
-            How to install →
+            How to install
           </button>
         </Section>
       )}
@@ -382,86 +401,75 @@ export default function SettingsPage() {
 
       {/* Account */}
       <Section title="Account">
-        <button onClick={handleSignOut} disabled={signingOut} style={linkBtn}>
+        <button onClick={handleSignOut} disabled={signingOut} style={{
+          width: '100%', padding: '10px 0', border: 'none', background: 'transparent',
+          color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+        }}>
           {signingOut ? 'Signing out...' : 'Sign out'}
         </button>
-        <button onClick={handleDeleteAccount} disabled={deletingAccount} style={{ ...linkBtn, color: 'var(--red)' }}>
+        <button onClick={handleDeleteAccount} disabled={deletingAccount} style={{
+          width: '100%', padding: '10px 0', border: 'none', background: 'transparent',
+          color: 'var(--red)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+          borderTop: '1px solid var(--border)',
+        }}>
           {deletingAccount ? 'Deleting...' : confirmDelete ? 'Tap again to confirm' : 'Delete account'}
         </button>
       </Section>
 
       {/* About */}
       <Section title="About">
-        <button onClick={() => router.push('/privacy')} style={linkBtn}>Privacy policy</button>
+        <button onClick={() => router.push('/privacy')} style={{
+          width: '100%', padding: '8px 0', border: 'none', background: 'transparent',
+          color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+        }}>Privacy policy</button>
         <Row label="Version" right={<span style={{ fontSize: 12, color: 'var(--text2)' }}>17.0</span>} />
       </Section>
 
-      {/* Add to Home Screen modal */}
+      {/* A2HS modal */}
       {showA2HS && (
-        <div
-          onClick={e => { if (e.target === e.currentTarget) setShowA2HS(false) }}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-            zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          }}
-        >
+        <div onClick={e => { if (e.target === e.currentTarget) setShowA2HS(false) }} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+          zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        }}>
           <div style={{
             background: 'var(--surface2)', borderRadius: '20px 20px 0 0',
             padding: '20px 20px calc(20px + env(safe-area-inset-bottom))',
             width: '100%', maxWidth: 440, maxHeight: '80vh', overflowY: 'auto',
           }}>
             <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 16px' }} />
-            <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>Add Pact to Home Screen</p>
-            <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 16 }}>
-              This makes Pact open full-screen like a native app and enables push notifications on iOS.
-            </p>
-
+            <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>Add Pact to Home Screen</p>
             {isiOS ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <Step n={1} text={'Tap the share button at the bottom of Safari'} detail="It looks like a square with an arrow pointing up ↑" />
-                <Step n={2} text={'Scroll down and tap "Add to Home Screen"'} detail="You may need to scroll the action sheet to find it" />
-                <Step n={3} text={'Tap "Add" in the top right'} detail="Pact will now appear on your home screen like any other app" />
-                <div style={{
-                  background: 'var(--accent-soft)', border: '1px solid rgba(124,92,255,0.3)',
-                  borderRadius: 12, padding: '10px 14px', fontSize: 12, color: 'var(--text)', lineHeight: 1.5,
-                }}>
-                  <b>iOS note:</b> Push notifications only work when Pact is added to your home screen. This is an Apple requirement for web apps.
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <Step n={1} text="Tap the share button ↑ at the bottom of Safari" />
+                <Step n={2} text='Scroll down and tap "Add to Home Screen"' />
+                <Step n={3} text='Tap "Add" in the top right' />
+                <p style={{ fontSize: 12, color: 'var(--accent)', lineHeight: 1.5, padding: '8px 12px', background: 'var(--accent-soft)', borderRadius: 10 }}>
+                  iOS requires adding to Home Screen for push notifications.
+                </p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <Step n={1} text={'Tap the three-dot menu ⋮ in your browser'} detail="Usually at the top right of Chrome or your browser" />
-                <Step n={2} text={'Tap "Add to Home Screen" or "Install app"'} detail="The wording varies by browser" />
-                <Step n={3} text={'Tap "Install" to confirm'} detail="Pact will appear on your home screen and open in full screen" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <Step n={1} text="Tap the ⋮ menu at the top right of your browser" />
+                <Step n={2} text='Tap "Add to Home Screen" or "Install app"' />
+                <Step n={3} text='Tap "Install" to confirm' />
               </div>
             )}
-
-            <button onClick={() => setShowA2HS(false)} style={{
-              marginTop: 16, width: '100%', padding: 14, border: 'none', borderRadius: 14,
-              background: 'var(--accent)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-            }}>
-              Got it
-            </button>
+            <button onClick={() => setShowA2HS(false)} style={{ ...primaryBtn, marginTop: 16 }}>Got it</button>
           </div>
         </div>
       )}
 
-      {/* Toast */}
       {toast && (
         <div style={{
           position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
           background: 'var(--surface3)', border: '1px solid var(--border)', color: 'var(--text)',
           padding: '10px 18px', borderRadius: 24, fontSize: 13, fontWeight: 600, zIndex: 60,
           boxShadow: '0 8px 24px rgba(0,0,0,0.4)', whiteSpace: 'nowrap',
-        }}>
-          {toast}
-        </div>
+        }}>{toast}</div>
       )}
     </div>
   )
 }
-
-// ─── Reusable components ───
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -479,7 +487,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Row({ label, right }: { label: string; right?: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
       <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
       {right}
     </div>
@@ -492,55 +500,59 @@ function Pill({ color, children }: { color: string; children: React.ReactNode })
       fontSize: 11, fontWeight: 700, color,
       background: color === 'var(--green)' ? 'var(--green-soft)' : 'var(--accent-soft)',
       padding: '3px 10px', borderRadius: 12,
-    }}>
-      {children}
-    </span>
+    }}>{children}</span>
   )
 }
 
-function ToggleSwitch({ on, onToggle, disabled }: { on: boolean; onToggle: () => void; disabled?: boolean }) {
+function PermRow({ icon, title, description, on, onToggle, blocked }: {
+  icon: string; title: string; description: string;
+  on: boolean; onToggle: () => void; blocked?: boolean
+}) {
   return (
-    <button
-      onClick={onToggle}
-      disabled={disabled}
-      style={{
-        width: 48, height: 28, borderRadius: 14, border: 'none', cursor: disabled ? 'default' : 'pointer',
-        background: on ? 'var(--accent)' : 'var(--surface3)',
-        position: 'relative', flexShrink: 0, transition: 'background 0.2s',
-        opacity: disabled ? 0.4 : 1,
-      }}
-    >
-      <div style={{
-        width: 22, height: 22, borderRadius: '50%', background: '#fff',
-        position: 'absolute', top: 3,
-        left: on ? 23 : 3,
-        transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-      }} />
-    </button>
-  )
-}
-
-function Step({ n, text, detail }: { n: number; text: string; detail: string }) {
-  return (
-    <div style={{ display: 'flex', gap: 12 }}>
-      <div style={{
-        width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-        background: 'var(--accent)', color: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 13, fontWeight: 800,
-      }}>{n}</div>
-      <div>
-        <p style={{ fontSize: 13, fontWeight: 700 }}>{text}</p>
-        <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2, lineHeight: 1.4 }}>{detail}</p>
+    <div style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <span style={{ fontSize: 20, flexShrink: 0, marginTop: 2 }}>{icon}</span>
+        <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+          <p style={{ fontSize: 14, fontWeight: 700 }}>{title}</p>
+          <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4, lineHeight: 1.5 }}>{description}</p>
+          {blocked && (
+            <p style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>
+              Blocked by browser. Enable in your browser or device settings.
+            </p>
+          )}
+        </div>
+        <button
+          onClick={onToggle}
+          style={{
+            width: 48, height: 28, borderRadius: 14, border: 'none', cursor: 'pointer',
+            background: on ? 'var(--accent)' : 'var(--surface3)',
+            position: 'relative', flexShrink: 0, transition: 'background 0.2s', marginTop: 2,
+          }}
+        >
+          <div style={{
+            width: 22, height: 22, borderRadius: '50%', background: '#fff',
+            position: 'absolute', top: 3,
+            left: on ? 23 : 3,
+            transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+          }} />
+        </button>
       </div>
     </div>
   )
 }
 
-const linkBtn: React.CSSProperties = {
-  display: 'block', width: '100%', padding: '10px 0', border: 'none',
-  background: 'transparent', color: 'var(--text)', fontSize: 13, fontWeight: 600,
-  cursor: 'pointer', textAlign: 'left', borderTop: '1px solid var(--border)',
+function Step({ n, text }: { n: number; text: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+      <div style={{
+        width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+        background: 'var(--accent)', color: '#fff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 12, fontWeight: 800,
+      }}>{n}</div>
+      <p style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>{text}</p>
+    </div>
+  )
 }
 
 const primaryBtn: React.CSSProperties = {

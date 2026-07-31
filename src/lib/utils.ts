@@ -52,6 +52,23 @@ export function txtOn(hex: string): string {
   return lum > 0.6 ? '#141824' : '#fff'
 }
 
+/** Ensure a member color is readable as text on app background.
+ *  Dark colors get lightened, light colors get darkened in light mode. */
+export function readableColor(hex: string): string {
+  if (!hex || hex.length < 7) return hex
+  const n = parseInt(hex.slice(1), 16)
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  // If too dark (< 0.35), lighten it by blending with white
+  if (lum < 0.35) {
+    r = Math.min(255, Math.round(r + (255 - r) * 0.45))
+    g = Math.min(255, Math.round(g + (255 - g) * 0.45))
+    b = Math.min(255, Math.round(b + (255 - b) * 0.45))
+    return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`
+  }
+  return hex
+}
+
 /** Birthday countdown in days (-1 if not within maxDays) */
 export function bdaySoon(birthday: string, maxDays = 14): number {
   const today = new Date()
