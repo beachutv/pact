@@ -910,29 +910,71 @@ export default function AppShell({
           )}
         </header>
 
-        {/* Unified circle panel — members + circle switcher + settings in one place */}
+        {/* Circle panel — bottom sheet */}
         {showCirclePanel && activeCircle && typeof document !== 'undefined' && createPortal(
           <>
           <div onClick={() => setShowCirclePanel(false)} style={{
-            position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.3)',
+            position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.45)',
           }} />
           <div style={{
-            position: 'fixed', left: 12, right: 12, top: 90, zIndex: 9999,
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 16,
-            maxHeight: 'calc(70vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
-            overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+            position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 9999,
+            background: 'var(--surface)', borderRadius: '20px 20px 0 0',
+            maxHeight: '80vh',
+            display: 'flex', flexDirection: 'column',
+            boxShadow: '0 -4px 30px rgba(0,0,0,0.3)',
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           }}>
-            {/* Active circle header with actions */}
+            {/* Drag handle */}
+            <div style={{ padding: '10px 0 6px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border)' }} />
+            </div>
+
+            {/* Circle tabs — horizontal scroll for switching circles */}
+            {circles.length > 1 && (
+              <div style={{
+                display: 'flex', gap: 6, padding: '0 16px 10px',
+                overflowX: 'auto', WebkitOverflowScrolling: 'touch', flexShrink: 0,
+              }}>
+                {orderedCircles.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => setActiveCircle(c)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                      padding: '6px 14px', borderRadius: 20, cursor: 'pointer',
+                      border: activeCircle.id === c.id ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                      background: activeCircle.id === c.id ? 'var(--accent-soft)' : 'var(--surface2)',
+                      color: activeCircle.id === c.id ? 'var(--accent)' : 'var(--text2)',
+                      fontSize: 13, fontWeight: 700,
+                    }}
+                  >
+                    <span style={{ fontSize: 14 }}>{c.emoji}</span>
+                    {c.name}
+                  </button>
+                ))}
+                <button
+                  onClick={() => { setShowCirclePanel(false); router.push('/circles/new') }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+                    padding: '6px 14px', borderRadius: 20, cursor: 'pointer',
+                    border: '1px dashed var(--border)', background: 'transparent',
+                    color: 'var(--text2)', fontSize: 13, fontWeight: 600,
+                  }}
+                >
+                  + New
+                </button>
+              </div>
+            )}
+
+            {/* Active circle header */}
             <div style={{
-              padding: '14px 14px 10px', borderBottom: '1px solid var(--border)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '8px 16px 10px', borderTop: '1px solid var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 20 }}>{activeCircle.emoji}</span>
+                <span style={{ fontSize: 18 }}>{activeCircle.emoji}</span>
                 <div>
-                  <p style={{ fontSize: 15, fontWeight: 800 }}>{activeCircle.name}</p>
+                  <p style={{ fontSize: 16, fontWeight: 800 }}>{activeCircle.name}</p>
                   <p style={{ fontSize: 11, color: 'var(--text2)' }}>{circleMembers.length} members</p>
                 </div>
               </div>
@@ -944,7 +986,7 @@ export default function AppShell({
                   title="Copy invite link"
                   style={{
                     background: 'var(--surface2)', border: '1px solid var(--border)',
-                    borderRadius: 10, padding: '6px 8px', cursor: 'pointer',
+                    borderRadius: 10, padding: '7px 9px', cursor: 'pointer',
                     display: 'flex', alignItems: 'center',
                   }}
                 >
@@ -958,7 +1000,7 @@ export default function AppShell({
                   title="Circle settings"
                   style={{
                     background: 'var(--surface2)', border: '1px solid var(--border)',
-                    borderRadius: 10, padding: '6px 8px', cursor: 'pointer',
+                    borderRadius: 10, padding: '7px 9px', cursor: 'pointer',
                     display: 'flex', alignItems: 'center',
                   }}
                 >
@@ -970,9 +1012,9 @@ export default function AppShell({
               </div>
             </div>
 
-            {/* Members list */}
-            <div style={{ padding: '6px 14px' }}>
-              {circleMembers.map(m => {
+            {/* Members list — scrollable */}
+            <div style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, padding: '0 16px' }}>
+              {circleMembers.map((m, i) => {
                 const isMe = m.id === user.id
                 const hasLocation = m.live_area && m.live_updated_at
                 const locAge = hasLocation ? Math.floor((Date.now() - new Date(m.live_updated_at!).getTime()) / 60000) : null
@@ -988,14 +1030,14 @@ export default function AppShell({
                     key={m.id}
                     onClick={() => { setShowCirclePanel(false); router.push(`/profile/${m.id}`) }}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '8px 0', cursor: 'pointer',
-                      borderBottom: '1px solid var(--border)',
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '10px 0', cursor: 'pointer',
+                      borderBottom: i < circleMembers.length - 1 ? '1px solid var(--border)' : 'none',
                     }}
                   >
                     <div style={{ position: 'relative', flexShrink: 0 }}>
                       <div className="avatar" style={{
-                        width: 32, height: 32, fontSize: 12,
+                        width: 36, height: 36, fontSize: 14,
                         background: m.color, color: txtOn(m.color),
                         position: 'relative', overflow: 'hidden',
                       }}>
@@ -1009,69 +1051,56 @@ export default function AppShell({
                       </div>
                       {isOnline && (
                         <div style={{
-                          position: 'absolute', bottom: -1, right: -1,
+                          position: 'absolute', bottom: 0, right: 0,
                           width: 10, height: 10, borderRadius: '50%',
                           background: '#8BB07E', border: '2px solid var(--surface)',
                         }} />
                       )}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>
-                        {m.name}{isMe ? ' (you)' : ''}
-                        {isOnline && <span style={{ fontSize: 10, color: '#8BB07E', marginLeft: 4 }}>online</span>}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600 }}>
+                          {m.name}{isMe ? ' (you)' : ''}
+                        </span>
+                        {isOnline && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, color: '#8BB07E',
+                            background: 'rgba(139,176,126,0.15)', padding: '1px 6px', borderRadius: 8,
+                          }}>online</span>
+                        )}
+                      </div>
                       {hasLocation && locAge !== null && locAge < 10080 && (
-                        <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                           {m.live_area} · {locLabel}
                         </p>
                       )}
                     </div>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.4 }}>
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
                   </div>
                 )
               })}
             </div>
 
-            {/* Other circles — only if user has more than one */}
-            {circles.length > 1 && (
-              <div style={{ padding: '6px 14px', borderTop: '1px solid var(--border)' }}>
-                <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
-                  Switch circle
-                </p>
-                {orderedCircles.filter(c => c.id !== activeCircle.id).map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => { setActiveCircle(c); setShowCirclePanel(false) }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                      padding: '9px 0', background: 'none', border: 'none', cursor: 'pointer',
-                      borderBottom: '1px solid var(--border)',
-                      color: 'var(--text)', fontSize: 14, fontWeight: 500, textAlign: 'left',
-                    }}
-                  >
-                    <span style={{ fontSize: 17 }}>{c.emoji}</span>
-                    {c.name}
-                  </button>
-                ))}
+            {/* Footer — single circle: show new circle button */}
+            {circles.length <= 1 && (
+              <div style={{
+                padding: '10px 16px', borderTop: '1px solid var(--border)', flexShrink: 0,
+              }}>
+                <button
+                  onClick={() => { setShowCirclePanel(false); router.push('/circles/new') }}
+                  style={{
+                    width: '100%', fontSize: 13, fontWeight: 700,
+                    color: 'var(--accent)', background: 'var(--accent-soft)', border: 'none',
+                    borderRadius: 12, padding: '10px 0', cursor: 'pointer',
+                  }}
+                >
+                  + Create or join a circle
+                </button>
               </div>
             )}
-
-            {/* Footer actions */}
-            <div style={{
-              padding: '10px 14px', borderTop: '1px solid var(--border)',
-              display: 'flex', gap: 8,
-            }}>
-              <button
-                onClick={() => { setShowCirclePanel(false); router.push('/circles/new') }}
-                style={{
-                  flex: 1, fontSize: 12, fontWeight: 700,
-                  color: 'var(--accent)', background: 'var(--accent-soft)', border: 'none',
-                  borderRadius: 10, padding: '9px 0', cursor: 'pointer',
-                }}
-              >
-                + New circle
-              </button>
-            </div>
           </div>
           </>,
           document.body
