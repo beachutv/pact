@@ -43,6 +43,13 @@ export default function PlansPage() {
   const [editArea, setEditArea] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Toast
+  const [toast, setToast] = useState('')
+  function showToast(msg: string) {
+    setToast(msg)
+    setTimeout(() => setToast(''), 2200)
+  }
+
 
   // Long press for quick actions
   const [longPressPactId, setLongPressPactId] = useState<string | null>(null)
@@ -197,11 +204,11 @@ export default function PlansPage() {
       spot_name: pact.spot_name !== 'TBD' ? pact.spot_name : null,
       spot_emoji: pact.spot_emoji || null,
       spot_area: pact.spot_area || null,
-      text: null,
+      text: `pact:${pact.id}`,
     })
     setSharing(false)
     setSharePactId(null)
-    alert('Pact shared to chat!')
+    showToast('📤 Pact shared to chat!')
   }
 
   const onRefresh = useCallback(async () => {
@@ -836,6 +843,18 @@ export default function PlansPage() {
               background: 'transparent', color: 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
             }}>Cancel</button>
           </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--surface3)', border: '1px solid var(--border)', color: 'var(--text)',
+          padding: '10px 18px', borderRadius: 24, fontSize: 13, fontWeight: 600, zIndex: 50,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.4)', whiteSpace: 'nowrap',
+        }}>
+          {toast}
         </div>
       )}
     </div>

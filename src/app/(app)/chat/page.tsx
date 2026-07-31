@@ -39,6 +39,7 @@ type Message = {
   reply_to: string | null
   rsvps: { user_id: string; response: string }[]
   reactions: Reaction[]
+  pact_id?: string | null
 }
 
 export default function ChatPage() {
@@ -214,12 +215,15 @@ export default function ChatPage() {
         const newMsg = payload.new as any
         setMessages(prev => {
           if (prev.some(m => m.id === newMsg.id)) return prev
-          return [...prev, { ...newMsg, rsvps: [], reactions: [] }]
+          return [...prev, { ...newMsg, rsvps: [], reactions: [], pact_id: newMsg.text?.startsWith('pact:') ? newMsg.text.replace('pact:', '') : null }]
         })
         scrollToBottom()
         markAsRead(activeThreadId)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rsvps' }, () => {
+        loadMessages(activeThreadId)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pact_members' }, () => {
         loadMessages(activeThreadId)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => {
@@ -264,6 +268,21 @@ export default function ChatPage() {
 
     const msgIds = msgs.map(m => m.id)
 
+    // Extract pact IDs from date card messages (stored as text: "pact:UUID")
+    const pactLinkedMsgs = msgs.filter(m => m.date_card && m.text?.startsWith('pact:'))
+    const pactIds = pactLinkedMsgs.map(m => m.text!.replace('pact:', ''))
+
+    // Load pact members for pact-linked date cards
+    let pactMemberMap: Record<string, string[]> = {}
+    if (pactIds.length > 0) {
+      const { data: pm } = await supabase
+        .from('pact_members').select('pact_id, user_id').in('pact_id', pactIds)
+      if (pm) for (const r of pm) {
+        if (!pactMemberMap[r.pact_id]) pactMemberMap[r.pact_id] = []
+        pactMemberMap[r.pact_id].push(r.user_id)
+      }
+    }
+
     // Load RSVPs for date cards
     const dateCardMsgIds = msgs.filter(m => m.date_card).map(m => m.id)
     let rsvpMap: Record<string, { user_id: string; response: string }[]> = {}
@@ -287,7 +306,20 @@ export default function ChatPage() {
       }
     }
 
-    setMessages(msgs.map(m => ({ ...m, rsvps: rsvpMap[m.id] || [], reactions: rxnMap[m.id] || [] })))
+    setMessages(msgs.map(m => {
+      const pactId = m.text?.startsWith('pact:') ? m.text.replace('pact:', '') : null
+      let rsvps = rsvpMap[m.id] || []
+
+      // For pact-linked messages, merge pact members as RSVPs (pact_members is the source of truth)
+      if (pactId && pactMemberMap[pactId]) {
+        const pactMembers = pactMemberMap[pactId]
+        // Use pact members as the RSVP list — they're the actual committed members
+        const mergedIds = new Set([...rsvps.map(r => r.user_id), ...pactMembers])
+        rsvps = Array.from(mergedIds).map(uid => ({ user_id: uid, response: 'in' }))
+      }
+
+      return { ...m, pact_id: pactId, rsvps, reactions: rxnMap[m.id] || [] }
+    }))
     scrollToBottom()
   }
 
@@ -373,7 +405,7 @@ export default function ChatPage() {
       spot_name: null, spot_emoji: null, spot_area: null,
       spot_avg_travel: null, with_user_ids: null, group_n: null,
       free_n: null, confirmed: false, created_at: new Date().toISOString(),
-      reply_to: replyId, rsvps: [], reactions: [],
+      reply_to: replyId, rsvps: [], reactions: [], pact_id: null,
     }
     setMessages(prev => [...prev, optimistic])
     scrollToBottom()
@@ -465,10 +497,49 @@ export default function ChatPage() {
     const msg = messages.find(m => m.id === messageId)
     if (!msg) return
     const existing = msg.rsvps.find(r => r.user_id === user.id)
+
     if (existing) {
+      // Removing RSVP
       await supabase.from('rsvps').delete().eq('message_id', messageId).eq('user_id', user.id)
+
+      // If pact-linked, also remove from pact_members
+      if (msg.pact_id) {
+        await supabase.from('pact_members').delete().eq('pact_id', msg.pact_id).eq('user_id', user.id)
+        await supabase.from('busy_blocks').delete().eq('pact_id', msg.pact_id).eq('user_id', user.id)
+        fetch('/api/calendar/delete-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pactId: msg.pact_id }),
+        }).catch(() => {})
+      }
     } else {
+      // Adding RSVP
       await supabase.from('rsvps').upsert({ message_id: messageId, user_id: user.id, response: 'in' })
+
+      // If pact-linked, also add to pact_members
+      if (msg.pact_id) {
+        await supabase.from('pact_members').upsert(
+          { pact_id: msg.pact_id, user_id: user.id },
+          { onConflict: 'pact_id,user_id' }
+        )
+
+        // Push event to Google Calendar
+        fetch('/api/calendar/push-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pactId: msg.pact_id,
+            date: msg.date_card,
+            startHour: msg.win_start,
+            endHour: msg.win_end,
+            location: msg.spot_name && msg.spot_area
+              ? `${msg.spot_name}, ${msg.spot_area}`
+              : msg.spot_name || undefined,
+            confirmed: false,
+            otherNames: [],
+          }),
+        }).catch(() => {})
+      }
     }
     await loadMessages(activeThreadId!)
   }
@@ -1055,6 +1126,7 @@ export default function ChatPage() {
           if (msg.date_card) {
             const myRsvp = msg.rsvps.find(r => r.user_id === user.id)
             const inCount = msg.rsvps.filter(r => r.response === 'in').length
+            const isPactLinked = !!msg.pact_id
             return (
               <div
                 key={msg.id}
@@ -1072,16 +1144,39 @@ export default function ChatPage() {
                 }}>{!sender?.avatar_url && (sender?.name[0] || '?')}</div>
                 <div style={{ maxWidth: '80%' }}>
                   {!isMe && <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 3, fontWeight: 600 }}>{sender?.name || 'Unknown'}</div>}
-                  <div style={{ background: 'var(--surface)', border: '1.5px solid var(--accent)', borderRadius: 16, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: 0.5 }}>📅 Proposed hangout</div>
+                  <div style={{ background: 'var(--surface)', border: `1.5px solid ${isPactLinked ? 'var(--green)' : 'var(--accent)'}`, borderRadius: 16, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: isPactLinked ? 'var(--green)' : 'var(--accent)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      {isPactLinked ? '📌 Pact' : '📅 Proposed hangout'}
+                    </div>
                     <div style={{ fontSize: 15, fontWeight: 800, marginTop: 6 }}>{fmtDate(msg.date_card)}</div>
                     <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>⏰ {fmtHour(msg.win_start!)} – {fmtHour(msg.win_end!)}</div>
                     {msg.spot_name && <div style={{ fontSize: 13, marginTop: 4 }}>{msg.spot_emoji || '📍'} <b>{msg.spot_name}</b>{msg.spot_area && ` · ${msg.spot_area}`}</div>}
-                    <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 6 }}>{inCount} in so far</div>
-                    <button onClick={() => handleRsvp(msg.id)} style={{
+                    {/* Member avatars */}
+                    {inCount > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 8 }}>
+                        {msg.rsvps.filter(r => r.response === 'in').slice(0, 6).map(r => {
+                          const m = getMember(r.user_id)
+                          return m ? (
+                            <div key={r.user_id} style={{
+                              width: 22, height: 22, borderRadius: '50%', background: m.color,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 9, fontWeight: 800, color: txtOn(m.color),
+                              marginLeft: -4, border: '2px solid var(--surface)',
+                            }}>{m.name[0]}</div>
+                          ) : null
+                        })}
+                        <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 6 }}>
+                          {inCount} in
+                        </span>
+                      </div>
+                    )}
+                    {inCount === 0 && (
+                      <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 6 }}>0 in so far</div>
+                    )}
+                    <button onClick={(e) => { e.stopPropagation(); handleRsvp(msg.id) }} style={{
                       marginTop: 8, width: '100%', padding: '8px 0', borderRadius: 10, border: 'none',
-                      background: myRsvp ? 'var(--accent)' : 'var(--surface2)',
-                      color: myRsvp ? '#fff' : 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                      background: myRsvp ? (isPactLinked ? 'var(--green-soft)' : 'var(--accent)') : 'var(--surface2)',
+                      color: myRsvp ? (isPactLinked ? 'var(--green)' : '#fff') : 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                     }}>{myRsvp ? "✓ You're in" : "👍 I'm in"}</button>
                   </div>
                 </div>
