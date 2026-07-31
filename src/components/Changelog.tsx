@@ -3,9 +3,22 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-const CURRENT_VERSION = '18.0'
+export const CURRENT_VERSION = '19.0'
 
 const CHANGELOG = [
+  {
+    version: '19.0',
+    date: 'August 1, 2026',
+    title: 'Privacy, Polish & Settings',
+    items: [
+      'Calendar privacy fix — deselecting all calendars now properly hides your availability',
+      'Save button always enabled — you can now save with zero calendars selected to opt out',
+      'Calendar ID mismatch fix — selected calendars now display correctly in the modal',
+      'Privacy policy page — added back button, uses app theme, fixed cut-off title',
+      'Logo consistency — "Pact." renders correctly across all pages',
+      '"What\'s new?" button added to settings',
+    ],
+  },
   {
     version: '18.0',
     date: 'August 1, 2026',
@@ -164,6 +177,10 @@ export default function Changelog() {
       const t = setTimeout(() => setShow(true), 1200)
       return () => clearTimeout(t)
     }
+    // Listen for manual open from settings
+    const handler = () => setShow(true)
+    window.addEventListener('pact-open-changelog', handler)
+    return () => window.removeEventListener('pact-open-changelog', handler)
   }, [])
 
   function dismiss() {

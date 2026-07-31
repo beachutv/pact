@@ -6,6 +6,7 @@ import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { txtOn } from '@/lib/utils'
 import { IconBell, IconPin, IconCalendar, IconRefresh, IconSmartphone, IconZap, IconSun, IconMoon } from '@/components/Icons'
+import { CURRENT_VERSION } from '@/components/Changelog'
 
 type PermState = 'granted' | 'denied' | 'prompt' | 'unsupported'
 
@@ -455,8 +456,21 @@ export default function SettingsPage() {
         <button onClick={() => router.push('/privacy')} style={{
           width: '100%', padding: '8px 0', border: 'none', background: 'transparent',
           color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
-        }}>Privacy policy</button>
-        <Row label="Version" right={<span style={{ fontSize: 12, color: 'var(--text2)' }}>17.0</span>} />
+          borderBottom: '1px solid var(--border)',
+        }}>Privacy policy →</button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Version {CURRENT_VERSION}</span>
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('pact-open-changelog'))}
+            style={{
+              padding: '4px 12px', borderRadius: 10, border: '1px solid var(--accent)',
+              background: 'transparent', color: 'var(--accent)',
+              fontSize: 11, fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            What&apos;s new?
+          </button>
+        </div>
       </Section>
 
       {/* A2HS modal */}

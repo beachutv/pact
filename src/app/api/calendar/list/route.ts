@@ -57,8 +57,12 @@ export async function GET() {
     accessRole: c.accessRole,
   }))
 
-  // Return current selection too
-  const selectedIds = conn.selected_calendars ?? [] // don't default to primary — user must opt in
+  // Return current selection — normalize "primary" alias to actual calendar id
+  const rawSelected: string[] = conn.selected_calendars ?? []
+  const primaryCal = calendars.find((c: any) => c.primary)
+  const selectedIds = rawSelected.map((id: string) =>
+    id === 'primary' && primaryCal ? primaryCal.id : id
+  )
 
   return NextResponse.json({ calendars, selectedIds })
 }

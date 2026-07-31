@@ -1262,15 +1262,14 @@ export default function AppShell({
             {gcals.length > 0 && (
               <button
                 onClick={saveCalendarSelection}
-                disabled={selectedCals.length === 0}
                 style={{
                   marginTop: 12, width: '100%', padding: 12, border: 'none', borderRadius: 12,
-                  background: selectedCals.length > 0 ? 'var(--accent)' : 'var(--surface3)',
-                  color: selectedCals.length > 0 ? '#fff' : 'var(--text2)',
+                  background: 'var(--accent)',
+                  color: '#fff',
                   fontSize: 14, fontWeight: 700, cursor: 'pointer',
                 }}
               >
-                Save & sync
+                {selectedCals.length > 0 ? 'Save & sync' : 'Save (no calendars shared)'}
               </button>
             )}
             {calError && calError.includes('expired') && (
