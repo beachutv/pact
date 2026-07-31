@@ -191,6 +191,7 @@ export default function SettingsPage() {
 
   function handleTheme(t: string) {
     setTheme(t)
+    localStorage.setItem('pact_theme', t)
     const applied = t === 'system'
       ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
       : t

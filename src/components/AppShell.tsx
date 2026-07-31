@@ -232,7 +232,14 @@ export default function AppShell({
   const showMembersList = false
   const showYourCircles = false
 
-  const [theme, setTheme] = useState(user.theme || 'dark')
+  // Theme — use localStorage as source of truth to survive SSR staleness
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pact_theme')
+      if (saved) return saved
+    }
+    return user.theme || 'dark'
+  })
   const [showThemePicker, setShowThemePicker] = useState(false)
   const [showNotifs, setShowNotifs] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
@@ -639,6 +646,7 @@ export default function AppShell({
   function selectTheme(t: string) {
     setTheme(t)
     setShowThemePicker(false)
+    localStorage.setItem('pact_theme', t)
     supabase.from('users').update({ theme: t }).eq('id', user.id)
   }
 
