@@ -1574,11 +1574,26 @@ export default function CalendarPage() {
 
                   {/* Per-member origin info */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-                    {memberOrigins.map((o, i) => (
-                      <div key={i} style={{ fontSize: 11, color: 'var(--text2)' }}>
-                        <b style={{ color: o.color, fontWeight: 700 }}>{o.name}</b> — {o.label}
-                      </div>
-                    ))}
+                    {memberOrigins.map((o, i) => {
+                      // Shorten long addresses to city/area
+                      let shortLabel = o.label
+                      if (shortLabel.length > 50) {
+                        // Extract the key parts: "coming from X (busy till Y)" or "near X"
+                        const match = shortLabel.match(/^(coming from |near )(.+?)(\s*\(busy till .+\))?$/)
+                        if (match) {
+                          const addr = match[2]
+                          // Take first 2 parts of comma-separated address
+                          const parts = addr.split(',').map(s => s.trim())
+                          const short = parts.length > 2 ? parts.slice(0, 2).join(', ') : addr
+                          shortLabel = `${match[1]}${short}${match[3] || ''}`
+                        }
+                      }
+                      return (
+                        <div key={i} style={{ fontSize: 11, color: 'var(--text2)' }}>
+                          <b style={{ color: readableColor(o.color), fontWeight: 700 }}>{o.name}</b> — {shortLabel}
+                        </div>
+                      )
+                    })}
                   </div>
 
                   {/* Search spots */}

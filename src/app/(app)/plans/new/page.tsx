@@ -9,6 +9,22 @@ import LocationPicker from '@/components/LocationPicker'
 import { sendPushNotification } from '@/lib/push'
 
 function NewPlanContent() {
+  // Generate 30-min time slots between start and end hours
+  function timeSlots(from: number, to: number): number[] {
+    const slots: number[] = []
+    for (let h = from; h <= to; h += 0.5) slots.push(h)
+    return slots
+  }
+
+  // Format hour with optional :30 (e.g., 18 → "6 PM", 18.5 → "6:30 PM")
+  function fmtHourMin(h: number): string {
+    const n = Math.floor(h % 24)
+    const min = h % 1 === 0.5 ? ':30' : ''
+    if (n === 0) return `12${min} MN`
+    if (n === 12) return `12${min} PM`
+    return n < 12 ? `${n}${min} AM` : `${n - 12}${min} PM`
+  }
+
   const { user, activeCircle, circleMembers } = useCircle()
   const supabase = createClient()
   const router = useRouter()
@@ -225,8 +241,8 @@ function NewPlanContent() {
               color: 'var(--text)', fontSize: 13, fontWeight: 600,
             }}
           >
-            {Array.from({ length: 15 }, (_, i) => i + 8).map(h => (
-              <option key={h} value={h}>{fmtHour(h)}</option>
+            {timeSlots(7, 25.5).map(h => (
+              <option key={h} value={h}>{fmtHourMin(h)}</option>
             ))}
           </select>
           <label style={{ fontSize: 12, color: 'var(--text2)', width: 20 }}>to</label>
@@ -239,8 +255,8 @@ function NewPlanContent() {
               color: 'var(--text)', fontSize: 13, fontWeight: 600,
             }}
           >
-            {Array.from({ length: 15 }, (_, i) => i + 9).map(h => (
-              <option key={h} value={h} disabled={h <= startHour}>{fmtHour(h)}</option>
+            {timeSlots(7.5, 26).map(h => (
+              <option key={h} value={h} disabled={h <= startHour}>{fmtHourMin(h)}</option>
             ))}
           </select>
         </div>

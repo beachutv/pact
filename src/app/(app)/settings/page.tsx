@@ -45,29 +45,15 @@ export default function SettingsPage() {
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 2200) }
 
   useEffect(() => {
-    // Check calendar connection using the list API (known to work)
+    // Check calendar connection — exact same query as profile page
     async function checkCal() {
-      try {
-        const res = await fetch('/api/calendar/list')
-        if (res.ok) {
-          const json = await res.json()
-          setCalConnected(true)
-          setSelectedCals(json.selected || [])
-          // Get creation date from a separate check
-          const { data: conn } = await supabase
-            .from('calendar_connections')
-            .select('created_at')
-            .eq('user_id', user.id)
-            .eq('provider', 'google')
-            .single()
-          if (conn) setLastSynced(conn.created_at)
-        } else {
-          // 400 = no calendar connected, which is fine
-          setCalConnected(false)
-        }
-      } catch {
-        setCalConnected(false)
-      }
+      const { data: conn } = await supabase
+        .from('calendar_connections')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('provider', 'google')
+        .single()
+      setCalConnected(!!conn)
       setCalLoading(false)
     }
     checkCal()
@@ -329,40 +315,27 @@ export default function SettingsPage() {
         {calLoading ? (
           <p style={{ fontSize: 13, color: 'var(--text2)', padding: '8px 0' }}>Checking...</p>
         ) : calConnected ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Row label="Status" right={<Pill color="var(--green)">Connected</Pill>} />
             {calEmail && <Row label="Account" right={<span style={{ fontSize: 12, color: 'var(--text2)' }}>{calEmail}</span>} />}
-            {selectedCals && selectedCals.length === 0 && (
-              <div style={{
-                margin: '8px 0', padding: '8px 12px', borderRadius: 10,
-                background: 'var(--amber-soft)', border: '1px solid rgba(255,184,84,0.3)',
-                fontSize: 12, color: 'var(--amber)', fontWeight: 600, lineHeight: 1.4,
-              }}>
-                No calendars selected — your availability won&apos;t show up. Tap &quot;Select calendars&quot; to pick which ones to share.
-              </div>
-            )}
-            <Row label="Last synced" right={
-              <span style={{ fontSize: 12, color: 'var(--text2)' }}>
-                {lastSynced ? new Date(lastSynced).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Not yet'}
-              </span>
-            } />
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => window.dispatchEvent(new CustomEvent('pact-open-cal-selector'))} style={{
                 flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid var(--border)',
                 background: 'var(--surface2)', color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
               }}>
-                Select calendars
+                My Calendars
               </button>
               <button onClick={syncCalendar} disabled={syncing} style={{
                 flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid var(--border)',
                 background: 'var(--surface2)', color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                opacity: syncing ? 0.5 : 1,
+                opacity: syncing ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
               }}>
-                {syncing ? 'Syncing...' : 'Sync now'}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={syncing ? { animation: 'spin 1s linear infinite' } : undefined}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                {syncing ? 'Syncing' : 'Sync'}
               </button>
             </div>
             <button onClick={disconnectCalendar} style={{
-              marginTop: 8, padding: '8px 0', border: 'none', background: 'transparent',
+              padding: '8px 0', border: 'none', background: 'transparent',
               color: 'var(--red)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
             }}>
               Disconnect calendar

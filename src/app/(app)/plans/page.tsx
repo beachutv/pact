@@ -672,30 +672,30 @@ export default function PlansPage() {
                     </div>
                   )}
 
-                  {/* Join button — only if not already in (visible collapsed) */}
-                  {!isIn && expandedPactId !== p.id && (
-                    <button
-                      onClick={() => joinPact(p.id)}
-                      style={{
-                        marginTop: 8, padding: '8px 0', borderRadius: 10, border: 'none',
-                        background: 'var(--accent)', color: '#fff',
-                        fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                      }}
-                    >
-                      I&apos;m in!
-                    </button>
-                  )}
-                  {!isIn && expandedPactId === p.id && (
-                    <button
-                      onClick={() => joinPact(p.id)}
-                      style={{
-                        padding: '8px 0', borderRadius: 10, border: 'none',
-                        background: 'var(--accent)', color: '#fff',
-                        fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                      }}
-                    >
-                      I&apos;m in!
-                    </button>
+                  {/* Join / Decline buttons — only if not already in */}
+                  {!isIn && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <button
+                        onClick={() => joinPact(p.id)}
+                        style={{
+                          flex: 2, padding: '10px 0', borderRadius: 10, border: 'none',
+                          background: 'var(--accent)', color: '#fff',
+                          fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                        }}
+                      >
+                        I&apos;m in!
+                      </button>
+                      <button
+                        onClick={() => showToast('Noted — marked as unavailable')}
+                        style={{
+                          flex: 1, padding: '10px 0', borderRadius: 10,
+                          border: '1px solid var(--border)', background: 'var(--surface2)',
+                          color: 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                        }}
+                      >
+                        Can&apos;t make it
+                      </button>
+                    </div>
                   )}
                 </>
               )}
