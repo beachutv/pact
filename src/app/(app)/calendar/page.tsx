@@ -1007,13 +1007,22 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {/* Upcoming pacts */}
-        {pacts.length > 0 && (
+        {/* Upcoming pacts — this week only */}
+        {(() => {
+          const now = new Date()
+          const dayOfWeek = now.getDay() // 0=Sun
+          const monday = new Date(now)
+          monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
+          const sunday = new Date(monday)
+          sunday.setDate(monday.getDate() + 6)
+          const sunStr = sunday.toISOString().slice(0, 10)
+          const weekPacts = pacts.filter(p => p.date >= todayStr && p.date <= sunStr)
+          return weekPacts.length > 0 ? (
           <div style={{ marginBottom: 14 }}>
             <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
-              📌 Upcoming Pacts
+              📌 This week
             </p>
-            {pacts.slice(0, 3).map(p => {
+            {weekPacts.slice(0, 3).map(p => {
               const du = daysUntil(p.date)
               const count = du === 0 ? 'today!' : du === 1 ? 'tomorrow' : `in ${du} days`
               return (
@@ -1082,7 +1091,7 @@ export default function CalendarPage() {
                 </div>
               )
             })}
-            {pacts.length > 3 && (
+            {weekPacts.length > 3 && (
               <button
                 onClick={() => router.push('/plans')}
                 style={{
@@ -1095,7 +1104,8 @@ export default function CalendarPage() {
               </button>
             )}
           </div>
-        )}
+        ) : null
+        })()}
 
         {/* Birthday reminders */}
         {upcomingBirthdays.length > 0 && (

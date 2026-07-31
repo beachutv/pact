@@ -3,9 +3,23 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-const CURRENT_VERSION = '16.0'
+const CURRENT_VERSION = '17.0'
 
 const CHANGELOG = [
+  {
+    version: '17.0',
+    date: 'July 31, 2026',
+    title: 'Push Notifications + Pact Commitment',
+    items: [
+      '🔔 Push notifications — get alerted when friends message you or make plans (works on Android Chrome & iOS Home Screen)',
+      '🤝 Slide-to-confirm — creating a pact now feels intentional with a swipe gesture',
+      '💔 Hold-to-break — leaving a pact takes 2 seconds of holding, and everyone gets notified',
+      '📌 Expandable pact cards — tap to see full member list, RSVP status, and send-to-chat',
+      '📅 Calendar only shows this week\'s pacts above sparks (full list in Plans tab)',
+      '🔐 Calendar auth now happens before profile setup — blocked users see a clear message',
+      '🎨 Logo fix — "Pact." renders consistently everywhere',
+    ],
+  },
   {
     version: '16.0',
     date: 'July 30, 2026',
