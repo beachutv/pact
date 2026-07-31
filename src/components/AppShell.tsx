@@ -409,79 +409,131 @@ export default function AppShell({
     }
   }, [user.id])
 
-  // Push notifications
-  const [showPushPrompt, setShowPushPrompt] = useState(false)
+  // Welcome flow for new users (location → notifications → add to home screen)
+  const [showWelcomeFlow, setShowWelcomeFlow] = useState(false)
+  const [welcomeStep, setWelcomeStep] = useState<'location' | 'notifications' | 'homescreen' | null>(null)
   const pushSetupDone = useRef(false)
   useEffect(() => {
     if (pushSetupDone.current) return
     pushSetupDone.current = true
 
-    async function setupPush() {
-      if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+    async function setupPushAndWelcome() {
+      if (typeof window === 'undefined') return
 
-      // Register service worker
-      try {
-        await navigator.serviceWorker.register('/sw.js')
-      } catch (e) {
-        console.error('SW registration failed:', e)
-        return
-      }
-
-      const permission = Notification.permission
-      if (permission === 'denied') return
-
-      // Check if already subscribed
-      const reg = await navigator.serviceWorker.ready
-      const existingSub = await reg.pushManager.getSubscription()
-
-      if (existingSub) {
-        // Already subscribed — make sure it's saved (idempotent upsert)
-        await fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subscription: existingSub.toJSON() }),
-        })
-        return
-      }
-
-      // Not subscribed yet — check if we've asked before
-      if (permission === 'default') {
-        const dismissed = localStorage.getItem('pact_push_dismissed')
-        if (!dismissed) {
-          // Show prompt after a short delay so the app loads first
-          setTimeout(() => setShowPushPrompt(true), 3000)
+      // Register service worker if available
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        try {
+          await navigator.serviceWorker.register('/sw.js')
+        } catch (e) {
+          console.error('SW registration failed:', e)
         }
+
+        // If already subscribed, save (idempotent)
+        try {
+          const reg = await navigator.serviceWorker.ready
+          const existingSub = await reg.pushManager.getSubscription()
+          if (existingSub) {
+            await fetch('/api/push/subscribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ subscription: existingSub.toJSON() }),
+            })
+          }
+        } catch {}
+      }
+
+      // Check if welcome flow has been shown
+      const welcomed = localStorage.getItem('pact_welcomed')
+      if (!welcomed) {
+        setTimeout(() => {
+          setShowWelcomeFlow(true)
+          // Determine which step to start with
+          const locAsked = localStorage.getItem('pact_loc_asked')
+          if (!locAsked && navigator.geolocation) {
+            setWelcomeStep('location')
+          } else if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+            setWelcomeStep('notifications')
+          } else {
+            const standalone = window.matchMedia('(display-mode: standalone)').matches
+              || (navigator as any).standalone === true
+            if (!standalone) {
+              setWelcomeStep('homescreen')
+            } else {
+              // Everything already done
+              localStorage.setItem('pact_welcomed', '1')
+              setShowWelcomeFlow(false)
+            }
+          }
+        }, 2000)
       }
     }
 
-    setupPush()
+    setupPushAndWelcome()
   }, [user.id])
 
-  async function handlePushAllow() {
-    setShowPushPrompt(false)
-    try {
-      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-      if (!vapidKey) return
-
-      const reg = await navigator.serviceWorker.ready
-      const subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: vapidKey,
-      })
-
-      await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subscription: subscription.toJSON() }),
-      })
-    } catch (e) {
-      console.error('Push subscription failed:', e)
+  function welcomeNext() {
+    if (welcomeStep === 'location') {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        setWelcomeStep('notifications')
+      } else {
+        const standalone = window.matchMedia('(display-mode: standalone)').matches
+          || (navigator as any).standalone === true
+        if (!standalone) {
+          setWelcomeStep('homescreen')
+        } else {
+          welcomeDone()
+        }
+      }
+    } else if (welcomeStep === 'notifications') {
+      const standalone = window.matchMedia('(display-mode: standalone)').matches
+        || (navigator as any).standalone === true
+      if (!standalone) {
+        setWelcomeStep('homescreen')
+      } else {
+        welcomeDone()
+      }
+    } else {
+      welcomeDone()
     }
   }
 
-  function handlePushDismiss() {
-    setShowPushPrompt(false)
-    localStorage.setItem('pact_push_dismissed', '1')
+  function welcomeDone() {
+    localStorage.setItem('pact_welcomed', '1')
+    setShowWelcomeFlow(false)
+    setWelcomeStep(null)
+  }
+
+  async function welcomeAllowLocation() {
+    localStorage.setItem('pact_loc_asked', '1')
+    navigator.geolocation.getCurrentPosition(
+      () => welcomeNext(),
+      () => welcomeNext(),
+      { timeout: 10000 }
+    )
+  }
+
+  async function welcomeAllowNotifications() {
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted' && 'PushManager' in window) {
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+        if (vapidKey) {
+          const reg = await navigator.serviceWorker.ready
+          const subscription = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: vapidKey,
+          })
+          await fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subscription: subscription.toJSON() }),
+          })
+        }
+      }
+    } catch (e) {
+      console.error('Push subscription failed:', e)
+    }
+    welcomeNext()
   }
 
   // Chat unread count
@@ -759,57 +811,18 @@ export default function AppShell({
                 )}
               </button>
 
-              {/* Calendar selector */}
+              {/* Settings gear */}
               <button
-                onClick={() => !calLoading && loadCalendars()}
-                title="My Calendars"
-                style={{
-                  background: 'var(--surface2)', border: '1px solid var(--border)',
-                  cursor: calLoading ? 'wait' : 'pointer', padding: '6px 10px', borderRadius: 20,
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  fontSize: 11, fontWeight: 600, color: 'var(--text)',
-                  opacity: calLoading ? 0.6 : 1,
-                }}
-              >
-                {calLoading ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-                  </svg>
-                ) : (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                    <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-                    <line x1="3" y1="10" x2="21" y2="10"/>
-                  </svg>
-                )}
-                {calLoading ? 'Loading...' : 'My calendars'}
-              </button>
-
-              {/* Theme picker */}
-              <button
-                onClick={() => setShowThemePicker(!showThemePicker)}
+                onClick={() => router.push('/settings')}
                 style={{
                   background: 'var(--surface2)', border: '1px solid var(--border)',
                   cursor: 'pointer', padding: '6px 8px', borderRadius: 20,
                   display: 'flex', alignItems: 'center',
                 }}
               >
-                {themeIcon === 'sun' ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-                  </svg>
-                ) : themeIcon === 'moon' ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                  </svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20V2z" fill="var(--text)"/>
-                  </svg>
-                )}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
               </button>
             </div>
           </div>
@@ -1050,57 +1063,6 @@ export default function AppShell({
         )}
 
         {/* Theme picker dropdown — portal */}
-        {showThemePicker && typeof document !== 'undefined' && createPortal(
-          <>
-            <div onClick={() => setShowThemePicker(false)} style={{ position: 'fixed', inset: 0, zIndex: 9998 }} />
-            <div style={{
-              position: 'fixed', right: 16, top: 52, zIndex: 9999,
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 14, boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
-              padding: 6, minWidth: 150,
-            }}>
-              {[
-                { key: 'light', label: 'Light', icon: (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="5"/>
-                    <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-                  </svg>
-                )},
-                { key: 'dark', label: 'Dark', icon: (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                  </svg>
-                )},
-                { key: 'system', label: 'System', icon: (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="M12 2a10 10 0 0 1 0 20V2z" fill="currentColor"/>
-                  </svg>
-                )},
-              ].map(opt => (
-                <button
-                  key={opt.key}
-                  onClick={() => selectTheme(opt.key)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    width: '100%', padding: '9px 12px', border: 'none',
-                    borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                    background: theme === opt.key ? 'var(--accent-soft)' : 'transparent',
-                    color: theme === opt.key ? 'var(--accent)' : 'var(--text)',
-                  }}
-                >
-                  {opt.icon}
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </>,
-          document.body
-        )}
-
         {/* Notifications dropdown — portal */}
         {showNotifs && typeof document !== 'undefined' && createPortal(
           <>
@@ -1322,38 +1284,109 @@ export default function AppShell({
         </div>,
         document.body
       )}
-      {/* Push notification permission prompt */}
-      {showPushPrompt && typeof document !== 'undefined' && createPortal(
+      {/* Welcome flow for new users */}
+      {showWelcomeFlow && welcomeStep && typeof document !== 'undefined' && createPortal(
         <div style={{
-          position: 'fixed', bottom: 'calc(70px + env(safe-area-inset-bottom))', left: 12, right: 12,
-          zIndex: 60, maxWidth: 420, margin: '0 auto',
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+          zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
         }}>
           <div style={{
-            background: 'var(--surface2)', border: '1px solid var(--border)',
-            borderRadius: 16, padding: '14px 16px',
-            boxShadow: '0 8px 32px rgba(0,0,0,.4)',
-            display: 'flex', alignItems: 'center', gap: 12,
+            background: 'var(--surface2)', borderRadius: '20px 20px 0 0',
+            padding: '20px 20px calc(20px + env(safe-area-inset-bottom))',
+            width: '100%', maxWidth: 440,
           }}>
-            <span style={{ fontSize: 24, flexShrink: 0 }}>🔔</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
-                Get notified when friends message you or make plans?
-              </p>
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button onClick={handlePushAllow} style={{
-                  padding: '7px 14px', borderRadius: 10, border: 'none',
-                  background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 16px' }} />
+
+            {welcomeStep === 'location' && (
+              <>
+                <p style={{ fontSize: 28, marginBottom: 8 }}>📍</p>
+                <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>Enable location?</p>
+                <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 16 }}>
+                  This lets Pact calculate travel times from where you actually are, and detect when you&apos;re near a friend with shared free time (Sparks). Without it, travel times use your home area instead — still works, just less accurate.
+                </p>
+                <button onClick={welcomeAllowLocation} style={{
+                  width: '100%', padding: 14, border: 'none', borderRadius: 14,
+                  background: 'var(--accent)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
                 }}>
-                  Allow
+                  Allow location
                 </button>
-                <button onClick={handlePushDismiss} style={{
-                  padding: '7px 14px', borderRadius: 10, border: '1px solid var(--border)',
-                  background: 'none', color: 'var(--text2)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                <button onClick={() => { localStorage.setItem('pact_loc_asked', '1'); welcomeNext() }} style={{
+                  width: '100%', padding: 12, border: 'none', borderRadius: 12, marginTop: 8,
+                  background: 'transparent', color: 'var(--text2)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}>
+                  Skip for now
+                </button>
+              </>
+            )}
+
+            {welcomeStep === 'notifications' && (
+              <>
+                <p style={{ fontSize: 28, marginBottom: 8 }}>🔔</p>
+                <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>Turn on notifications?</p>
+                <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 16 }}>
+                  Get alerted when friends message you, make plans, or when a Spark detects you&apos;re near someone free. Without this, you&apos;ll only see updates when you open the app.
+                </p>
+                <button onClick={welcomeAllowNotifications} style={{
+                  width: '100%', padding: 14, border: 'none', borderRadius: 14,
+                  background: 'var(--accent)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                }}>
+                  Turn on notifications
+                </button>
+                <button onClick={welcomeNext} style={{
+                  width: '100%', padding: 12, border: 'none', borderRadius: 12, marginTop: 8,
+                  background: 'transparent', color: 'var(--text2)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                 }}>
                   Not now
                 </button>
-              </div>
-            </div>
+              </>
+            )}
+
+            {welcomeStep === 'homescreen' && (
+              <>
+                <p style={{ fontSize: 28, marginBottom: 8 }}>📱</p>
+                <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>Add Pact to your home screen</p>
+                <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 16 }}>
+                  This makes Pact open full-screen like a native app, load faster, and is required for push notifications on iOS.
+                </p>
+                {/iPad|iPhone|iPod/.test(typeof navigator !== 'undefined' ? navigator.userAgent : '') ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 16, flexShrink: 0, width: 24, textAlign: 'center' }}>1.</span>
+                      <span style={{ fontSize: 13, lineHeight: 1.5 }}>Tap the <b>share button</b> ↑ at the bottom of Safari</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 16, flexShrink: 0, width: 24, textAlign: 'center' }}>2.</span>
+                      <span style={{ fontSize: 13, lineHeight: 1.5 }}>Scroll down and tap <b>&quot;Add to Home Screen&quot;</b></span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 16, flexShrink: 0, width: 24, textAlign: 'center' }}>3.</span>
+                      <span style={{ fontSize: 13, lineHeight: 1.5 }}>Tap <b>&quot;Add&quot;</b> — Pact appears on your home screen</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 16, flexShrink: 0, width: 24, textAlign: 'center' }}>1.</span>
+                      <span style={{ fontSize: 13, lineHeight: 1.5 }}>Tap the <b>three-dot menu ⋮</b> in your browser</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 16, flexShrink: 0, width: 24, textAlign: 'center' }}>2.</span>
+                      <span style={{ fontSize: 13, lineHeight: 1.5 }}>Tap <b>&quot;Add to Home Screen&quot;</b> or <b>&quot;Install app&quot;</b></span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 16, flexShrink: 0, width: 24, textAlign: 'center' }}>3.</span>
+                      <span style={{ fontSize: 13, lineHeight: 1.5 }}>Tap <b>&quot;Install&quot;</b> to confirm</span>
+                    </div>
+                  </div>
+                )}
+                <button onClick={welcomeDone} style={{
+                  width: '100%', padding: 14, border: 'none', borderRadius: 14,
+                  background: 'var(--accent)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                }}>
+                  Got it
+                </button>
+              </>
+            )}
           </div>
         </div>,
         document.body
