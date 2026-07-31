@@ -175,6 +175,12 @@ export default function Changelog() {
     if (seen !== CURRENT_VERSION) {
       // Small delay so the main UI loads first
       const t = setTimeout(() => setShow(true), 1200)
+      // Also fire a custom event so AppShell can insert a notification
+      const notifKey = `pact_changelog_notif_${CURRENT_VERSION}`
+      if (!localStorage.getItem(notifKey)) {
+        localStorage.setItem(notifKey, '1')
+        window.dispatchEvent(new CustomEvent('pact-new-version', { detail: { version: CURRENT_VERSION } }))
+      }
       return () => clearTimeout(t)
     }
     // Listen for manual open from settings

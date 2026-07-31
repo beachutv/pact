@@ -303,6 +303,28 @@ export default function AppShell({
     return () => window.removeEventListener('pact-open-cal-selector', handler)
   }, [])
 
+  // Listen for new version event and insert a notification
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const version = (e as CustomEvent).detail?.version
+      if (version && user?.id) {
+        const s = createClient()
+        s.from('notifications').insert({
+          user_id: user.id,
+          type: 'pact_change',
+          title: "What's new in Pact",
+          body: `Version ${version} is here — tap to see what changed`,
+          link: '/settings',
+        }).then(() => {
+          // Refresh notifications
+          // realtime subscription handles refresh
+        })
+      }
+    }
+    window.addEventListener('pact-new-version', handler)
+    return () => window.removeEventListener('pact-new-version', handler)
+  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function saveCalendarSelection() {
     await fetch('/api/calendar/list', {
       method: 'POST',
