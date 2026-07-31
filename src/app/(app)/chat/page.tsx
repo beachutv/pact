@@ -5,6 +5,7 @@ import { useCircle, type UserProfile } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { txtOn, fmtDate, fmtHour, AVATAR_COLORS } from '@/lib/utils'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
+import { sendPushNotification } from '@/lib/push'
 
 type Thread = {
   id: string
@@ -382,6 +383,19 @@ export default function ChatPage() {
     await supabase.from('messages').insert(insert)
     setSending(false)
     inputRef.current?.focus()
+
+    // Push notification to other thread members (fire and forget)
+    const activeThread = threads.find(t => t.id === activeThreadId)
+    if (activeThread) {
+      const otherIds = activeThread.member_ids.filter(id => id !== user.id)
+      sendPushNotification({
+        userIds: otherIds,
+        title: user.name || 'Someone',
+        body: text.length > 100 ? text.slice(0, 100) + '…' : text,
+        url: '/chat',
+        tag: `msg-${activeThreadId}`,
+      })
+    }
   }
 
   async function toggleReaction(msgId: string, emoji: string) {

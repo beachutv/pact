@@ -6,6 +6,7 @@ import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { fmtDate, fmtHour, fmtWin, txtOn } from '@/lib/utils'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
+import { sendPushNotification } from '@/lib/push'
 import LocationPicker from '@/components/LocationPicker'
 
 type Pact = {
@@ -171,6 +172,17 @@ export default function PlansPage() {
       }).catch(() => {})
     }
     await loadPacts()
+
+    // Push notification to pact creator about RSVP
+    if (pact && pact.created_by && pact.created_by !== user.id) {
+      sendPushNotification({
+        userIds: [pact.created_by as string],
+        title: 'Pact Update',
+        body: `${user.name?.split(' ')[0] || 'Someone'} is in for ${pact.occasion || fmtDate(pact.date)}`,
+        url: '/plans',
+        tag: `rsvp-${pactId}`,
+      })
+    }
   }
 
   async function leavePact(pactId: string) {
@@ -216,6 +228,15 @@ export default function PlansPage() {
       }
       // Update status to 'cancelled' instead of deleting
       await supabase.from('pacts').update({ status: 'cancelled' }).eq('id', pactId)
+
+      // Push notification to all members about cancellation
+      sendPushNotification({
+        userIds: otherMembers.map(m => m.user_id),
+        title: `${cancelTitle} cancelled`,
+        body: `${user.name?.split(' ')[0] || 'Someone'} cancelled the pact on ${fmtDate(pact.date)}`,
+        url: '/plans',
+        tag: `pact-cancel-${pactId}`,
+      })
     }
 
     // Delete busy blocks and pact data

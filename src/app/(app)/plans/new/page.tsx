@@ -6,6 +6,7 @@ import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { fmtDate, fmtHour } from '@/lib/utils'
 import LocationPicker from '@/components/LocationPicker'
+import { sendPushNotification } from '@/lib/push'
 
 function NewPlanContent() {
   const { user, activeCircle, circleMembers } = useCircle()
@@ -168,6 +169,20 @@ function NewPlanContent() {
 
       // Show toast and redirect to plans
       setToast('Pact proposed! Your circle will see it.')
+
+      // Push notification to selected members
+      const pushTargets = circleMembers
+        .filter(m => m.id !== user.id && selectedMemberIds.has(m.id))
+        .map(m => m.id)
+      if (pushTargets.length) {
+        sendPushNotification({
+          userIds: pushTargets,
+          title: 'New Pact',
+          body: `${user.name?.split(' ')[0] || 'Someone'} wants to make a pact on ${fmtDate(date)}`,
+          url: '/plans',
+          tag: `pact-${pactId}`,
+        })
+      }
       setTimeout(() => {
         window.location.href = '/plans'
       }, 800)

@@ -409,6 +409,81 @@ export default function AppShell({
     }
   }, [user.id])
 
+  // Push notifications
+  const [showPushPrompt, setShowPushPrompt] = useState(false)
+  const pushSetupDone = useRef(false)
+  useEffect(() => {
+    if (pushSetupDone.current) return
+    pushSetupDone.current = true
+
+    async function setupPush() {
+      if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+
+      // Register service worker
+      try {
+        await navigator.serviceWorker.register('/sw.js')
+      } catch (e) {
+        console.error('SW registration failed:', e)
+        return
+      }
+
+      const permission = Notification.permission
+      if (permission === 'denied') return
+
+      // Check if already subscribed
+      const reg = await navigator.serviceWorker.ready
+      const existingSub = await reg.pushManager.getSubscription()
+
+      if (existingSub) {
+        // Already subscribed — make sure it's saved (idempotent upsert)
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscription: existingSub.toJSON() }),
+        })
+        return
+      }
+
+      // Not subscribed yet — check if we've asked before
+      if (permission === 'default') {
+        const dismissed = localStorage.getItem('pact_push_dismissed')
+        if (!dismissed) {
+          // Show prompt after a short delay so the app loads first
+          setTimeout(() => setShowPushPrompt(true), 3000)
+        }
+      }
+    }
+
+    setupPush()
+  }, [user.id])
+
+  async function handlePushAllow() {
+    setShowPushPrompt(false)
+    try {
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      if (!vapidKey) return
+
+      const reg = await navigator.serviceWorker.ready
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: vapidKey,
+      })
+
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: subscription.toJSON() }),
+      })
+    } catch (e) {
+      console.error('Push subscription failed:', e)
+    }
+  }
+
+  function handlePushDismiss() {
+    setShowPushPrompt(false)
+    localStorage.setItem('pact_push_dismissed', '1')
+  }
+
   // Chat unread count
   useEffect(() => {
     async function fetchChatUnread() {
@@ -1243,6 +1318,42 @@ export default function AppShell({
             >
               Disconnect Google Calendar
             </button>
+          </div>
+        </div>,
+        document.body
+      )}
+      {/* Push notification permission prompt */}
+      {showPushPrompt && typeof document !== 'undefined' && createPortal(
+        <div style={{
+          position: 'fixed', bottom: 'calc(70px + env(safe-area-inset-bottom))', left: 12, right: 12,
+          zIndex: 60, maxWidth: 420, margin: '0 auto',
+        }}>
+          <div style={{
+            background: 'var(--surface2)', border: '1px solid var(--border)',
+            borderRadius: 16, padding: '14px 16px',
+            boxShadow: '0 8px 32px rgba(0,0,0,.4)',
+            display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <span style={{ fontSize: 24, flexShrink: 0 }}>🔔</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
+                Get notified when friends message you or make plans?
+              </p>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={handlePushAllow} style={{
+                  padding: '7px 14px', borderRadius: 10, border: 'none',
+                  background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                }}>
+                  Allow
+                </button>
+                <button onClick={handlePushDismiss} style={{
+                  padding: '7px 14px', borderRadius: 10, border: '1px solid var(--border)',
+                  background: 'none', color: 'var(--text2)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                }}>
+                  Not now
+                </button>
+              </div>
+            </div>
           </div>
         </div>,
         document.body
