@@ -70,11 +70,11 @@ async function fetchEventLocations(
           String(mStart.getDate()).padStart(2, '0')
         const startHour = mStart.getHours()
         const endHour = mEnd.getDate() !== mStart.getDate()
-          ? 24
+          ? 26 // matches DAY_END — covers past midnight
           : Math.ceil(mEnd.getHours() + mEnd.getMinutes() / 60)
 
         // Store for each hour this event covers
-        for (let h = startHour; h < endHour && h < 24; h++) {
+        for (let h = startHour; h < endHour && h < 26; h++) {
           const key = `${dateStr}|${h}`
           // Later events overwrite earlier ones for the same hour — that's fine
           locationMap.set(key, event.location)
@@ -211,7 +211,7 @@ export async function POST(request: Request) {
 
       const endHour = manilaEnd < dayEnd
         ? Math.ceil(manilaEnd.getHours() + manilaEnd.getMinutes() / 60)
-        : 24
+        : 26 // extends to 2 AM next day — matches DAY_END in the calendar UI
 
       if (endHour > startHour) {
         // Find location for this block — check the last hour of the block

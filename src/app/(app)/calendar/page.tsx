@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
-import { toStr, fmtDate, fmtHour, fmtTiny, fmtWin, txtOn, readableColor, travelMin, travelMinGps, getBrowserTimezone, currentHourInTz, daysUntil, bdaySoon, AREAS, AREA_GPS, DAY_START, DAY_END } from '@/lib/utils'
+import { toStr, fmtDate, fmtHour, fmtTiny, fmtWin, txtOn, readableColor, travelMin, travelMinGps, getBrowserTimezone, currentHourInTz, daysUntil, bdaySoon, birthdayMMDD, AREAS, AREA_GPS, DAY_START, DAY_END } from '@/lib/utils'
 import { useLocationUpdate } from '@/lib/useLocationUpdate'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { IconZap, IconPin, IconClock, IconStar, IconCalendar, IconEdit, IconEye, IconSearch, IconGift, IconCheck, IconRefresh, IconUsers } from '@/components/Icons'
@@ -941,6 +941,17 @@ export default function CalendarPage() {
         }
       }
 
+      // Member birthdays — check if any circle member has a birthday on this day
+      const mmdd = ds.slice(5) // "MM-DD" from "YYYY-MM-DD"
+      const birthdayMembers = circleMembers.filter(m => m.birthday && birthdayMMDD(m.birthday) === mmdd)
+      const hasBirthday = birthdayMembers.length > 0
+      if (hasBirthday && !occasionIcons.includes('bday')) occasionIcons.push('bday')
+
+      // Birthday gives a red border (like the prototype)
+      if (hasBirthday && borderColor === 'transparent') {
+        borderColor = 'var(--red)'
+      }
+
       if (isToday) borderColor = 'var(--accent)'
       if (isSelected) borderColor = 'var(--text)'
 
@@ -1374,6 +1385,34 @@ export default function CalendarPage() {
               <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
                 Checking {activeIds.size === circleMembers.length ? 'everyone' : `${activeMembers.length} members`} · busy blocks are red — friends only see when, never what
               </div>
+
+              {/* Birthday banners */}
+              {(() => {
+                const mmdd = sheetDate.slice(5)
+                return circleMembers.filter(m => m.birthday && birthdayMMDD(m.birthday) === mmdd).map(m => (
+                  <div
+                    key={`bday-${m.id}`}
+                    style={{
+                      marginTop: 10, padding: '10px 12px', borderRadius: 12,
+                      background: 'var(--red-soft)', border: '1px solid rgba(231,118,93,0.4)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                      fontSize: 12.5, fontWeight: 700,
+                    }}
+                  >
+                    <span>🎂 It&apos;s {m.name}&apos;s birthday{m.id === user.id ? ' (you!)' : ''} — plan something!</span>
+                    <button
+                      onClick={() => window.location.href = '/plans/new'}
+                      style={{
+                        border: 'none', background: 'var(--accent)', color: '#fff',
+                        borderRadius: 10, padding: '7px 11px', fontSize: 11, fontWeight: 800,
+                        cursor: 'pointer', flexShrink: 0,
+                      }}
+                    >
+                      Plan
+                    </button>
+                  </div>
+                ))
+              })()}
 
               {/* Occasion banners */}
               {(pactsByDate[sheetDate] || []).filter(p => p.occasion).map(p => (

@@ -75,13 +75,24 @@ export function readableColor(hex: string): string {
 /** Birthday countdown in days (-1 if not within maxDays) */
 export function bdaySoon(birthday: string, maxDays = 14): number {
   const today = new Date()
-  const [mm, dd] = birthday.split('-').map(Number)
+  const parts = birthday.split('-').map(Number)
+  // Handle both "MM-DD" and "YYYY-MM-DD" formats
+  const mm = parts.length === 3 ? parts[1] : parts[0]
+  const dd = parts.length === 3 ? parts[2] : parts[1]
+  if (!mm || !dd) return -1
   let b = new Date(today.getFullYear(), mm - 1, dd)
   if (b < new Date(toStr(today) + 'T00:00:00')) {
     b = new Date(today.getFullYear() + 1, mm - 1, dd)
   }
   const days = Math.round((b.getTime() - new Date(toStr(today) + 'T00:00:00').getTime()) / 86400000)
   return days <= maxDays ? days : -1
+}
+
+/** Extract MM-DD from a birthday string (handles both "MM-DD" and "YYYY-MM-DD") */
+export function birthdayMMDD(birthday: string): string {
+  const parts = birthday.split('-')
+  if (parts.length === 3) return `${parts[1]}-${parts[2]}`
+  return birthday // already MM-DD
 }
 
 /** Escape HTML entities */
