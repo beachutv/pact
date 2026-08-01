@@ -23,6 +23,7 @@ type Pact = {
   created_by: string | null
   status: string
   members: { user_id: string }[]
+  declines: { user_id: string }[]
 }
 
 type MemberInfo = { id: string; name: string; color: string }
@@ -229,11 +230,11 @@ export default function PlansPage() {
     const today = new Date().toISOString().slice(0, 10)
     const { data } = await supabase
       .from('pacts')
-      .select('*, members:pact_members(user_id)')
+      .select('*, members:pact_members(user_id), declines:pact_declines(user_id)')
       .eq('circle_id', activeCircle!.id)
       .gte('date', today)
       .order('date', { ascending: true })
-    if (data) setPacts(data)
+    if (data) setPacts(data.map(p => ({ ...p, declines: p.declines || [] })))
     setLoading(false)
   }
 
@@ -608,7 +609,7 @@ export default function PlansPage() {
                       )}
                     </div>
 
-                    {/* Who's in — always visible */}
+                    {/* Who's in + who's out — always visible */}
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
                       {p.members.map(pm => {
                         const m = getMember(pm.user_id)
@@ -623,8 +624,36 @@ export default function PlansPage() {
                           </div>
                         )
                       })}
+                      {/* Show declined members with red X */}
+                      {(p.declines || []).map(d => {
+                        const m = getMember(d.user_id)
+                        if (!m) return null
+                        return (
+                          <div key={`out-${m.id}`} style={{ position: 'relative' }}>
+                            <div style={{
+                              width: 26, height: 26, borderRadius: '50%', background: m.color,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 10, fontWeight: 800, color: txtOn(m.color), opacity: 0.4,
+                            }}>
+                              {m.name[0]}
+                            </div>
+                            <span style={{
+                              position: 'absolute', top: -3, right: -3,
+                              width: 14, height: 14, borderRadius: '50%',
+                              background: 'var(--red)', color: '#fff',
+                              fontSize: 8, fontWeight: 800,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>✕</span>
+                          </div>
+                        )
+                      })}
                       <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 4 }}>
-                        {p.members.length}/{circleMembers.length} in
+                        {p.members.length} in
+                        {(p.declines || []).length > 0 && (
+                          <span style={{ color: 'var(--red)', marginLeft: 4 }}>
+                            · {p.declines.length} out
+                          </span>
+                        )}
                       </span>
                       <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 'auto' }}>
                         {expandedPactId === p.id ? '▲' : '▼'}
@@ -638,7 +667,7 @@ export default function PlansPage() {
                       marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
                       display: 'flex', flexDirection: 'column', gap: 8,
                     }}>
-                      {/* Member list with names */}
+                      {/* Member list with names + declined */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {p.members.map(pm => {
                           const m = getMember(pm.user_id)
@@ -654,6 +683,23 @@ export default function PlansPage() {
                               </div>
                               <span style={{ fontWeight: 600 }}>{m.name}{m.id === user.id ? ' (you)' : ''}</span>
                               <span style={{ color: 'var(--green)', marginLeft: 'auto', fontSize: 11, fontWeight: 700 }}>✓ In</span>
+                            </div>
+                          )
+                        })}
+                        {(p.declines || []).map(d => {
+                          const m = getMember(d.user_id)
+                          if (!m) return null
+                          return (
+                            <div key={`out-${m.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, opacity: 0.6 }}>
+                              <div style={{
+                                width: 20, height: 20, borderRadius: '50%', background: m.color,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 8, fontWeight: 800, color: txtOn(m.color), flexShrink: 0,
+                              }}>
+                                {m.name[0]}
+                              </div>
+                              <span style={{ fontWeight: 600 }}>{m.name}{m.id === user.id ? ' (you)' : ''}</span>
+                              <span style={{ color: 'var(--red)', marginLeft: 'auto', fontSize: 11, fontWeight: 700 }}>✕ Out</span>
                             </div>
                           )
                         })}
@@ -688,7 +734,7 @@ export default function PlansPage() {
                   )}
 
                   {/* Slide to commit / Decline — only if not already in */}
-                  {!isIn && declinedPacts.has(p.id) && (
+                  {!isIn && (declinedPacts.has(p.id) || p.declines?.some(d => d.user_id === user.id)) && (
                     <div style={{
                       marginTop: 8, padding: '10px 14px', borderRadius: 10,
                       background: 'var(--surface2)', textAlign: 'center',
@@ -697,7 +743,12 @@ export default function PlansPage() {
                         You declined this pact
                       </p>
                       <button
-                        onClick={() => setDeclinedPacts(prev => { const n = new Set(prev); n.delete(p.id); return n })}
+                        onClick={async () => {
+                          setDeclinedPacts(prev => { const n = new Set(prev); n.delete(p.id); return n })
+                          await supabase.from('pact_declines').delete()
+                            .eq('pact_id', p.id).eq('user_id', user.id)
+                          await loadPacts()
+                        }}
                         style={{
                           marginTop: 6, padding: '6px 16px', borderRadius: 8, border: '1px solid var(--border)',
                           background: 'transparent', color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
@@ -707,7 +758,7 @@ export default function PlansPage() {
                       </button>
                     </div>
                   )}
-                  {!isIn && !declinedPacts.has(p.id) && (
+                  {!isIn && !declinedPacts.has(p.id) && !p.declines?.some(d => d.user_id === user.id) && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                       <SlideToConfirm
                         label="Slide to lock in"
@@ -721,6 +772,11 @@ export default function PlansPage() {
                           if (p.created_by && !allOtherIds.includes(p.created_by) && p.created_by !== user.id) {
                             allOtherIds.push(p.created_by)
                           }
+                          // Persist decline in DB
+                          await supabase.from('pact_declines').upsert({
+                            pact_id: p.id,
+                            user_id: user.id,
+                          }, { onConflict: 'pact_id,user_id' })
                           // Mark as declined locally
                           setDeclinedPacts(prev => new Set([...prev, p.id]))
                           for (const uid of allOtherIds) {
@@ -741,6 +797,7 @@ export default function PlansPage() {
                               tag: `decline-${p.id}`,
                             })
                           }
+                          await loadPacts()
                           showToast('The group has been informed')
                         }}
                         style={{
@@ -905,7 +962,7 @@ export default function PlansPage() {
       {/* Toast */}
       {toast && (
         <div style={{
-          position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+          position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)',
           background: 'var(--surface3)', border: '1px solid var(--border)', color: 'var(--text)',
           padding: '10px 18px', borderRadius: 24, fontSize: 13, fontWeight: 600, zIndex: 50,
           boxShadow: '0 8px 24px rgba(0,0,0,0.4)', whiteSpace: 'nowrap',

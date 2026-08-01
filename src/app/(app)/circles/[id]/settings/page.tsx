@@ -28,6 +28,12 @@ export default function CircleSettingsPage() {
   const [newEmoji, setNewEmoji] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Invite code editing
+  const [editingCode, setEditingCode] = useState(false)
+  const [newCode, setNewCode] = useState('')
+  const [codeError, setCodeError] = useState('')
+  const [savingCode, setSavingCode] = useState(false)
+
   // Member action state
   const [actionMember, setActionMember] = useState<string | null>(null)
 
@@ -167,6 +173,21 @@ export default function CircleSettingsPage() {
     navigator.clipboard.writeText(circle.invite_code)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function saveInviteCode() {
+    const code = newCode.trim().toLowerCase().replace(/[^a-z0-9-]/g, '')
+    if (!code || code.length < 3) { setCodeError('Code must be at least 3 characters'); return }
+    if (code.length > 32) { setCodeError('Code must be 32 characters or less'); return }
+    setSavingCode(true); setCodeError('')
+    // Check uniqueness
+    const { data: existing } = await supabase
+      .from('circles').select('id').eq('invite_code', code).neq('id', id).single()
+    if (existing) { setCodeError('This code is already taken — try another'); setSavingCode(false); return }
+    const { error } = await supabase.from('circles').update({ invite_code: code }).eq('id', id)
+    if (error) { setCodeError('Failed to update: ' + error.message); setSavingCode(false); return }
+    setCircle({ ...circle, invite_code: code })
+    setEditingCode(false); setSavingCode(false)
   }
 
   async function saveName() {
@@ -352,23 +373,75 @@ export default function CircleSettingsPage() {
           >
             Add from your other circles
           </button>
+
+          {/* Invite code — editable */}
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: 'var(--surface2)', borderRadius: 10, padding: '8px 12px',
+            background: 'var(--surface2)', borderRadius: 10, padding: '10px 12px',
           }}>
-            <code style={{ flex: 1, fontSize: 13, color: 'var(--text2)', wordBreak: 'break-all' }}>
-              {circle.invite_code}
-            </code>
-            <button
-              onClick={copyInviteCode}
-              style={{
-                background: 'none', border: 'none', fontSize: 12,
-                color: 'var(--accent)', cursor: 'pointer', fontWeight: 600,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Copy code
-            </button>
+            <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.3px' }}>
+              Invite code
+            </p>
+            {editingCode ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <input
+                  type="text"
+                  value={newCode}
+                  onChange={e => { setNewCode(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); setCodeError('') }}
+                  placeholder="e.g. barkada-2026"
+                  autoFocus
+                  style={{
+                    padding: '8px 10px', borderRadius: 8, fontSize: 13,
+                    background: 'var(--surface)', border: '1.5px solid var(--accent)',
+                    color: 'var(--text)', outline: 'none', fontFamily: 'monospace',
+                  }}
+                />
+                <p style={{ fontSize: 10, color: 'var(--text2)' }}>
+                  Lowercase letters, numbers, and dashes only. This becomes the end of your invite link.
+                </p>
+                {codeError && <p style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600 }}>{codeError}</p>}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={saveInviteCode} disabled={savingCode} style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8, border: 'none',
+                    background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  }}>{savingCode ? 'Saving...' : 'Save'}</button>
+                  <button onClick={() => { setEditingCode(false); setCodeError('') }} style={{
+                    padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border)',
+                    background: 'transparent', color: 'var(--text2)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <code style={{ flex: 1, fontSize: 13, color: 'var(--text2)', wordBreak: 'break-all' }}>
+                  {circle.invite_code}
+                </code>
+                <button
+                  onClick={copyInviteCode}
+                  style={{
+                    background: 'none', border: 'none', fontSize: 12,
+                    color: 'var(--accent)', cursor: 'pointer', fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Copy
+                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => { setNewCode(circle.invite_code); setEditingCode(true) }}
+                    style={{
+                      background: 'none', border: 'none', fontSize: 12,
+                      color: 'var(--text2)', cursor: 'pointer', fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+            )}
+            <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 6 }}>
+              Link: {typeof window !== 'undefined' ? window.location.origin : ''}/join/{circle.invite_code}
+            </p>
           </div>
         </div>
       </div>

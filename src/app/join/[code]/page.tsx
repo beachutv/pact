@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function JoinPage() {
   const { code } = useParams<{ code: string }>()
-  const [status, setStatus] = useState<'loading' | 'joining' | 'done' | 'login'>('loading')
+  const [status, setStatus] = useState<'loading' | 'joining' | 'done' | 'login' | 'invalid' | 'already'>('loading')
   const [circleName, setCircleName] = useState('')
   const supabase = createClient()
 
@@ -32,8 +32,7 @@ export default function JoinPage() {
         .single()
 
       if (!circle) {
-        // Invalid code — just go to calendar
-        window.location.href = '/calendar'
+        setStatus('invalid')
         return
       }
 
@@ -47,17 +46,21 @@ export default function JoinPage() {
         .eq('user_id', user.id)
         .single()
 
-      if (!existing) {
-        await supabase.from('circle_members').insert({
-          circle_id: circle.id,
-          user_id: user.id,
-          role: 'member',
-        })
+      if (existing) {
+        setStatus('already')
+        setTimeout(() => { window.location.href = '/calendar' }, 1500)
+        return
       }
+
+      await supabase.from('circle_members').insert({
+        circle_id: circle.id,
+        user_id: user.id,
+        role: 'member',
+      })
 
       setStatus('done')
       // Full page load to refresh circle context
-      window.location.href = '/calendar'
+      setTimeout(() => { window.location.href = '/calendar' }, 800)
     }
 
     joinCircle()
@@ -81,6 +84,28 @@ export default function JoinPage() {
           <p style={{ fontSize: 14, color: 'var(--green)' }}>
             Joined{circleName ? ` ${circleName}` : ''}! Redirecting...
           </p>
+        )}
+        {status === 'already' && (
+          <p style={{ fontSize: 14, color: 'var(--accent)' }}>
+            You&apos;re already in{circleName ? ` ${circleName}` : ' this circle'}! Redirecting...
+          </p>
+        )}
+        {status === 'invalid' && (
+          <div>
+            <p style={{ fontSize: 14, color: 'var(--red)', marginBottom: 12 }}>
+              This invite link is no longer valid or the code doesn&apos;t exist.
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
+              Ask the person who shared it for a new link, or join with a code from the app.
+            </p>
+            <a href="/calendar" style={{
+              display: 'inline-block', padding: '10px 24px', borderRadius: 12,
+              background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700,
+              textDecoration: 'none',
+            }}>
+              Go to Pact
+            </a>
+          </div>
         )}
         {status === 'login' && (
           <p style={{ fontSize: 14, color: 'var(--text2)' }}>Redirecting to sign in...</p>

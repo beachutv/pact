@@ -175,8 +175,8 @@ export default function NewCirclePage() {
       role: 'member',
     })
 
-    router.push('/calendar')
-    router.refresh()
+    // Full page reload to refresh circle context (server component fetches circles)
+    window.location.href = '/calendar'
   }
 
   if (mode === 'pick') {

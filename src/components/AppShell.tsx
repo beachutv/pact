@@ -245,6 +245,10 @@ export default function AppShell({
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
 
+  // Toast
+  const [appToast, setAppToast] = useState('')
+  function showAppToast(msg: string) { setAppToast(msg); setTimeout(() => setAppToast(''), 2200) }
+
   // Chat unread badge
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
@@ -1002,8 +1006,20 @@ export default function AppShell({
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/join/${activeCircle.invite_code}`)
+                  onClick={async () => {
+                    const link = `${window.location.origin}/join/${activeCircle.invite_code}`
+                    try {
+                      await navigator.clipboard.writeText(link)
+                      showAppToast('✓ Invite link copied!')
+                    } catch {
+                      // Fallback for browsers that block clipboard
+                      const ta = document.createElement('textarea')
+                      ta.value = link; ta.style.position = 'fixed'; ta.style.opacity = '0'
+                      document.body.appendChild(ta); ta.select()
+                      document.execCommand('copy')
+                      document.body.removeChild(ta)
+                      showAppToast('✓ Invite link copied!')
+                    }
                   }}
                   title="Copy invite link"
                   style={{
@@ -1454,6 +1470,17 @@ export default function AppShell({
             )}
           </div>
         </div>,
+        document.body
+      )}
+      {/* App-level toast — positioned at top center */}
+      {appToast && typeof document !== 'undefined' && createPortal(
+        <div style={{
+          position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--surface3)', border: '1px solid var(--border)', color: 'var(--text)',
+          padding: '10px 18px', borderRadius: 24, fontSize: 13, fontWeight: 600, zIndex: 10001,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.4)', whiteSpace: 'nowrap',
+          animation: 'toast-in 0.2s ease-out',
+        }}>{appToast}</div>,
         document.body
       )}
     </CircleContext.Provider>

@@ -3,9 +3,24 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-export const CURRENT_VERSION = '19.0'
+export const CURRENT_VERSION = '20.0'
 
 const CHANGELOG = [
+  {
+    version: '20.0',
+    date: 'August 1, 2026',
+    title: 'Circles, Declines & UX Fixes',
+    items: [
+      'Sign out is now device-only — signing out on your phone no longer signs you out everywhere',
+      'Joining a circle via code now shows the new circle immediately (no refresh needed)',
+      'Invite link copy button now shows confirmation toast + works in all browsers',
+      'Invalid invite links show a clear error instead of silently redirecting',
+      'Custom invite codes — admins can set a memorable code (e.g. "barkada-2026") in circle settings',
+      'Pact declines are now visible — declined members show with a red ✕ and "out" counter on the card',
+      'Toasts moved to top of screen — notifications and confirmations are harder to miss',
+      'Calendar settings redesigned — cleaner layout with Google logo, inline connect button',
+    ],
+  },
   {
     version: '19.0',
     date: 'August 1, 2026',

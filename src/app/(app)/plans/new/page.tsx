@@ -433,7 +433,7 @@ function NewPlanContent() {
       {/* Toast notification */}
       {toast && (
         <div style={{
-          position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+          position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)',
           background: 'var(--green)', color: '#fff', padding: '12px 20px',
           borderRadius: 14, fontSize: 13, fontWeight: 700, zIndex: 50,
           boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
