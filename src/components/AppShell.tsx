@@ -3,7 +3,7 @@
 import { useState, createContext, useContext, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname, useRouter } from 'next/navigation'
-import { txtOn } from '@/lib/utils'
+import { txtOn, bdaySoon, birthdayMMDD } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useLocationUpdate } from '@/lib/useLocationUpdate'
 
@@ -328,6 +328,78 @@ export default function AppShell({
     window.addEventListener('pact-new-version', handler)
     return () => window.removeEventListener('pact-new-version', handler)
   }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Birthday scanner — check circle mates for upcoming birthdays (2 weeks out)
+  // Runs once per day per device (tracked in localStorage)
+  useEffect(() => {
+    if (!user?.id || circles.length === 0) return
+    const todayKey = new Date().toISOString().slice(0, 10)
+    const scanKey = `pact_bday_scan_${todayKey}`
+    if (localStorage.getItem(scanKey)) return
+
+    async function scanBirthdays() {
+      const s = createClient()
+      // Get all circle mates
+      const allMemberIds = new Set<string>()
+      for (const c of circles) {
+        const { data: members } = await s.from('circle_members').select('user_id').eq('circle_id', c.id)
+        members?.forEach(m => { if (m.user_id !== user!.id) allMemberIds.add(m.user_id) })
+      }
+      if (allMemberIds.size === 0) return
+
+      const { data: mates } = await s.from('users').select('id, name, birthday').in('id', [...allMemberIds])
+      if (!mates) return
+
+      for (const mate of mates) {
+        if (!mate.birthday) continue
+        const days = bdaySoon(mate.birthday, 14)
+        if (days < 0) continue
+
+        // Check if we already sent a birthday notification for this person this year
+        const year = new Date().getFullYear()
+        const notifTag = `bday-${mate.id}-${year}`
+        const { data: existing } = await s.from('notifications')
+          .select('id')
+          .eq('user_id', user!.id)
+          .eq('type', 'pact_change')
+          .ilike('title', `%${mate.name?.split(' ')[0]}%birthday%`)
+          .gte('created_at', `${year}-01-01`)
+          .limit(1)
+        if (existing && existing.length > 0) continue
+
+        const firstName = mate.name?.split(' ')[0] || 'Someone'
+        const mmdd = birthdayMMDD(mate.birthday)
+        const bdayDate = new Date(year, parseInt(mmdd.slice(0, 2)) - 1, parseInt(mmdd.slice(3)))
+        const dateStr = bdayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+
+        let title: string, body: string
+        if (days === 0) {
+          title = `🎂 It's ${firstName}'s birthday today!`
+          body = `Plan something special — tap to see your shared circles`
+        } else if (days === 1) {
+          title = `🎂 ${firstName}'s birthday is tomorrow!`
+          body = `${dateStr} — tap to plan something`
+        } else {
+          title = `🎂 ${firstName}'s birthday in ${days} days`
+          body = `${dateStr} — tap to plan something with your circle`
+        }
+
+        await s.from('notifications').insert({
+          user_id: user!.id,
+          type: 'pact_change',
+          title,
+          body,
+          link: `/profile/${mate.id}`,
+        })
+      }
+
+      localStorage.setItem(scanKey, '1')
+    }
+
+    // Delay to not slow down initial load
+    const t = setTimeout(scanBirthdays, 3000)
+    return () => clearTimeout(t)
+  }, [user?.id, circles.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveCalendarSelection() {
     await fetch('/api/calendar/list', {
@@ -1472,10 +1544,10 @@ export default function AppShell({
         </div>,
         document.body
       )}
-      {/* App-level toast — positioned at top center */}
+      {/* App-level toast — positioned above middle */}
       {appToast && typeof document !== 'undefined' && createPortal(
         <div style={{
-          position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)',
+          position: 'fixed', top: '38%', left: '50%', transform: 'translate(-50%, -50%)',
           background: 'var(--surface3)', border: '1px solid var(--border)', color: 'var(--text)',
           padding: '10px 18px', borderRadius: 24, fontSize: 13, fontWeight: 600, zIndex: 10001,
           boxShadow: '0 8px 24px rgba(0,0,0,0.4)', whiteSpace: 'nowrap',

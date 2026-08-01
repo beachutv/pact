@@ -395,6 +395,9 @@ export default function ProfilePage() {
         </button>
       )}
 
+      {/* Shared circles — shown on other people's profiles */}
+      {!isOwn && <SharedCircles userId={profile.id} circles={circles} />}
+
       {/* Calendar settings — own profile only */}
       {isOwn && calConnected !== null && (
         <div style={{ width: '100%', maxWidth: 280, marginTop: 12 }}>
@@ -436,6 +439,61 @@ export default function ProfilePage() {
           <span style={{ color: 'var(--text2)' }}>›</span>
         </button>
       )}
+    </div>
+  )
+}
+
+function SharedCircles({ userId, circles }: { userId: string; circles: { id: string; name: string; emoji: string }[] }) {
+  const [shared, setShared] = useState<{ id: string; name: string; emoji: string }[]>([])
+  const supabase = createClient()
+
+  useEffect(() => {
+    async function load() {
+      // For each of the current user's circles, check if this profile user is also a member
+      const results: typeof circles = []
+      for (const c of circles) {
+        const { data } = await supabase
+          .from('circle_members')
+          .select('user_id')
+          .eq('circle_id', c.id)
+          .eq('user_id', userId)
+          .single()
+        if (data) results.push(c)
+      }
+      setShared(results)
+    }
+    load()
+  }, [userId, circles.length])
+
+  if (shared.length === 0) return null
+
+  return (
+    <div style={{ width: '100%', maxWidth: 280, marginTop: 16 }}>
+      <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+        Circles you share
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {shared.map(c => (
+          <button
+            key={c.id}
+            onClick={() => {
+              localStorage.setItem('pact_active_circle', c.id)
+              window.location.href = '/calendar'
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 12px', borderRadius: 12,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              color: 'var(--text)', fontSize: 13, fontWeight: 600,
+              cursor: 'pointer', textAlign: 'left', width: '100%',
+            }}
+          >
+            <span style={{ fontSize: 16 }}>{c.emoji || '👥'}</span>
+            <span style={{ flex: 1 }}>{c.name}</span>
+            <span style={{ fontSize: 11, color: 'var(--text2)' }}>Plan →</span>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

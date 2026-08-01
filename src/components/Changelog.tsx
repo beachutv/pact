@@ -3,28 +3,27 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-export const CURRENT_VERSION = '1.3'
+export const CURRENT_VERSION = '4.0'
 
 const CHANGELOG = [
   {
-    version: '1.3',
+    version: '4.0',
     date: 'August 1, 2026',
     title: 'Circles, Declines & Calendar Fixes',
     items: [
+      'Birthday notifications — get reminded 2 weeks ahead, tap to see shared circles and plan',
+      'Shared circles on profiles — see which circles you have in common, tap to plan',
       'Sign out is now device-only — no longer signs you out everywhere',
       'Custom invite codes — admins can set a memorable code in circle settings',
       'Pact declines are now visible — red ✕ and "out" counter on pact cards',
       'Birthdays now show on the calendar with 🎂 badges and red borders',
-      'Tapping a birthday on the calendar shows a "plan something!" banner',
       'All-day calendar events now properly block through 2 AM',
-      'Toasts moved to top of screen for better visibility',
-      'Calendar settings redesigned — cleaner layout with Google logo',
       'Invite link copy button now shows confirmation + works in all browsers',
       'Invalid invite links show a clear error page',
     ],
   },
   {
-    version: '1.2',
+    version: '3.0',
     date: 'August 1, 2026',
     title: 'Privacy, Polish & Settings',
     items: [
@@ -37,7 +36,7 @@ const CHANGELOG = [
     ],
   },
   {
-    version: '1.1',
+    version: '2.0',
     date: 'August 1, 2026',
     title: 'Push Notifications & Commitment',
     items: [
