@@ -1079,12 +1079,15 @@ export default function AppShell({
               <div style={{ display: 'flex', gap: 6 }}>
                 <button
                   onClick={async () => {
-                    const link = `${window.location.origin}/join/${activeCircle.invite_code}`
+                    // Fetch latest invite code from DB (may have been customized)
+                    const s = createClient()
+                    const { data } = await s.from('circles').select('invite_code').eq('id', activeCircle.id).single()
+                    const code = data?.invite_code || activeCircle.invite_code
+                    const link = `${window.location.origin}/join/${code}`
                     try {
                       await navigator.clipboard.writeText(link)
                       showAppToast('✓ Invite link copied!')
                     } catch {
-                      // Fallback for browsers that block clipboard
                       const ta = document.createElement('textarea')
                       ta.value = link; ta.style.position = 'fixed'; ta.style.opacity = '0'
                       document.body.appendChild(ta); ta.select()

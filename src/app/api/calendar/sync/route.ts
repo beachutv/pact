@@ -184,7 +184,7 @@ export async function POST(request: Request) {
   }
 
   // Convert to busy_blocks (hourly granularity, Manila timezone)
-  const blocks: { user_id: string; date: string; start_hour: number; end_hour: number; location: string | null }[] = []
+  const blocks: { user_id: string; date: string; start_hour: number; end_hour: number; location: string | null; source: string }[] = []
 
   for (const period of merged) {
     const start = new Date(period.start)
@@ -227,6 +227,7 @@ export async function POST(request: Request) {
           start_hour: startHour,
           end_hour: endHour,
           location: blockLocation,
+          source: 'google',
         })
       }
 

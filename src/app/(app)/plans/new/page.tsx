@@ -17,13 +17,11 @@ function NewPlanContent() {
     return slots
   }
 
-  // Format hour with optional :30 (e.g., 18 → "6 PM", 18.5 → "6:30 PM")
+  // Format hour with 24H format (e.g., 18 → "18:00", 18.5 → "18:30", 0 → "00:00")
   function fmtHourMin(h: number): string {
-    const n = Math.floor(h % 24)
-    const min = h % 1 === 0.5 ? ':30' : ''
-    if (n === 0) return `12${min} MN`
-    if (n === 12) return `12${min} PM`
-    return n < 12 ? `${n}${min} AM` : `${n - 12}${min} PM`
+    const n = Math.floor(h) % 24
+    const min = h % 1 === 0.5 ? '30' : '00'
+    return `${String(n).padStart(2, '0')}:${min}`
   }
 
   const { user, activeCircle, circleMembers } = useCircle()

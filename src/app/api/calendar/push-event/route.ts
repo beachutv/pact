@@ -97,17 +97,48 @@ export async function POST(request: Request) {
   }
 
   const targetCalendar = calendarId || 'primary'
-  const gcalRes = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendar)}/events`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(event),
+
+  // Check if an event for this pact already exists (update instead of creating duplicate)
+  let existingEventId: string | null = null
+  try {
+    const searchRes = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendar)}/events?privateExtendedProperty=pactId%3D${pactId}&maxResults=1`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    )
+    const searchData = await searchRes.json()
+    if (searchData.items?.length > 0) {
+      existingEventId = searchData.items[0].id
     }
-  )
+  } catch {}
+
+  let gcalRes
+  if (existingEventId) {
+    // Update existing event (new title when confirmed)
+    gcalRes = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendar)}/events/${existingEventId}`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(event),
+      }
+    )
+  } else {
+    // Create new event
+    gcalRes = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendar)}/events`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(event),
+      }
+    )
+  }
 
   const gcalEvent = await gcalRes.json()
   if (gcalEvent.error) {
@@ -121,15 +152,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: gcalEvent.error.message }, { status: 500 })
   }
 
-  // Also add a busy block with source='pact'
-  await supabase.from('busy_blocks').insert({
-    user_id: user.id,
-    date,
-    start_hour: startHour,
-    end_hour: endHour,
-    source: 'pact',
-    pact_id: pactId,
-  })
+  // Add/update busy block with source='pact' (avoid duplicates)
+  if (!existingEventId) {
+    await supabase.from('busy_blocks').insert({
+      user_id: user.id,
+      date,
+      start_hour: startHour,
+      end_hour: endHour,
+      source: 'pact',
+      pact_id: pactId,
+    })
+  }
 
   return NextResponse.json({ eventId: gcalEvent.id, ok: true })
 }

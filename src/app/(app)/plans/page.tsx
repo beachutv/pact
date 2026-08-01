@@ -250,12 +250,22 @@ export default function PlansPage() {
     await supabase.from('pact_members').insert({ pact_id: pactId, user_id: user.id })
     const pact = pacts.find(p => p.id === pactId)
     if (pact) {
-      // Push event to Google Calendar
       const otherMembers = pact.members
         .filter(m => m.user_id !== user.id)
         .map(m => getMember(m.user_id)?.name.split(' ')[0])
         .filter(Boolean)
       const newMemberCount = pact.members.length + 1
+
+      // Check if this seals the pact (everyone who hasn't declined is in)
+      const declinedCount = (pact.declines || []).length
+      const eligibleCount = circleMembers.length - declinedCount
+      const isNowConfirmed = newMemberCount >= eligibleCount && eligibleCount >= 2
+
+      if (isNowConfirmed) {
+        await supabase.from('pacts').update({ status: 'confirmed' }).eq('id', pactId)
+      }
+
+      // Push event to Google Calendar (confirmed title if sealed)
       fetch('/api/calendar/push-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -271,29 +281,58 @@ export default function PlansPage() {
           location: pact.spot_name !== 'TBD' && pact.spot_area
             ? `${pact.spot_name}, ${pact.spot_area}`
             : pact.spot_name !== 'TBD' ? pact.spot_name : undefined,
-          confirmed: false,
+          confirmed: isNowConfirmed,
           totalCircleMembers: circleMembers.length,
           pactMemberCount: newMemberCount,
         }),
       }).catch(() => {})
 
-      // Notify ALL existing pact members (not just creator)
+      // Also update the creator's Google Calendar if pact is now confirmed
+      if (isNowConfirmed && pact.created_by && pact.created_by !== user.id) {
+        // Re-push for creator with confirmed title
+        const creatorOthers = [...otherMembers.filter(n => n !== getMember(pact.created_by!)?.name.split(' ')[0]), user.name?.split(' ')[0]].filter(Boolean)
+        fetch('/api/calendar/push-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pactId,
+            occasion: pact.occasion || null,
+            spotName: pact.spot_name !== 'TBD' ? pact.spot_name : null,
+            otherNames: creatorOthers,
+            circleName: activeCircle?.name,
+            date: pact.date,
+            startHour: pact.win_start,
+            endHour: pact.win_end,
+            confirmed: true,
+            totalCircleMembers: circleMembers.length,
+            pactMemberCount: newMemberCount,
+          }),
+        }).catch(() => {})
+      }
+
+      // Notify ALL existing pact members
       const pactTitle = pact.occasion || fmtDate(pact.date)
       const allOtherIds = pact.members.filter(m => m.user_id !== user.id).map(m => m.user_id)
       if (allOtherIds.length > 0) {
+        const notifTitle = isNowConfirmed
+          ? `It's a pact! 📌`
+          : `${user.name?.split(' ')[0] || 'Someone'} is in`
+        const notifBody = isNowConfirmed
+          ? `Everyone's in for ${pactTitle} — it's locked!`
+          : `Committed to ${pactTitle}`
         for (const uid of allOtherIds) {
           await supabase.from('notifications').insert({
             user_id: uid,
             type: 'pact_change',
-            title: `${user.name?.split(' ')[0] || 'Someone'} is in`,
-            body: `Committed to ${pactTitle}`,
+            title: notifTitle,
+            body: notifBody,
             link: '/plans',
           })
         }
         sendPushNotification({
           userIds: allOtherIds,
-          title: `${user.name?.split(' ')[0] || 'Someone'} is in`,
-          body: `Committed to ${pactTitle}`,
+          title: notifTitle,
+          body: notifBody,
           url: '/plans',
           tag: `join-${pactId}`,
         })
