@@ -27,44 +27,82 @@ async function getAccessToken(conn: any, supabase: any): Promise<string | null> 
   return tokens.access_token
 }
 
+function hourToISO(date: string, hour: number): string {
+  const h = Math.floor(hour)
+  const m = hour % 1 === 0.5 ? '30' : '00'
+  return `${date}T${String(h).padStart(2, '0')}:${m}:00`
+}
+
+/**
+ * Build the Google Calendar event title.
+ *
+ * PROPOSED (not yet confirmed):
+ *   "Proposed Pact: {occasion}" or "Proposed Pact with {names/circle}"
+ *
+ * CONFIRMED (pact made):
+ *   "Pact Made: {occasion}" or "Pact Made with {names/circle}"
+ *
+ * "with" logic:
+ *   - 1 other person → their name          ("Pact Made with Bea")
+ *   - 2-3 other people → list names         ("Pact Made with Bea and Nicole")
+ *   - 4+ people OR all circle members → circle name ("Pact Made with Sapact")
+ */
+function buildTitle(
+  confirmed: boolean,
+  occasion: string | null,
+  otherNames: string[],
+  circleName: string,
+  totalCircleMembers: number,
+  pactMemberCount: number,
+): string {
+  const prefix = confirmed ? 'Pact Made' : 'Proposed Pact'
+
+  // If there's an occasion, use it
+  if (occasion) {
+    return `${prefix}: ${occasion}`
+  }
+
+  // Determine the "with" part
+  const allIn = totalCircleMembers >= 3 && pactMemberCount >= totalCircleMembers
+  const otherCount = otherNames.length
+
+  let withPart: string
+  if (allIn && circleName) {
+    withPart = circleName
+  } else if (otherCount === 0) {
+    withPart = circleName || ''
+  } else if (otherCount === 1) {
+    withPart = otherNames[0]
+  } else if (otherCount <= 3) {
+    const last = otherNames[otherCount - 1]
+    const rest = otherNames.slice(0, -1).join(', ')
+    withPart = `${rest} and ${last}`
+  } else {
+    // 4+ people → use circle name
+    withPart = circleName || otherNames.slice(0, 3).join(', ') + ` +${otherCount - 3}`
+  }
+
+  return withPart ? `${prefix} with ${withPart}` : prefix
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
-  const { pactId, occasion, spotName, otherNames, circleName, title, date, startHour, endHour, location, calendarId, confirmed, totalCircleMembers, pactMemberCount } = await request.json()
+  const { pactId, occasion, spotName, otherNames, circleName, date, startHour, endHour, location, calendarId, confirmed, totalCircleMembers, pactMemberCount } = await request.json()
   if (!pactId || !date || startHour == null || endHour == null) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   }
 
-  // Determine the "with" part: use circle name ONLY if ALL members (3+) in circle are in the pact
-  const allCircleInPact = totalCircleMembers && pactMemberCount && totalCircleMembers >= 3 && pactMemberCount >= totalCircleMembers
-  const namesPart = allCircleInPact && circleName
-    ? circleName
-    : otherNames?.length > 0
-      ? otherNames.join(', ')
-      : circleName || ''
-
-  let smartTitle: string
-  if (confirmed) {
-    // Confirmed: "(occasion)" if set, otherwise "Pact with (other user)"
-    if (occasion && namesPart) {
-      smartTitle = `${occasion} with ${namesPart}`
-    } else if (occasion) {
-      smartTitle = occasion
-    } else if (namesPart) {
-      smartTitle = `Pact with ${namesPart}`
-    } else {
-      smartTitle = title || 'Pact'
-    }
-  } else {
-    // Unfinalized: "‼️ Finalize Proposed Pact with (other user)"
-    if (namesPart) {
-      smartTitle = `‼️ Finalize Proposed Pact with ${namesPart}`
-    } else {
-      smartTitle = `‼️ Finalize Proposed Pact`
-    }
-  }
+  const smartTitle = buildTitle(
+    !!confirmed,
+    occasion || null,
+    otherNames || [],
+    circleName || '',
+    totalCircleMembers || 0,
+    pactMemberCount || 0,
+  )
 
   const { data: conn } = await supabase
     .from('calendar_connections')
@@ -78,17 +116,16 @@ export async function POST(request: Request) {
   const accessToken = await getAccessToken(conn, supabase)
   if (!accessToken) return NextResponse.json({ error: 'Token refresh failed' }, { status: 500 })
 
-  // Create Google Calendar event
   const event = {
     summary: smartTitle,
     location: location || undefined,
-    description: 'Created by Pact — plans that actually happen',
+    description: `Created by Pact — plans that actually happen${spotName ? `\n📍 ${spotName}` : ''}`,
     start: {
-      dateTime: `${date}T${String(startHour).padStart(2, '0')}:00:00`,
+      dateTime: hourToISO(date, startHour),
       timeZone: 'Asia/Manila',
     },
     end: {
-      dateTime: `${date}T${String(endHour).padStart(2, '0')}:00:00`,
+      dateTime: hourToISO(date, endHour),
       timeZone: 'Asia/Manila',
     },
     extendedProperties: {
@@ -113,28 +150,20 @@ export async function POST(request: Request) {
 
   let gcalRes
   if (existingEventId) {
-    // Update existing event (new title when confirmed)
     gcalRes = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendar)}/events/${existingEventId}`,
       {
         method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(event),
       }
     )
   } else {
-    // Create new event
     gcalRes = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendar)}/events`,
       {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(event),
       }
     )
@@ -142,7 +171,6 @@ export async function POST(request: Request) {
 
   const gcalEvent = await gcalRes.json()
   if (gcalEvent.error) {
-    // If scope not granted yet, return specific error
     if (gcalEvent.error.code === 403) {
       return NextResponse.json({
         error: 'Calendar write permission not granted. Please reconnect your calendar.',
@@ -152,7 +180,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: gcalEvent.error.message }, { status: 500 })
   }
 
-  // Add/update busy block with source='pact' (avoid duplicates)
+  // Add busy block (only for new events — updates don't need a new block)
   if (!existingEventId) {
     await supabase.from('busy_blocks').insert({
       user_id: user.id,

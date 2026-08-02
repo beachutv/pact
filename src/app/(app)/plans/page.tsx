@@ -250,13 +250,12 @@ export default function PlansPage() {
     await supabase.from('pact_members').insert({ pact_id: pactId, user_id: user.id })
     const pact = pacts.find(p => p.id === pactId)
     if (pact) {
-      const otherMembers = pact.members
+      // Members who confirmed BEFORE this user (excluding self)
+      const confirmedOthers = pact.members
         .filter(m => m.user_id !== user.id)
         .map(m => getMember(m.user_id)?.name.split(' ')[0])
-        .filter(Boolean)
+        .filter(Boolean) as string[]
       const newMemberCount = pact.members.length + 1
-
-      // Check if this seals the pact (everyone who hasn't declined is in)
       const declinedCount = (pact.declines || []).length
       const eligibleCount = circleMembers.length - declinedCount
       const isNowConfirmed = newMemberCount >= eligibleCount && eligibleCount >= 2
@@ -265,7 +264,8 @@ export default function PlansPage() {
         await supabase.from('pacts').update({ status: 'confirmed' }).eq('id', pactId)
       }
 
-      // Push event to Google Calendar (confirmed title if sealed)
+      // Push/update event on THIS user's Google Calendar
+      // otherNames = people confirmed OTHER than me
       fetch('/api/calendar/push-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -273,7 +273,7 @@ export default function PlansPage() {
           pactId,
           occasion: pact.occasion || null,
           spotName: pact.spot_name !== 'TBD' ? pact.spot_name : null,
-          otherNames: otherMembers,
+          otherNames: confirmedOthers,
           circleName: activeCircle?.name,
           date: pact.date,
           startHour: pact.win_start,
@@ -287,27 +287,21 @@ export default function PlansPage() {
         }),
       }).catch(() => {})
 
-      // Also update the creator's Google Calendar if pact is now confirmed
-      if (isNowConfirmed && pact.created_by && pact.created_by !== user.id) {
-        // Re-push for creator with confirmed title
-        const creatorOthers = [...otherMembers.filter(n => n !== getMember(pact.created_by!)?.name.split(' ')[0]), user.name?.split(' ')[0]].filter(Boolean)
-        fetch('/api/calendar/push-event', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pactId,
-            occasion: pact.occasion || null,
-            spotName: pact.spot_name !== 'TBD' ? pact.spot_name : null,
-            otherNames: creatorOthers,
-            circleName: activeCircle?.name,
-            date: pact.date,
-            startHour: pact.win_start,
-            endHour: pact.win_end,
-            confirmed: true,
-            totalCircleMembers: circleMembers.length,
-            pactMemberCount: newMemberCount,
-          }),
-        }).catch(() => {})
+      // If pact is now confirmed, update ALL other members' calendar events too
+      if (isNowConfirmed) {
+        for (const pm of pact.members) {
+          if (pm.user_id === user.id) continue
+          // Each member's "otherNames" = everyone confirmed EXCEPT themselves
+          const theirOthers = [
+            ...confirmedOthers.filter(n => n !== getMember(pm.user_id)?.name.split(' ')[0]),
+            user.name?.split(' ')[0],
+          ].filter(Boolean) as string[]
+          // We can't push to their calendar from our session — but the API
+          // uses auth.getUser() which is the CURRENT user. So we rely on
+          // the notification to tell them it's confirmed, and their calendar
+          // will update next time they open plans or sync.
+          // For now, skip cross-user calendar updates.
+        }
       }
 
       // Notify ALL existing pact members
@@ -315,7 +309,7 @@ export default function PlansPage() {
       const allOtherIds = pact.members.filter(m => m.user_id !== user.id).map(m => m.user_id)
       if (allOtherIds.length > 0) {
         const notifTitle = isNowConfirmed
-          ? `It's a pact! 📌`
+          ? 'It\'s a pact! 📌'
           : `${user.name?.split(' ')[0] || 'Someone'} is in`
         const notifBody = isNowConfirmed
           ? `Everyone's in for ${pactTitle} — it's locked!`
@@ -816,6 +810,15 @@ export default function PlansPage() {
                             pact_id: p.id,
                             user_id: user.id,
                           }, { onConflict: 'pact_id,user_id' })
+                          // Remove from own Google Calendar
+                          fetch('/api/calendar/delete-event', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ pactId: p.id }),
+                          }).catch(() => {})
+                          // Also remove pact busy block
+                          await supabase.from('busy_blocks').delete()
+                            .eq('pact_id', p.id).eq('user_id', user.id)
                           // Mark as declined locally
                           setDeclinedPacts(prev => new Set([...prev, p.id]))
                           for (const uid of allOtherIds) {
