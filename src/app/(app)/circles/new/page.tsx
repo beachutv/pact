@@ -514,15 +514,18 @@ export default function NewCirclePage() {
             value={browseQuery}
             onChange={e => setBrowseQuery(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') browsePublic() }}
-            style={{ flex: 1, minWidth: 0 }}
+            style={{ flex: 1, minWidth: 0, fontSize: 14 }}
             autoFocus
           />
           <button
-            className="btn-primary"
             onClick={browsePublic}
-            style={{ flexShrink: 0, padding: '10px 18px', fontSize: 13, fontWeight: 700 }}
+            style={{
+              flexShrink: 0, width: 44, borderRadius: 12, border: '1px solid var(--border)',
+              background: 'var(--accent)', color: '#fff', fontSize: 16, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
           >
-            Search
+            🔍
           </button>
         </div>
 
