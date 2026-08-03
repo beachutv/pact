@@ -746,7 +746,7 @@ export default function AppShell({
           padding: '12px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
           overflowY: 'auto', overflowX: 'hidden',
         } : {
-          padding: '16px 18px 10px',
+          padding: '10px 18px 10px',
           borderBottom: '1px solid var(--border)',
           flexShrink: 0,
         }}>
@@ -850,16 +850,73 @@ export default function AppShell({
             </>
           ) : (
           <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div
+          {/* Row 1: Icon buttons top-right, like WhatsApp */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginBottom: 6 }}>
+            {/* Notification bell */}
+            <button
+              onClick={() => router.push('/notifications')}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                width: 36, height: 36, borderRadius: '50%', position: 'relative',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+              {unreadNotifCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: 2, right: 2,
+                  minWidth: 16, height: 16, borderRadius: 8,
+                  background: 'var(--red)', color: '#fff', fontSize: 9, fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 4px',
+                }}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
+              )}
+            </button>
+
+            {/* Friends */}
+            <button
+              onClick={() => router.push('/friends')}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                width: 36, height: 36, borderRadius: '50%', position: 'relative',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              {pendingFriendRequests > 0 && (
+                <span style={{
+                  position: 'absolute', top: 2, right: 2,
+                  minWidth: 16, height: 16, borderRadius: 8,
+                  background: 'var(--red)', color: '#fff', fontSize: 9, fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 4px',
+                }}>{pendingFriendRequests}</span>
+              )}
+            </button>
+
+            {/* Profile avatar */}
+            <button
               onClick={() => router.push(`/profile/${currentUser.id}`)}
-              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                width: 36, height: 36, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: 0,
+              }}
             >
               <div style={{
-                width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                width: 28, height: 28, borderRadius: '50%',
                 background: currentUser.color, color: txtOn(currentUser.color),
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 15, fontWeight: 800, position: 'relative', overflow: 'hidden',
+                fontSize: 11, fontWeight: 800, position: 'relative', overflow: 'hidden',
               }}>
                 {currentUser.name[0]}
                 {currentUser.avatar_url && (
@@ -871,146 +928,68 @@ export default function AppShell({
                   />
                 )}
               </div>
-              <div>
-                <p style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1 }}>
-                  Pact<span style={{ color: 'var(--accent)' }}>.</span>
-                </p>
-                <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
-                  plans that actually happen
-                </p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {/* Notification bell */}
-              <button
-                onClick={() => router.push('/notifications')}
-                style={{
-                  background: 'var(--surface2)', border: '1px solid var(--border)',
-                  cursor: 'pointer', padding: '6px 10px', borderRadius: 20, position: 'relative',
-                  display: 'flex', alignItems: 'center', gap: 5,
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                </svg>
-                {unreadNotifCount > 0 && (
-                  <span style={{
-                    background: 'var(--red)', color: '#fff', borderRadius: 8,
-                    fontSize: 9, fontWeight: 800, padding: '1px 5px', lineHeight: 1.3,
-                  }}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
-                )}
-              </button>
-
-              {/* Friends */}
-              <button
-                onClick={() => router.push('/friends')}
-                style={{
-                  background: 'var(--surface2)', border: '1px solid var(--border)',
-                  cursor: 'pointer', padding: '6px 8px', borderRadius: 20,
-                  display: 'flex', alignItems: 'center', position: 'relative',
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                  <circle cx="9" cy="7" r="4"/>
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                </svg>
-                {pendingFriendRequests > 0 && (
-                  <span style={{
-                    position: 'absolute', top: -4, right: -4,
-                    minWidth: 16, height: 16, borderRadius: 8,
-                    background: 'var(--red)', color: '#fff', fontSize: 10,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '0 4px', fontWeight: 700,
-                  }}>{pendingFriendRequests}</span>
-                )}
-              </button>
-
-              {/* Settings gear */}
-              <button
-                onClick={() => router.push('/settings')}
-                style={{
-                  background: 'var(--surface2)', border: '1px solid var(--border)',
-                  cursor: 'pointer', padding: '6px 8px', borderRadius: 20,
-                  display: 'flex', alignItems: 'center',
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-              </button>
-            </div>
+            </button>
           </div>
 
-          {/* Row 2: Circle name + avatars — single tap opens unified panel */}
-          <button
-            onClick={() => activeCircle ? setShowCirclePanel(!showCirclePanel) : router.push('/circles/new')}
-            style={{
-              marginTop: 11, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-            }}
-          >
-            {activeCircle ? (
-              <>
-                <span style={{
-                  color: 'var(--text2)', fontSize: 13, fontWeight: 600,
-                  display: 'flex', alignItems: 'center', gap: 5,
-                }}>
-                  <span style={{ fontSize: 15 }}>{activeCircle.emoji}</span>
-                  {activeCircle.name} · {circleMembers.length}
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
-                    {showCirclePanel ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
-                  </svg>
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center' }}>
-                  {circleMembers.slice(0, 6).map((m, i) => {
-                    const mOnline = m.last_seen_at && (Date.now() - new Date(m.last_seen_at).getTime()) < 5 * 60 * 1000
-                    return (
-                    <span key={m.id} style={{ position: 'relative', marginLeft: i > 0 ? -8 : 0 }}>
-                      <span style={{
-                        width: 28, height: 28, borderRadius: '50%',
-                        background: m.color, color: txtOn(m.color),
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 10, fontWeight: 700,
-                        border: '2px solid var(--bg)',
-                        position: 'relative', overflow: 'hidden',
-                      }}>
-                        {m.name?.[0] || '?'}
-                        {m.avatar_url && (
-                          <img src={m.avatar_url} alt="" style={{
-                            position: 'absolute', inset: 0, width: '100%', height: '100%',
-                            objectFit: 'cover', borderRadius: '50%',
-                          }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                        )}
-                      </span>
-                      {mOnline && (
-                        <span style={{
-                          position: 'absolute', bottom: 0, right: 0,
-                          width: 8, height: 8, borderRadius: '50%',
-                          background: '#34d399', border: '1.5px solid var(--bg)',
-                          zIndex: 2,
-                        }} />
-                      )}
-                    </span>
-                    )
-                  })}
-                  {circleMembers.length > 6 && (
-                    <span style={{
-                      width: 28, height: 28, borderRadius: '50%',
-                      background: 'var(--surface2)', color: 'var(--text2)',
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 9, fontWeight: 800, border: '2px solid var(--bg)', marginLeft: -8,
-                    }}>+{circleMembers.length - 6}</span>
-                  )}
-                </span>
-              </>
-            ) : (
-              <span style={{ fontSize: 12, color: 'var(--text2)' }}>No circles yet — tap to create one</span>
-            )}
-          </button>
+          {/* Row 2: Bold page title */}
+          <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1 }}>
+            {(() => {
+              const titles: Record<string, string> = {
+                '/calendar': 'Calendar',
+                '/chat': 'Chat',
+                '/plans': 'Plans',
+                '/spots': 'Spots',
+                '/friends': 'Friends',
+                '/notifications': 'Notifications',
+                '/settings': 'Settings',
+              }
+              if (pathname.startsWith('/profile')) return 'Profile'
+              if (pathname.startsWith('/circles')) return 'Circles'
+              return titles[pathname] || 'Pact'
+            })()}
+          </h1>
+
+          {/* Row 3: Circle chips — horizontal scroll */}
+          {circles.length > 0 && ['/calendar', '/chat', '/plans', '/spots'].includes(pathname) && (
+            <div style={{
+              display: 'flex', gap: 6, marginTop: 10, overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
+              paddingBottom: 2,
+            }}>
+              {circles.map(c => {
+                const isActive = activeCircle?.id === c.id
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setActiveCircle(c)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '5px 12px 5px 7px', borderRadius: 20, flexShrink: 0,
+                      border: isActive ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
+                      background: isActive ? 'var(--accent-soft)' : 'var(--surface2)',
+                      color: isActive ? 'var(--text)' : 'var(--text2)',
+                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    }}
+                  >
+                    <span style={{ fontSize: 14 }}>{c.emoji}</span>
+                    {c.name}
+                  </button>
+                )
+              })}
+              <button
+                onClick={() => router.push('/circles/new')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '5px 12px', borderRadius: 20, flexShrink: 0,
+                  border: '1.5px dashed var(--border)',
+                  background: 'none', color: 'var(--text2)',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                +
+              </button>
+            </div>
+          )}
           </>
           )}
         </header>

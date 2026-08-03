@@ -126,30 +126,18 @@ export default function NotificationsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
+      {/* Actions bar */}
       <div style={{
-        padding: '14px 16px 12px', display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', borderBottom: '1px solid var(--border)',
+        padding: '10px 16px', display: 'flex', alignItems: 'center',
+        justifyContent: 'flex-end',
         flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            onClick={() => router.back()}
-            style={{
-              background: 'none', border: 'none', color: 'var(--accent)',
-              fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: 0,
-            }}
-          >
-            ←
-          </button>
-          <h2 style={{ fontSize: 18, fontWeight: 800 }}>Notifications</h2>
-        </div>
         {hasUnread && (
           <button
             onClick={markAllRead}
             style={{
-              background: 'none', border: 'none', fontSize: 12,
-              fontWeight: 700, color: 'var(--accent)', cursor: 'pointer',
+              background: 'none', border: 'none', fontSize: 13,
+              fontWeight: 600, color: 'var(--accent)', cursor: 'pointer',
             }}
           >
             Mark all read

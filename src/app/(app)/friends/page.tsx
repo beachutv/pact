@@ -232,14 +232,6 @@ export default function FriendsPage() {
 
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <button onClick={() => router.back()} style={{
-        alignSelf: 'flex-start', background: 'none', border: 'none',
-        color: 'var(--accent)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-      }}>
-        ← Back
-      </button>
-
-      <h2 style={{ fontSize: 20, fontWeight: 800 }}>Friends</h2>
       <p style={{ fontSize: 13, color: 'var(--text2)' }}>
         Add friends by their username — they&apos;ll get a notification to confirm.
       </p>
