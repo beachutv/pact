@@ -204,7 +204,6 @@ export default function AppShell({
   // Auto-collapse members list and close panels when navigating between tabs
   useEffect(() => {
     setShowCirclePanel(false)
-    setShowNotifs(false)
     setShowThemePicker(false)
   }, [pathname])
 
@@ -246,7 +245,6 @@ export default function AppShell({
     return user.theme || 'dark'
   })
   const [showThemePicker, setShowThemePicker] = useState(false)
-  const [showNotifs, setShowNotifs] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
 
@@ -721,45 +719,6 @@ export default function AppShell({
     return () => { supabase.removeChannel(channel) }
   }, [user.id])
 
-  async function markAllNotifsRead() {
-    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-    setUnreadNotifCount(0)
-  }
-
-  async function clearAllNotifs() {
-    await supabase.from('notifications').delete().eq('user_id', user.id)
-    setNotifications([])
-    setUnreadNotifCount(0)
-  }
-
-  async function clearNotif(notifId: string, wasUnread: boolean) {
-    await supabase.from('notifications').delete().eq('id', notifId)
-    setNotifications(prev => prev.filter(n => n.id !== notifId))
-    if (wasUnread) setUnreadNotifCount(prev => Math.max(0, prev - 1))
-  }
-
-  function notifIcon(type: string) {
-    const s = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
-    switch (type) {
-      case 'message': return <svg {...s} stroke="var(--accent)"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      case 'pact_new': return <svg {...s} stroke="var(--green)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-      case 'pact_change': return <svg {...s} stroke="var(--amber)"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-      case 'pact_upcoming': return <svg {...s} stroke="var(--lavender)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      case 'spark': return <svg {...s} stroke="var(--amber)"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      default: return <svg {...s} stroke="var(--text2)"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-    }
-  }
-
-  function notifTimeAgo(ts: string) {
-    const mins = Math.floor((Date.now() - new Date(ts).getTime()) / 60000)
-    if (mins < 1) return 'now'
-    if (mins < 60) return `${mins}m ago`
-    const hrs = Math.floor(mins / 60)
-    if (hrs < 24) return `${hrs}h ago`
-    return `${Math.floor(hrs / 24)}d ago`
-  }
-
   // Theme
   useEffect(() => {
     const applied = theme === 'system'
@@ -848,7 +807,7 @@ export default function AppShell({
               <div style={{ width: 32, height: 1, background: 'var(--border)' }} />
 
               {/* Action buttons vertical */}
-              <button onClick={() => setShowNotifs(!showNotifs)} style={{
+              <button onClick={() => router.push('/notifications')} style={{
                 background: 'none', border: 'none', cursor: 'pointer', padding: 8, borderRadius: 10, position: 'relative',
               }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -925,7 +884,7 @@ export default function AppShell({
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {/* Notification bell */}
               <button
-                onClick={() => setShowNotifs(!showNotifs)}
+                onClick={() => router.push('/notifications')}
                 style={{
                   background: 'var(--surface2)', border: '1px solid var(--border)',
                   cursor: 'pointer', padding: '6px 10px', borderRadius: 20, position: 'relative',
@@ -1268,80 +1227,6 @@ export default function AppShell({
         )}
 
         {/* Theme picker dropdown — portal */}
-        {/* Notifications dropdown — portal */}
-        {showNotifs && typeof document !== 'undefined' && createPortal(
-          <>
-            <div onClick={() => setShowNotifs(false)} style={{
-              position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.3)',
-            }} />
-            <div style={{
-              position: 'fixed', right: 12, left: 12, top: 60, zIndex: 9999,
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 16, maxWidth: 340, marginLeft: 'auto', maxHeight: 400, overflowY: 'auto',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
-            }}>
-              <div style={{ padding: '12px 14px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 14, fontWeight: 800 }}>Notifications</span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {unreadNotifCount > 0 && (
-                    <button onClick={markAllNotifsRead} style={{
-                      background: 'none', border: 'none', fontSize: 11,
-                      fontWeight: 600, color: 'var(--accent)', cursor: 'pointer',
-                    }}>Mark all read</button>
-                  )}
-                  {notifications.length > 0 && (
-                    <button onClick={clearAllNotifs} style={{
-                      background: 'none', border: 'none', fontSize: 11,
-                      fontWeight: 600, color: 'var(--red)', cursor: 'pointer',
-                    }}>Clear all</button>
-                  )}
-                </div>
-              </div>
-              {notifications.length === 0 ? (
-                <div style={{ padding: '20px 14px', textAlign: 'center', color: 'var(--text2)', fontSize: 13 }}>
-                  No notifications yet
-                </div>
-              ) : (
-                notifications.map(n => (
-                  <div
-                    key={n.id}
-                    onClick={() => {
-                      if (n.link) router.push(n.link)
-                      setShowNotifs(false)
-                      if (!n.read) {
-                        supabase.from('notifications').update({ read: true }).eq('id', n.id)
-                        setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))
-                        setUnreadNotifCount(prev => Math.max(0, prev - 1))
-                      }
-                    }}
-                    style={{
-                      padding: '10px 14px', cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'flex-start',
-                      background: n.read ? 'transparent' : 'var(--accent-soft)',
-                      borderTop: '1px solid var(--border)',
-                    }}
-                  >
-                    <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>{notifIcon(n.type)}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 13, fontWeight: n.read ? 500 : 700, lineHeight: 1.3 }}>{n.title}</p>
-                      {n.body && <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{n.body}</p>}
-                      <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 3 }}>{notifTimeAgo(n.created_at)}</p>
-                    </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); clearNotif(n.id, !n.read) }}
-                      style={{
-                        background: 'none', border: 'none', color: 'var(--text2)',
-                        fontSize: 14, cursor: 'pointer', padding: '2px 4px',
-                        flexShrink: 0, marginTop: 2,
-                      }}
-                    >✕</button>
-                  </div>
-                ))
-              )}
-            </div>
-          </>,
-          document.body
-        )}
-
         {/* Main content */}
         <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column' }}>
           {children}
