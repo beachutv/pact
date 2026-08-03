@@ -322,7 +322,15 @@ export default function CircleSettingsPage() {
     await supabase.from('circle_members').delete()
       .eq('circle_id', id)
       .eq('user_id', user.id)
-    window.location.href = '/calendar'
+    const remaining = circles.filter(c => c.id !== id)
+    if (remaining.length > 0) {
+      setActiveCircle(remaining[0])
+      window.location.href = '/calendar'
+    } else {
+      // No circles left — go to create/join
+      localStorage.removeItem('pact_active_circle')
+      window.location.href = '/circles/new'
+    }
   }
 
   if (loading) return <div style={{ padding: 20 }}><div className="spinner" /></div>

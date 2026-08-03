@@ -199,7 +199,7 @@ export default function NewCirclePage() {
 
     let query = supabase
       .from('circles')
-      .select('id, name, emoji, join_mode, created_by')
+      .select('id, name, emoji, join_mode, created_by, circle_members(count)')
       .eq('visibility', 'public')
 
     if (browseQuery.trim()) {
@@ -223,8 +223,9 @@ export default function NewCirclePage() {
       .eq('status', 'pending')
     const pendingIds = new Set((pendingReqs || []).map(r => r.circle_id))
 
-    setPublicCircles((data || []).map(c => ({
+    setPublicCircles((data || []).map((c: any) => ({
       ...c,
+      member_count: c.circle_members?.[0]?.count || 0,
       already: myCircleIds.has(c.id),
       pending: pendingIds.has(c.id),
     })))
@@ -506,17 +507,21 @@ export default function NewCirclePage() {
     return (
       <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <h2 style={{ fontSize: 20, fontWeight: 800 }}>Browse public circles</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
           <input
             className="input"
             placeholder="Search circles..."
             value={browseQuery}
             onChange={e => setBrowseQuery(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') browsePublic() }}
-            style={{ flex: 1 }}
+            style={{ flex: 1, minWidth: 0 }}
             autoFocus
           />
-          <button className="btn-primary" onClick={browsePublic} style={{ flexShrink: 0 }}>
+          <button
+            className="btn-primary"
+            onClick={browsePublic}
+            style={{ flexShrink: 0, padding: '10px 18px', fontSize: 13, fontWeight: 700 }}
+          >
             Search
           </button>
         </div>
@@ -535,30 +540,35 @@ export default function NewCirclePage() {
               <div
                 key={c.id}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '12px', borderRadius: 12,
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '14px 12px', borderRadius: 14,
                   background: 'var(--surface)', border: '1px solid var(--border)',
                 }}
               >
-                <span style={{ fontSize: 22 }}>{c.emoji || '👥'}</span>
-                <div style={{ flex: 1 }}>
+                <span style={{
+                  fontSize: 20, width: 40, height: 40, borderRadius: 10,
+                  background: 'var(--surface2)', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>{c.emoji || '👥'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: 14, fontWeight: 700 }}>{c.name}</p>
-                  <p style={{ fontSize: 11, color: 'var(--text2)' }}>
+                  <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
+                    {c.member_count ? `${c.member_count} member${c.member_count === 1 ? '' : 's'} · ` : ''}
                     {c.join_mode === 'auto' ? 'Open — join instantly' : 'Requires approval'}
                   </p>
                 </div>
                 {c.already ? (
-                  <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>✓ Joined</span>
+                  <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700, flexShrink: 0 }}>✓ Joined</span>
                 ) : c.pending ? (
-                  <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 700 }}>⏳ Pending</span>
+                  <span style={{ fontSize: 11, color: 'var(--amber)', fontWeight: 700, flexShrink: 0 }}>⏳ Pending</span>
                 ) : (
                   <button
                     onClick={() => joinPublicCircle(c.id, c.join_mode)}
                     disabled={loading}
                     style={{
-                      padding: '6px 14px', borderRadius: 8, border: 'none',
+                      padding: '8px 16px', borderRadius: 10, border: 'none',
                       background: 'var(--accent)', color: '#fff',
-                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
                     }}
                   >
                     {c.join_mode === 'auto' ? 'Join' : 'Request'}

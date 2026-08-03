@@ -222,6 +222,10 @@ export default function AppShell({
   const setActiveCircle = (c: Circle) => {
     setActiveCircleState(c)
     localStorage.setItem('pact_active_circle', c.id)
+    // If currently viewing another circle's settings, navigate away
+    if (typeof window !== 'undefined' && window.location.pathname.includes('/circles/') && window.location.pathname.includes('/settings')) {
+      router.push(`/circles/${c.id}/settings`)
+    }
   }
   const [circleMembers, setCircleMembers] = useState<UserProfile[]>([user])
 

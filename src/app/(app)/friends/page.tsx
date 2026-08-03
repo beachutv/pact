@@ -41,6 +41,7 @@ export default function FriendsPage() {
   const [searchResults, setSearchResults] = useState<FriendUser[]>([])
   const [searching, setSearching] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null) // friendship ID pending confirm
 
   const loadFriendships = useCallback(async () => {
     setLoading(true)
@@ -155,6 +156,15 @@ export default function FriendsPage() {
       accepted_at: new Date().toISOString(),
     }).eq('id', friendshipId)
 
+    // Clear the friend request notification for the current user
+    const requesterProfile = incoming.find(f => f.id === friendshipId)?.profile
+    if (requesterProfile) {
+      await supabase.from('notifications').delete()
+        .eq('user_id', user.id)
+        .eq('type', 'friend_request')
+        .ilike('title', `%${requesterProfile.name}%`)
+    }
+
     // Notify the requester
     await supabase.from('notifications').insert({
       user_id: requesterId,
@@ -168,9 +178,21 @@ export default function FriendsPage() {
   }
 
   async function removeFriendship(friendshipId: string) {
-    if (!confirm('Remove this friend?')) return
+    if (confirmRemove !== friendshipId) {
+      setConfirmRemove(friendshipId)
+      return
+    }
     setActionLoading(friendshipId)
+    setConfirmRemove(null)
     await supabase.from('friendships').delete().eq('id', friendshipId)
+    // Also clear any friend_request notifications related to this friendship
+    const friendship = [...friends, ...incoming, ...outgoing].find(f => f.id === friendshipId)
+    if (friendship) {
+      await supabase.from('notifications').delete()
+        .eq('user_id', user.id)
+        .eq('type', 'friend_request')
+        .ilike('title', `%${friendship.profile.name}%`)
+    }
     await loadFriendships()
     setActionLoading(null)
   }
@@ -290,11 +312,13 @@ export default function FriendsPage() {
                   disabled={actionLoading === f.id}
                   style={{
                     padding: '5px 10px', borderRadius: 8, border: 'none',
-                    background: 'var(--surface2)', color: 'var(--text2)',
+                    background: confirmRemove === f.id ? 'var(--red)' : 'var(--surface2)',
+                    color: confirmRemove === f.id ? '#fff' : 'var(--text2)',
                     fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    transition: 'all .15s',
                   }}
                 >
-                  {actionLoading === f.id ? '...' : 'Remove'}
+                  {actionLoading === f.id ? '...' : confirmRemove === f.id ? 'Confirm?' : 'Remove'}
                 </button>
               </div>
             ))
