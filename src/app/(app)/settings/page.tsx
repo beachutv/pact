@@ -11,7 +11,7 @@ import { CURRENT_VERSION } from '@/components/Changelog'
 type PermState = 'granted' | 'denied' | 'prompt' | 'unsupported'
 
 export default function SettingsPage() {
-  const { user, updateUser } = useCircle()
+  const { user, updateUser, circles } = useCircle()
   const supabase = createClient()
   const router = useRouter()
 
@@ -319,6 +319,68 @@ export default function SettingsPage() {
         </button>
       </div>
 
+      {/* Manage circles */}
+      <Section title="Circles">
+        {circles.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--text2)', padding: '4px 0' }}>
+            No circles yet
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {circles.map((c, i) => (
+              <div key={c.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0',
+                borderBottom: i < circles.length - 1 ? '1px solid var(--border)' : 'none',
+              }}>
+                <span style={{ fontSize: 18, width: 28, textAlign: 'center' }}>{c.emoji}</span>
+                <span style={{ flex: 1, fontSize: 14, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {i > 0 && (
+                    <button
+                      onClick={() => {
+                        const order = JSON.parse(localStorage.getItem('pact_circle_order') || '[]') as string[]
+                        const ids = order.length === circles.length ? order : circles.map(x => x.id)
+                        const idx = ids.indexOf(c.id)
+                        if (idx > 0) { [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]] }
+                        localStorage.setItem('pact_circle_order', JSON.stringify(ids))
+                        window.location.reload()
+                      }}
+                      style={{
+                        width: 28, height: 28, borderRadius: 8, border: '1px solid var(--border)',
+                        background: 'var(--surface2)', color: 'var(--text2)', fontSize: 12, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >↑</button>
+                  )}
+                  <button
+                    onClick={() => router.push(`/circles/${c.id}/settings`)}
+                    style={{
+                      width: 28, height: 28, borderRadius: 8, border: '1px solid var(--border)',
+                      background: 'var(--surface2)', color: 'var(--text2)', fontSize: 12, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <button
+          onClick={() => router.push('/circles/new')}
+          style={{
+            marginTop: 8, width: '100%', padding: '9px 0', borderRadius: 10,
+            border: '1px dashed var(--border)', background: 'none',
+            color: 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          + Create or join a circle
+        </button>
+      </Section>
+
       {/* Google Calendar */}
       <Section title="Calendar">
         {calLoading ? (
@@ -493,6 +555,15 @@ export default function SettingsPage() {
           color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
           borderBottom: '1px solid var(--border)',
         }}>Privacy policy →</button>
+        <button onClick={() => {
+          localStorage.removeItem('pact_walkthrough_seen')
+          router.push('/calendar')
+          setTimeout(() => window.dispatchEvent(new CustomEvent('pact-start-walkthrough')), 500)
+        }} style={{
+          width: '100%', padding: '8px 0', border: 'none', background: 'transparent',
+          color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+          borderBottom: '1px solid var(--border)',
+        }}>Show me around →</button>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
           <span style={{ fontSize: 13, fontWeight: 600 }}>Version {CURRENT_VERSION}</span>
           <button

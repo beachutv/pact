@@ -980,6 +980,11 @@ export default function AppShell({
                   >
                     <span style={{ fontSize: 14 }}>{c.emoji}</span>
                     {c.name}
+                    {isActive && (
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: -2, opacity: 0.5 }}>
+                        {showCirclePanel ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
+                      </svg>
+                    )}
                   </button>
                 )
               })}
