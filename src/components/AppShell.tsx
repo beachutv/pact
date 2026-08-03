@@ -84,20 +84,37 @@ function SpotsIcon({ color }: { color: string }) {
     </svg>
   )
 }
+function FriendsIcon({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  )
+}
+function ProfileIcon({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+    </svg>
+  )
+}
 
 const NAV_ICONS: Record<string, (props: { color: string }) => React.ReactNode> = {
   '/calendar': CalendarIcon,
-  '/chat': ChatIcon,
+  '/friends': FriendsIcon,
   '/plans': PlansIcon,
   '/spots': SpotsIcon,
+  '/settings': ProfileIcon,
 }
 
-// ---- Nav tabs (4 tabs) ----
+// ---- Nav tabs (5 tabs) ----
 const TABS = [
   { key: '/calendar', label: 'Calendar' },
-  { key: '/chat', label: 'Chat' },
+  { key: '/friends', label: 'Friends' },
   { key: '/plans', label: 'Plans' },
   { key: '/spots', label: 'Spots' },
+  { key: '/settings', label: 'You' },
 ]
 
 export default function AppShell({
@@ -850,8 +867,31 @@ export default function AppShell({
             </>
           ) : (
           <>
-          {/* Row 1: Icon buttons top-right, like WhatsApp */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginBottom: 6 }}>
+          {/* Row 1: Icon buttons top-right */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, marginBottom: 6 }}>
+            {/* Chat — like Facebook Messenger icon */}
+            <button
+              onClick={() => router.push('/chat')}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                width: 36, height: 36, borderRadius: '50%', position: 'relative',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              {chatUnreadCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: 2, right: 2,
+                  minWidth: 16, height: 16, borderRadius: 8,
+                  background: 'var(--red)', color: '#fff', fontSize: 9, fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 4px',
+                }}>{chatUnreadCount > 9 ? '9+' : chatUnreadCount}</span>
+              )}
+            </button>
+
             {/* Notification bell */}
             <button
               onClick={() => router.push('/notifications')}
@@ -875,60 +915,6 @@ export default function AppShell({
                 }}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
               )}
             </button>
-
-            {/* Friends */}
-            <button
-              onClick={() => router.push('/friends')}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                width: 36, height: 36, borderRadius: '50%', position: 'relative',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              {pendingFriendRequests > 0 && (
-                <span style={{
-                  position: 'absolute', top: 2, right: 2,
-                  minWidth: 16, height: 16, borderRadius: 8,
-                  background: 'var(--red)', color: '#fff', fontSize: 9, fontWeight: 800,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  padding: '0 4px',
-                }}>{pendingFriendRequests}</span>
-              )}
-            </button>
-
-            {/* Profile avatar → settings page */}
-            <button
-              onClick={() => router.push('/settings')}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                width: 36, height: 36, borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: 0,
-              }}
-            >
-              <div style={{
-                width: 28, height: 28, borderRadius: '50%',
-                background: currentUser.color, color: txtOn(currentUser.color),
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 11, fontWeight: 800, position: 'relative', overflow: 'hidden',
-              }}>
-                {currentUser.name[0]}
-                {currentUser.avatar_url && (
-                  <img
-                    src={currentUser.avatar_url}
-                    alt=""
-                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                  />
-                )}
-              </div>
-            </button>
           </div>
 
           {/* Row 2: Bold page title */}
@@ -950,7 +936,7 @@ export default function AppShell({
           </h1>
 
           {/* Row 3: Circle chips — horizontal scroll */}
-          {circles.length > 0 && ['/calendar', '/chat', '/plans', '/spots'].includes(pathname) && (
+          {circles.length > 0 && ['/calendar', '/chat', '/plans', '/spots', '/friends'].includes(pathname) && (
             <div style={{
               display: 'flex', gap: 6, marginTop: 10, overflowX: 'auto',
               WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
@@ -1238,8 +1224,8 @@ export default function AppShell({
               >
                 <span className="nav-icon">{IconComp ? <IconComp color={iconColor} /> : null}</span>
                 {tab.label}
-                {/* Chat unread badge */}
-                {tab.key === '/chat' && chatUnreadCount > 0 && (
+                {/* Friends request badge */}
+                {tab.key === '/friends' && pendingFriendRequests > 0 && (
                   <span style={{
                     position: 'absolute', top: 2, right: '50%', transform: 'translateX(12px)',
                     width: 16, height: 16, borderRadius: '50%',
@@ -1247,7 +1233,7 @@ export default function AppShell({
                     fontSize: 9, fontWeight: 800,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                    {pendingFriendRequests > 9 ? '9+' : pendingFriendRequests}
                   </span>
                 )}
               </button>

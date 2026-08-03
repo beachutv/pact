@@ -2,68 +2,76 @@
 
 import { useState, useEffect } from 'react'
 
-const STEPS = [
+type Step = {
+  title: string
+  body: string
+  anchor: 'top-left' | 'top-right' | 'center' | 'bottom'
+  arrow?: 'up-right' | 'up-left' | 'down' | 'none'
+}
+
+const STEPS: Step[] = [
   {
-    title: 'Your circles',
-    body: 'Switch between friend groups here. Each circle has its own calendar, chat, and plans.',
-    position: 'bottom' as const,
+    title: '👋 Welcome to Pact',
+    body: 'Let\'s show you around. This takes 30 seconds.',
+    anchor: 'center',
+    arrow: 'none',
   },
   {
-    title: 'Circle details',
-    body: 'Tap the active circle again to see members, invite friends, and access circle settings.',
-    position: 'bottom' as const,
+    title: '💬 Chat & 🔔 Notifications',
+    body: 'These icons at the top are your inbox. Chat has your group and private messages. The bell shows friend requests, pact updates, and sparks.',
+    anchor: 'top-right',
+    arrow: 'up-right',
   },
   {
-    title: 'Calendar',
-    body: 'See when your circle is free. Tap any day for the full schedule and to propose a plan.',
-    position: 'top' as const,
+    title: '🍻 Your circles',
+    body: 'These chips are your friend groups. Tap one to switch. Tap the active circle again (the one with ▾) to see members, invite friends, and access settings.',
+    anchor: 'top-left',
+    arrow: 'up-left',
   },
   {
-    title: 'Notifications',
-    body: 'Friend requests, pact updates, and sparks all show up here.',
-    position: 'bottom' as const,
+    title: '📅 The calendar',
+    body: 'Green days = your circle is free. Tap any day to see the full schedule, pick a time window, and propose a hangout. Red borders = busy. Blue = pending pact. Yellow = confirmed.',
+    anchor: 'center',
+    arrow: 'none',
   },
   {
-    title: 'Friends',
-    body: 'Add friends by their username. They\'ll get a notification to confirm.',
-    position: 'bottom' as const,
+    title: '⚡ Sparks',
+    body: 'When you and a friend are nearby and both free, a Spark card appears at the top. Tap "Propose" to send a quick plan — just the two of you.',
+    anchor: 'center',
+    arrow: 'none',
   },
   {
-    title: 'Your profile',
-    body: 'Your profile, settings, calendar connection, and appearance — all in one place.',
-    position: 'bottom' as const,
+    title: '🧭 Navigation',
+    body: 'Calendar shows availability. Friends is your contact list. Plans has your locked-in hangouts. Spots finds places near everyone. "You" is your profile and settings.',
+    anchor: 'bottom',
+    arrow: 'down',
   },
   {
-    title: 'Navigation',
-    body: 'Calendar, Chat, Plans, and Spots. Everything you need is down here.',
-    position: 'top' as const,
+    title: '✅ You\'re all set',
+    body: 'Start by syncing your Google Calendar in Settings, then invite friends to a circle. You can replay this tour anytime from You → Show me around.',
+    anchor: 'center',
+    arrow: 'none',
   },
 ]
 
 export default function Walkthrough() {
-  const [step, setStep] = useState(-1) // -1 = not showing
+  const [step, setStep] = useState(-1)
   const [show, setShow] = useState(false)
 
   useEffect(() => {
-    // Auto-start for first-time users
     const seen = localStorage.getItem('pact_walkthrough_seen')
     if (!seen) {
       const t = setTimeout(() => { setStep(0); setShow(true) }, 1500)
       return () => clearTimeout(t)
     }
-
-    // Manual trigger from settings
     const handler = () => { setStep(0); setShow(true) }
     window.addEventListener('pact-start-walkthrough', handler)
     return () => window.removeEventListener('pact-start-walkthrough', handler)
   }, [])
 
   function next() {
-    if (step < STEPS.length - 1) {
-      setStep(step + 1)
-    } else {
-      dismiss()
-    }
+    if (step < STEPS.length - 1) setStep(step + 1)
+    else dismiss()
   }
 
   function dismiss() {
@@ -76,34 +84,65 @@ export default function Walkthrough() {
 
   const s = STEPS[step]
   const isLast = step === STEPS.length - 1
-  const isTop = s.position === 'top'
+
+  // Position the card based on what we're pointing at
+  const cardStyle: React.CSSProperties = {
+    position: 'fixed', left: '50%', transform: 'translateX(-50%)',
+    zIndex: 9991,
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 20, padding: '20px 18px 16px',
+    width: '88%', maxWidth: 340,
+    boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+  }
+
+  if (s.anchor === 'top-left' || s.anchor === 'top-right') {
+    cardStyle.top = 120
+  } else if (s.anchor === 'bottom') {
+    cardStyle.bottom = 90
+  } else {
+    cardStyle.top = '50%'
+    cardStyle.transform = 'translate(-50%, -50%)'
+  }
 
   return (
     <>
-      {/* Overlay */}
       <div style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
-        zIndex: 9990, transition: 'opacity .2s',
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+        zIndex: 9990,
       }} onClick={dismiss} />
 
-      {/* Tooltip card */}
-      <div style={{
-        position: 'fixed',
-        left: '50%', transform: 'translateX(-50%)',
-        ...(isTop
-          ? { bottom: 90 }
-          : { top: step <= 1 ? 110 : 70 }
-        ),
-        zIndex: 9991,
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 20, padding: '20px 18px 16px',
-        width: '85%', maxWidth: 320,
-        boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
-      }}>
-        {/* Step indicator */}
-        <div style={{
-          display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 14,
-        }}>
+      <div style={cardStyle}>
+        {/* Arrow pointer */}
+        {s.arrow === 'up-right' && (
+          <div style={{
+            position: 'absolute', top: -10, right: 40,
+            width: 0, height: 0,
+            borderLeft: '10px solid transparent',
+            borderRight: '10px solid transparent',
+            borderBottom: '10px solid var(--surface)',
+          }} />
+        )}
+        {s.arrow === 'up-left' && (
+          <div style={{
+            position: 'absolute', top: -10, left: 40,
+            width: 0, height: 0,
+            borderLeft: '10px solid transparent',
+            borderRight: '10px solid transparent',
+            borderBottom: '10px solid var(--surface)',
+          }} />
+        )}
+        {s.arrow === 'down' && (
+          <div style={{
+            position: 'absolute', bottom: -10, left: '50%', transform: 'translateX(-50%)',
+            width: 0, height: 0,
+            borderLeft: '10px solid transparent',
+            borderRight: '10px solid transparent',
+            borderTop: '10px solid var(--surface)',
+          }} />
+        )}
+
+        {/* Step dots */}
+        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 14 }}>
           {STEPS.map((_, i) => (
             <div key={i} style={{
               width: i === step ? 18 : 6, height: 6, borderRadius: 3,
@@ -114,7 +153,7 @@ export default function Walkthrough() {
         </div>
 
         <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>{s.title}</h3>
-        <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>{s.body}</p>
+        <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.55 }}>{s.body}</p>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
           <button onClick={dismiss} style={{
@@ -127,7 +166,7 @@ export default function Walkthrough() {
             flex: 2, padding: '10px 0', border: 'none', borderRadius: 12,
             background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
           }}>
-            {isLast ? 'Done' : `Next (${step + 1}/${STEPS.length})`}
+            {isLast ? 'Get started' : `Next (${step + 1}/${STEPS.length})`}
           </button>
         </div>
       </div>
