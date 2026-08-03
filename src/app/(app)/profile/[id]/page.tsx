@@ -10,6 +10,7 @@ import LocationPicker from '@/components/LocationPicker'
 type FullProfile = {
   id: string
   name: string
+  username: string | null
   email: string
   color: string
   home_area: string
@@ -48,6 +49,13 @@ export default function ProfilePage() {
   const [editSharePhone, setEditSharePhone] = useState('nobody')
   const [editShareAddress, setEditShareAddress] = useState('nobody')
   const [editHomeArea, setEditHomeArea] = useState('')
+  const [editUsername, setEditUsername] = useState('')
+  const [usernameError, setUsernameError] = useState('')
+  const [checkingUsername, setCheckingUsername] = useState(false)
+
+  // Friendship state (for other people's profiles)
+  const [friendship, setFriendship] = useState<{ id: string; status: string; requester_id: string; addressee_id: string } | null>(null)
+  const [friendLoading, setFriendLoading] = useState(false)
 
   // Account actions
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false)
@@ -69,10 +77,26 @@ export default function ProfilePage() {
         setEditSharePhone(p.share_phone || 'nobody')
         setEditShareAddress(p.share_address || 'nobody')
         setEditHomeArea(p.home_area || '')
+        setEditUsername(p.username || '')
       }
     }
     load()
   }, [id])
+
+  // Check friendship status with this user
+  useEffect(() => {
+    if (isOwn) return
+    async function checkFriendship() {
+      const { data } = await supabase
+        .from('friendships')
+        .select('id, status, requester_id, addressee_id')
+        .or(`and(requester_id.eq.${user.id},addressee_id.eq.${id}),and(requester_id.eq.${id},addressee_id.eq.${user.id})`)
+        .limit(1)
+        .single()
+      setFriendship(data || null)
+    }
+    checkFriendship()
+  }, [id, isOwn, user.id])
 
   // Check calendar connection for own profile
   useEffect(() => {
@@ -103,6 +127,77 @@ export default function ProfilePage() {
       })
     } catch {}
     setSyncing(false)
+  }
+
+  // Friendship actions
+  async function sendFriendRequest() {
+    setFriendLoading(true)
+    const { data, error } = await supabase.from('friendships').insert({
+      requester_id: user.id,
+      addressee_id: id,
+    }).select('id, status, requester_id, addressee_id').single()
+    if (!error && data) {
+      setFriendship(data)
+      await supabase.from('notifications').insert({
+        user_id: id,
+        type: 'friend_request',
+        title: `${user.name} says you're friends!`,
+        body: 'Tap to accept the friend request',
+        link: '/friends',
+      })
+    }
+    setFriendLoading(false)
+  }
+
+  async function acceptFriendRequest() {
+    if (!friendship) return
+    setFriendLoading(true)
+    await supabase.from('friendships').update({
+      status: 'accepted',
+      accepted_at: new Date().toISOString(),
+    }).eq('id', friendship.id)
+    setFriendship({ ...friendship, status: 'accepted' })
+    await supabase.from('notifications').insert({
+      user_id: friendship.requester_id,
+      type: 'friend_request',
+      title: `${user.name} accepted your friend request!`,
+      body: 'You\'re now friends on Pact',
+      link: '/friends',
+    })
+    setFriendLoading(false)
+  }
+
+  async function removeFriend() {
+    if (!friendship) return
+    if (!confirm('Remove this friend?')) return
+    setFriendLoading(true)
+    await supabase.from('friendships').delete().eq('id', friendship.id)
+    setFriendship(null)
+    setFriendLoading(false)
+  }
+
+  function formatUsername(val: string) {
+    return val.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24)
+  }
+
+  async function validateUsername(val: string): Promise<boolean> {
+    const clean = formatUsername(val)
+    if (!clean) { setUsernameError(''); return false }
+    if (clean.length < 3) { setUsernameError('At least 3 characters'); return false }
+    setCheckingUsername(true)
+    const { data } = await supabase
+      .from('users')
+      .select('id')
+      .ilike('username', clean)
+      .neq('id', user.id)
+      .limit(1)
+    setCheckingUsername(false)
+    if (data && data.length > 0) {
+      setUsernameError('Already taken')
+      return false
+    }
+    setUsernameError('')
+    return true
   }
 
 
@@ -154,6 +249,14 @@ export default function ProfilePage() {
 
   async function handleSave() {
     setSaving(true)
+
+    // Validate username if changed
+    const cleanUsername = formatUsername(editUsername)
+    if (cleanUsername && cleanUsername.length >= 3 && cleanUsername !== profile?.username) {
+      const valid = await validateUsername(cleanUsername)
+      if (!valid) { setSaving(false); return }
+    }
+
     // Try exact match, then fuzzy match on AREAS for coordinate lookup
     const areaKey = editHomeArea || profile?.home_area || ''
     const exactMatch = AREAS[areaKey]
@@ -161,6 +264,7 @@ export default function ProfilePage() {
     const coords = exactMatch || (fuzzyMatch ? AREAS[fuzzyMatch] : { x: 14.55, y: 121.0 })
     await supabase.from('users').update({
       name: editName,
+      username: cleanUsername || null,
       color: editColor,
       phone: editPhone || null,
       address: editAddress || null,
@@ -252,6 +356,36 @@ export default function ProfilePage() {
         <div>
           <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>Name</label>
           <input className="input" value={editName} onChange={e => setEditName(e.target.value)} style={{ marginTop: 4 }} />
+        </div>
+
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>Username</label>
+          <div style={{ position: 'relative', marginTop: 4 }}>
+            <span style={{
+              position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+              fontSize: 14, color: 'var(--text2)', fontWeight: 600, pointerEvents: 'none',
+            }}>@</span>
+            <input
+              className="input"
+              value={editUsername}
+              onChange={e => {
+                setEditUsername(formatUsername(e.target.value))
+                setUsernameError('')
+              }}
+              onBlur={() => { if (editUsername.length >= 3 && editUsername !== profile?.username) validateUsername(editUsername) }}
+              placeholder="username"
+              style={{ paddingLeft: 30 }}
+            />
+          </div>
+          {usernameError && (
+            <p style={{ fontSize: 11, color: 'var(--red)', marginTop: 3 }}>{usernameError}</p>
+          )}
+          {!usernameError && editUsername.length >= 3 && !checkingUsername && editUsername !== profile?.username && (
+            <p style={{ fontSize: 11, color: 'var(--green)', marginTop: 3 }}>Available!</p>
+          )}
+          <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 3 }}>
+            Friends can find you by your username
+          </p>
         </div>
 
         <div>
@@ -367,6 +501,9 @@ export default function ProfilePage() {
       </div>
 
       <h2 style={{ fontSize: 20, fontWeight: 800 }}>{profile.name}</h2>
+      {profile.username && (
+        <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: -4 }}>@{profile.username}</p>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center', maxWidth: 280 }}>
         <p style={{ fontSize: 12, color: 'var(--text2)' }}>{profile.home_area}</p>
@@ -386,10 +523,71 @@ export default function ProfilePage() {
         )}
       </div>
 
+      {/* Friend button — other people's profiles */}
+      {!isOwn && (
+        <div style={{ width: '100%', maxWidth: 280, marginTop: 8 }}>
+          {!friendship && (
+            <button
+              className="btn-primary"
+              onClick={sendFriendRequest}
+              disabled={friendLoading}
+              style={{ width: '100%' }}
+            >
+              {friendLoading ? 'Sending...' : '👋 Add friend'}
+            </button>
+          )}
+          {friendship?.status === 'pending' && friendship.requester_id === user.id && (
+            <button
+              className="btn-secondary"
+              onClick={removeFriend}
+              disabled={friendLoading}
+              style={{ width: '100%', color: 'var(--text2)' }}
+            >
+              {friendLoading ? '...' : '⏳ Request sent — tap to cancel'}
+            </button>
+          )}
+          {friendship?.status === 'pending' && friendship.addressee_id === user.id && (
+            <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+              <button
+                className="btn-primary"
+                onClick={acceptFriendRequest}
+                disabled={friendLoading}
+                style={{ flex: 1 }}
+              >
+                {friendLoading ? '...' : 'Accept request'}
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={removeFriend}
+                disabled={friendLoading}
+                style={{ flex: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          {friendship?.status === 'accepted' && (
+            <button
+              className="btn-secondary"
+              onClick={removeFriend}
+              disabled={friendLoading}
+              style={{ width: '100%' }}
+            >
+              {friendLoading ? '...' : '✓ Friends — tap to remove'}
+            </button>
+          )}
+        </div>
+      )}
+
       {isOwn && (
-        <button className="btn-secondary" onClick={() => setEditing(true)} style={{ marginTop: 8, width: '100%', maxWidth: 280 }}>
-          Edit profile
-        </button>
+        <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 280, marginTop: 8 }}>
+          <button className="btn-secondary" onClick={() => setEditing(true)} style={{ flex: 1 }}>
+            Edit profile
+          </button>
+          <button className="btn-secondary" onClick={() => router.push('/friends')} style={{ flex: 1 }}>
+            👥 Friends
+          </button>
+        </div>
       )}
 
       {/* Shared circles — shown on other people's profiles */}

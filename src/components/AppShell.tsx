@@ -11,6 +11,7 @@ import { useLocationUpdate } from '@/lib/useLocationUpdate'
 export type UserProfile = {
   id: string
   name: string
+  username: string | null
   email: string
   color: string
   home_area: string
@@ -32,6 +33,9 @@ export type Circle = {
   name: string
   emoji: string
   invite_code: string
+  visibility: string
+  join_mode: string
+  created_by: string
 }
 
 type CircleContextType = {
@@ -248,6 +252,9 @@ export default function AppShell({
 
   // Chat unread badge
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
+
+  // Friend request badge
+  const [pendingFriendRequests, setPendingFriendRequests] = useState(0)
 
   // Calendar selection modal (global — works from any tab)
   type GCal = { id: string; summary: string; primary: boolean; backgroundColor: string }
@@ -688,6 +695,28 @@ export default function AppShell({
     return () => { supabase.removeChannel(channel) }
   }, [user.id])
 
+  // Load pending friend request count
+  useEffect(() => {
+    async function fetchFriendRequests() {
+      const { count } = await supabase
+        .from('friendships')
+        .select('id', { count: 'exact', head: true })
+        .eq('addressee_id', user.id)
+        .eq('status', 'pending')
+      setPendingFriendRequests(count || 0)
+    }
+    fetchFriendRequests()
+
+    const channel = supabase
+      .channel('friend-requests-badge')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'friendships',
+      }, () => { fetchFriendRequests() })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [user.id])
+
   async function markAllNotifsRead() {
     await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
@@ -908,6 +937,32 @@ export default function AppShell({
                     background: 'var(--red)', color: '#fff', borderRadius: 8,
                     fontSize: 9, fontWeight: 800, padding: '1px 5px', lineHeight: 1.3,
                   }}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
+                )}
+              </button>
+
+              {/* Friends */}
+              <button
+                onClick={() => router.push('/friends')}
+                style={{
+                  background: 'var(--surface2)', border: '1px solid var(--border)',
+                  cursor: 'pointer', padding: '6px 8px', borderRadius: 20,
+                  display: 'flex', alignItems: 'center', position: 'relative',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                {pendingFriendRequests > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -4, right: -4,
+                    minWidth: 16, height: 16, borderRadius: 8,
+                    background: 'var(--red)', color: '#fff', fontSize: 10,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '0 4px', fontWeight: 700,
+                  }}>{pendingFriendRequests}</span>
                 )}
               </button>
 

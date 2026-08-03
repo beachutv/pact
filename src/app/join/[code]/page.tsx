@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function JoinPage() {
   const { code } = useParams<{ code: string }>()
-  const [status, setStatus] = useState<'loading' | 'joining' | 'done' | 'login' | 'invalid' | 'already'>('loading')
+  const [status, setStatus] = useState<'loading' | 'joining' | 'done' | 'login' | 'invalid' | 'already' | 'requested' | 'already_requested'>('loading')
   const [circleName, setCircleName] = useState('')
   const supabase = createClient()
 
@@ -24,10 +24,10 @@ export default function JoinPage() {
 
       setStatus('joining')
 
-      // Find circle by invite code
+      // Find circle by invite code — include join_mode
       const { data: circle } = await supabase
         .from('circles')
-        .select('id, name, emoji')
+        .select('id, name, emoji, join_mode, visibility')
         .eq('invite_code', code)
         .single()
 
@@ -52,6 +52,29 @@ export default function JoinPage() {
         return
       }
 
+      // Private circles with invite code — always allow direct join (the code IS the invite)
+      // Public circles with approval mode via direct link — also allow (link = explicit invite)
+      // The approval gate only applies to browsing/searching for public circles
+      if (circle.visibility === 'public' && circle.join_mode === 'approval') {
+        // Check for existing pending request
+        const { data: existingReq } = await supabase
+          .from('circle_join_requests')
+          .select('id, status')
+          .eq('circle_id', circle.id)
+          .eq('user_id', user.id)
+          .single()
+
+        if (existingReq) {
+          if (existingReq.status === 'pending') {
+            setStatus('already_requested')
+            return
+          }
+        }
+
+        // For invite links, join directly even for approval circles
+        // The invite link IS the approval
+      }
+
       await supabase.from('circle_members').insert({
         circle_id: circle.id,
         user_id: user.id,
@@ -64,7 +87,7 @@ export default function JoinPage() {
     }
 
     joinCircle()
-  }, [code])
+  }, [code]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div id="app-shell" style={{ justifyContent: 'center', padding: '0 24px' }}>
@@ -89,6 +112,40 @@ export default function JoinPage() {
           <p style={{ fontSize: 14, color: 'var(--accent)' }}>
             You&apos;re already in{circleName ? ` ${circleName}` : ' this circle'}! Redirecting...
           </p>
+        )}
+        {status === 'requested' && (
+          <div>
+            <p style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 8 }}>
+              Request sent to join{circleName ? ` ${circleName}` : ''}!
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
+              An admin will review your request. You&apos;ll get a notification when you&apos;re approved.
+            </p>
+            <a href="/calendar" style={{
+              display: 'inline-block', padding: '10px 24px', borderRadius: 12,
+              background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700,
+              textDecoration: 'none',
+            }}>
+              Go to Pact
+            </a>
+          </div>
+        )}
+        {status === 'already_requested' && (
+          <div>
+            <p style={{ fontSize: 14, color: 'var(--amber)', marginBottom: 8 }}>
+              You&apos;ve already requested to join{circleName ? ` ${circleName}` : ''}.
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
+              Hang tight — an admin will review your request.
+            </p>
+            <a href="/calendar" style={{
+              display: 'inline-block', padding: '10px 24px', borderRadius: 12,
+              background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700,
+              textDecoration: 'none',
+            }}>
+              Go to Pact
+            </a>
+          </div>
         )}
         {status === 'invalid' && (
           <div>

@@ -13,12 +13,19 @@ export default function NewCirclePage() {
   const router = useRouter()
   const supabase = createClient()
 
-  const [mode, setMode] = useState<'pick' | 'create' | 'join' | 'add-friends'>('pick')
+  const [mode, setMode] = useState<'pick' | 'create' | 'join' | 'browse' | 'add-friends'>('pick')
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState('🍻')
+  const [visibility, setVisibility] = useState<'private' | 'public'>('private')
+  const [joinMode, setJoinMode] = useState<'invite' | 'auto' | 'approval'>('invite')
   const [inviteCode, setInviteCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Browse public circles state
+  const [publicCircles, setPublicCircles] = useState<any[]>([])
+  const [browseQuery, setBrowseQuery] = useState('')
+  const [browseLoading, setBrowseLoading] = useState(false)
 
   // Add friends state
   const [createdCircleId, setCreatedCircleId] = useState<string | null>(null)
@@ -109,7 +116,13 @@ export default function NewCirclePage() {
 
     const { data: circle, error: createError } = await supabase
       .from('circles')
-      .insert({ name: name.trim(), emoji: emoji || '🍻', created_by: user.id })
+      .insert({
+        name: name.trim(),
+        emoji: emoji || '🍻',
+        created_by: user.id,
+        visibility,
+        join_mode: visibility === 'private' ? 'invite' : joinMode,
+      })
       .select()
       .single()
 
@@ -179,6 +192,84 @@ export default function NewCirclePage() {
     window.location.href = '/calendar'
   }
 
+  async function browsePublic() {
+    setBrowseLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setBrowseLoading(false); return }
+
+    let query = supabase
+      .from('circles')
+      .select('id, name, emoji, join_mode, created_by')
+      .eq('visibility', 'public')
+
+    if (browseQuery.trim()) {
+      query = query.ilike('name', `%${browseQuery.trim()}%`)
+    }
+
+    const { data } = await query.limit(20)
+
+    // Filter out circles user is already in
+    const { data: myCms } = await supabase
+      .from('circle_members')
+      .select('circle_id')
+      .eq('user_id', user.id)
+    const myCircleIds = new Set((myCms || []).map(c => c.circle_id))
+
+    // Also check for pending join requests
+    const { data: pendingReqs } = await supabase
+      .from('circle_join_requests')
+      .select('circle_id')
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+    const pendingIds = new Set((pendingReqs || []).map(r => r.circle_id))
+
+    setPublicCircles((data || []).map(c => ({
+      ...c,
+      already: myCircleIds.has(c.id),
+      pending: pendingIds.has(c.id),
+    })))
+    setBrowseLoading(false)
+  }
+
+  async function joinPublicCircle(circleId: string, joinModeVal: string) {
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoading(false); return }
+
+    if (joinModeVal === 'auto') {
+      await supabase.from('circle_members').insert({
+        circle_id: circleId,
+        user_id: user.id,
+        role: 'member',
+      })
+      window.location.href = '/calendar'
+    } else if (joinModeVal === 'approval') {
+      await supabase.from('circle_join_requests').insert({
+        circle_id: circleId,
+        user_id: user.id,
+      })
+      // Notify admins
+      const { data: admins } = await supabase
+        .from('circle_members')
+        .select('user_id')
+        .eq('circle_id', circleId)
+        .eq('role', 'admin')
+      if (admins) {
+        await Promise.all(admins.map(a =>
+          supabase.from('notifications').insert({
+            user_id: a.user_id,
+            type: 'pact_change',
+            title: `${user.user_metadata?.full_name || 'Someone'} wants to join your circle`,
+            body: 'Tap to review the request',
+            link: `/circles/${circleId}/settings`,
+          })
+        ))
+      }
+      setPublicCircles(prev => prev.map(c => c.id === circleId ? { ...c, pending: true } : c))
+      setLoading(false)
+    }
+  }
+
   if (mode === 'pick') {
     return (
       <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -191,6 +282,9 @@ export default function NewCirclePage() {
         </button>
         <button className="btn-secondary" onClick={() => setMode('join')} style={{ width: '100%' }}>
           Join with invite code
+        </button>
+        <button className="btn-secondary" onClick={() => { setMode('browse'); browsePublic() }} style={{ width: '100%' }}>
+          🔎 Browse public circles
         </button>
         <button
           className="btn-secondary"
@@ -337,10 +431,144 @@ export default function NewCirclePage() {
             ))}
           </div>
         </div>
+
+        <div>
+          <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8 }}>
+            Who can find this circle?
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {([
+              { key: 'private' as const, label: '🔒 Private', desc: 'Invite only' },
+              { key: 'public' as const, label: '🌐 Public', desc: 'Searchable' },
+            ]).map(v => (
+              <button
+                key={v.key}
+                onClick={() => {
+                  setVisibility(v.key)
+                  if (v.key === 'private') setJoinMode('invite')
+                  else if (joinMode === 'invite') setJoinMode('auto')
+                }}
+                style={{
+                  flex: 1, padding: '10px 12px', borderRadius: 12,
+                  background: visibility === v.key ? 'var(--accent-soft)' : 'var(--surface)',
+                  border: visibility === v.key ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
+                  cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{v.label}</p>
+                <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{v.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {visibility === 'public' && (
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8 }}>
+              How do people join?
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {([
+                { key: 'auto' as const, label: 'Open', desc: 'Anyone can join instantly' },
+                { key: 'approval' as const, label: 'Approval', desc: 'Admin must approve' },
+              ]).map(v => (
+                <button
+                  key={v.key}
+                  onClick={() => setJoinMode(v.key)}
+                  style={{
+                    flex: 1, padding: '10px 12px', borderRadius: 12,
+                    background: joinMode === v.key ? 'var(--accent-soft)' : 'var(--surface)',
+                    border: joinMode === v.key ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
+                    cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{v.label}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{v.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {error && <p style={{ fontSize: 13, color: 'var(--red)' }}>{error}</p>}
         <button className="btn-primary" onClick={handleCreate} disabled={loading || !name.trim()}>
           {loading ? 'Creating...' : 'Create circle'}
         </button>
+        <button className="btn-secondary" onClick={() => setMode('pick')} style={{ width: '100%' }}>
+          ← Back
+        </button>
+      </div>
+    )
+  }
+
+  // Browse public circles mode
+  if (mode === 'browse') {
+    return (
+      <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 800 }}>Browse public circles</h2>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            className="input"
+            placeholder="Search circles..."
+            value={browseQuery}
+            onChange={e => setBrowseQuery(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') browsePublic() }}
+            style={{ flex: 1 }}
+            autoFocus
+          />
+          <button className="btn-primary" onClick={browsePublic} style={{ flexShrink: 0 }}>
+            Search
+          </button>
+        </div>
+
+        {browseLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+            <div className="spinner" />
+          </div>
+        ) : publicCircles.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--text2)', textAlign: 'center', padding: 20 }}>
+            No public circles found — try a different search or create your own!
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {publicCircles.map(c => (
+              <div
+                key={c.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px', borderRadius: 12,
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                }}
+              >
+                <span style={{ fontSize: 22 }}>{c.emoji || '👥'}</span>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 14, fontWeight: 700 }}>{c.name}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text2)' }}>
+                    {c.join_mode === 'auto' ? 'Open — join instantly' : 'Requires approval'}
+                  </p>
+                </div>
+                {c.already ? (
+                  <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>✓ Joined</span>
+                ) : c.pending ? (
+                  <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 700 }}>⏳ Pending</span>
+                ) : (
+                  <button
+                    onClick={() => joinPublicCircle(c.id, c.join_mode)}
+                    disabled={loading}
+                    style={{
+                      padding: '6px 14px', borderRadius: 8, border: 'none',
+                      background: 'var(--accent)', color: '#fff',
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    }}
+                  >
+                    {c.join_mode === 'auto' ? 'Join' : 'Request'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         <button className="btn-secondary" onClick={() => setMode('pick')} style={{ width: '100%' }}>
           ← Back
         </button>

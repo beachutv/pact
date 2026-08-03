@@ -44,6 +44,10 @@ export default function CircleSettingsPage() {
   const [friendsLoading, setFriendsLoading] = useState(false)
   const [addingFriends, setAddingFriends] = useState(false)
 
+  // Join requests state
+  const [joinRequests, setJoinRequests] = useState<any[]>([])
+  const [joiningAction, setJoiningAction] = useState<string | null>(null)
+
   useEffect(() => {
     async function load() {
       const { data: c } = await supabase
@@ -68,6 +72,15 @@ export default function CircleSettingsPage() {
           role: cm.role,
         })))
       }
+
+      // Load pending join requests
+      const { data: reqs } = await supabase
+        .from('circle_join_requests')
+        .select('id, user_id, status, created_at, users(id, name, color, avatar_url)')
+        .eq('circle_id', id)
+        .eq('status', 'pending')
+      if (reqs) setJoinRequests(reqs)
+
       setLoading(false)
     }
     load()
@@ -240,6 +253,59 @@ export default function CircleSettingsPage() {
       m.id === memberId ? { ...m, role: 'member' } : m
     ))
     setActionMember(null)
+  }
+
+  async function approveJoinRequest(reqId: string, userId: string) {
+    setJoiningAction(reqId)
+    await supabase.from('circle_join_requests').update({
+      status: 'approved',
+      resolved_at: new Date().toISOString(),
+      resolved_by: user.id,
+    }).eq('id', reqId)
+
+    await supabase.rpc('add_circle_member', { p_circle_id: id, p_user_id: userId })
+    setJoinRequests(prev => prev.filter(r => r.id !== reqId))
+
+    // Reload members
+    const { data: cms } = await supabase
+      .from('circle_members')
+      .select('user_id, role, users(*)')
+      .eq('circle_id', id)
+    if (cms) {
+      setMembers(cms.map(cm => ({ ...(cm as any).users, role: cm.role })))
+    }
+
+    // Notify the user
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      type: 'pact_change',
+      title: `You're in! Welcome to ${circle?.name}`,
+      body: 'Your request to join was approved',
+      link: '/calendar',
+    })
+    setJoiningAction(null)
+  }
+
+  async function rejectJoinRequest(reqId: string, userId: string) {
+    setJoiningAction(reqId)
+    await supabase.from('circle_join_requests').update({
+      status: 'rejected',
+      resolved_at: new Date().toISOString(),
+      resolved_by: user.id,
+    }).eq('id', reqId)
+    setJoinRequests(prev => prev.filter(r => r.id !== reqId))
+    setJoiningAction(null)
+  }
+
+  async function updateVisibility(v: string) {
+    const jm = v === 'private' ? 'invite' : (circle?.join_mode === 'invite' ? 'auto' : circle?.join_mode)
+    await supabase.from('circles').update({ visibility: v, join_mode: jm }).eq('id', id)
+    setCircle({ ...circle, visibility: v, join_mode: jm })
+  }
+
+  async function updateJoinMode(jm: string) {
+    await supabase.from('circles').update({ join_mode: jm }).eq('id', id)
+    setCircle({ ...circle, join_mode: jm })
   }
 
   async function handleDelete() {
@@ -446,7 +512,128 @@ export default function CircleSettingsPage() {
         </div>
       </div>
 
-      {/* Add friends overlay */}
+      {/* Visibility & Join Mode — admin only */}
+      {isAdmin && circle && (
+        <div className="card">
+          <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+            Circle visibility
+          </p>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            {([
+              { key: 'private', label: '🔒 Private', desc: 'Invite only' },
+              { key: 'public', label: '🌐 Public', desc: 'Searchable by anyone' },
+            ] as const).map(v => (
+              <button
+                key={v.key}
+                onClick={() => updateVisibility(v.key)}
+                style={{
+                  flex: 1, padding: '10px 12px', borderRadius: 12,
+                  background: circle.visibility === v.key ? 'var(--accent-soft)' : 'var(--surface)',
+                  border: circle.visibility === v.key ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
+                  cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{v.label}</p>
+                <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{v.desc}</p>
+              </button>
+            ))}
+          </div>
+
+          {circle.visibility === 'public' && (
+            <>
+              <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+                How people join
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {([
+                  { key: 'auto', label: 'Open', desc: 'Anyone joins instantly' },
+                  { key: 'approval', label: 'Approval', desc: 'Admin must approve' },
+                ] as const).map(v => (
+                  <button
+                    key={v.key}
+                    onClick={() => updateJoinMode(v.key)}
+                    style={{
+                      flex: 1, padding: '10px 12px', borderRadius: 12,
+                      background: circle.join_mode === v.key ? 'var(--accent-soft)' : 'var(--surface)',
+                      border: circle.join_mode === v.key ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
+                      cursor: 'pointer', textAlign: 'left',
+                    }}
+                  >
+                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{v.label}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{v.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Join Requests — admin only, show when approval mode */}
+      {isAdmin && joinRequests.length > 0 && (
+        <div className="card" style={{ border: '1.5px solid var(--amber)' }}>
+          <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--amber)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+            Pending join requests · {joinRequests.length}
+          </p>
+          {joinRequests.map(req => {
+            const reqUser = (req as any).users
+            return (
+              <div key={req.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 0', borderBottom: '1px solid var(--border)',
+              }}>
+                <div className="avatar" style={{
+                  background: reqUser?.color || '#666', color: txtOn(reqUser?.color || '#666'),
+                  position: 'relative',
+                }}>
+                  {reqUser?.avatar_url && (
+                    <img
+                      src={reqUser.avatar_url}
+                      alt=""
+                      style={{
+                        position: 'absolute', inset: 0, borderRadius: '50%',
+                        width: '100%', height: '100%', objectFit: 'cover',
+                      }}
+                      onError={e => (e.currentTarget.style.display = 'none')}
+                    />
+                  )}
+                  {reqUser?.name?.[0] || '?'}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 13, fontWeight: 700 }}>{reqUser?.name || 'Unknown'}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text2)' }}>
+                    {new Date(req.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={() => approveJoinRequest(req.id, req.user_id)}
+                    disabled={joiningAction === req.id}
+                    style={{
+                      padding: '5px 12px', borderRadius: 8, border: 'none',
+                      background: 'var(--accent)', color: '#fff',
+                      fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    }}
+                  >
+                    {joiningAction === req.id ? '...' : 'Approve'}
+                  </button>
+                  <button
+                    onClick={() => rejectJoinRequest(req.id, req.user_id)}
+                    disabled={joiningAction === req.id}
+                    style={{
+                      padding: '5px 10px', borderRadius: 8, border: 'none',
+                      background: 'var(--surface2)', color: 'var(--text2)',
+                      fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
       {showAddFriends && (
         <div className="card" style={{ border: '1.5px solid var(--accent)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>

@@ -3,9 +3,24 @@
 import { useState, useEffect } from 'react'
 
 // Increment this version string each time you deploy a batch of fixes/features
-export const CURRENT_VERSION = '4.0'
+export const CURRENT_VERSION = '5.0'
 
 const CHANGELOG = [
+  {
+    version: '5.0',
+    date: 'August 3, 2026',
+    title: 'Friends, Usernames & Circle Privacy',
+    items: [
+      'Usernames — set a @username so friends can find and add you',
+      'Friend list — add friends by username, accept/decline requests with notifications',
+      'Friend profiles — add/remove friend button on any profile, see friendship status',
+      'Public & private circles — public circles are searchable, private circles require an invite code',
+      'Circle join modes — open circles let anyone join instantly, approval circles require admin approval',
+      'Browse public circles — search and join open circles from the circles page',
+      'Join requests — admins see pending requests and can approve or reject',
+      'Username editing — change your username anytime from your profile',
+    ],
+  },
   {
     version: '4.0',
     date: 'August 1, 2026',

@@ -22,7 +22,7 @@ function OnboardingInner() {
   const nextUrl = searchParams.get('next')
   const calError = searchParams.get('error')
 
-  // Steps: 0 = calendar connect, 1 = name, 2 = area, 3 = birthday
+  // Steps: 0 = calendar connect, 1 = name + username, 2 = area, 3 = birthday
   const [step, setStep] = useState(0)
   const [calendarConnected, setCalendarConnected] = useState(false)
   const [checkingCalendar, setCheckingCalendar] = useState(true)
@@ -30,6 +30,9 @@ function OnboardingInner() {
   const [userEmail, setUserEmail] = useState('')
 
   const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
+  const [usernameError, setUsernameError] = useState('')
+  const [checkingUsername, setCheckingUsername] = useState(false)
   const [color, setColor] = useState(AVATAR_COLORS[0])
   const [customColor, setCustomColor] = useState('')
   const [homeArea, setHomeArea] = useState('')
@@ -86,12 +89,42 @@ function OnboardingInner() {
     }
   }
 
+  function formatUsername(val: string) {
+    return val.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24)
+  }
+
+  async function validateUsername(val: string): Promise<boolean> {
+    const clean = formatUsername(val)
+    if (!clean) { setUsernameError(''); return false }
+    if (clean.length < 3) { setUsernameError('At least 3 characters'); return false }
+    setCheckingUsername(true)
+    const { data } = await supabase
+      .from('users')
+      .select('id')
+      .ilike('username', clean)
+      .limit(1)
+    setCheckingUsername(false)
+    if (data && data.length > 0) {
+      setUsernameError('Already taken')
+      return false
+    }
+    setUsernameError('')
+    return true
+  }
+
   async function handleSave() {
     setLoading(true)
     setError('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setError('Not signed in'); setLoading(false); return }
+
+      // Validate username if provided
+      const cleanUsername = formatUsername(username)
+      if (cleanUsername && cleanUsername.length >= 3) {
+        const valid = await validateUsername(cleanUsername)
+        if (!valid) { setLoading(false); return }
+      }
 
       const area = homeArea || 'Metro Manila'
       const exactMatch = AREAS[area]
@@ -100,6 +133,7 @@ function OnboardingInner() {
 
       const { error: updateError } = await supabase.from('users').update({
         name: name || 'User',
+        username: cleanUsername || null,
         color: activeColor,
         home_area: area,
         home_x: coords.x,
@@ -255,6 +289,41 @@ function OnboardingInner() {
                   onChange={e => setName(e.target.value)}
                   autoFocus
                 />
+                <div>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 6 }}>
+                    Pick a username
+                  </p>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{
+                      position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+                      fontSize: 14, color: 'var(--text2)', fontWeight: 600, pointerEvents: 'none',
+                    }}>@</span>
+                    <input
+                      className="input"
+                      placeholder="username"
+                      value={username}
+                      onChange={e => {
+                        const v = formatUsername(e.target.value)
+                        setUsername(v)
+                        setUsernameError('')
+                      }}
+                      onBlur={() => { if (username.length >= 3) validateUsername(username) }}
+                      style={{ paddingLeft: 30 }}
+                    />
+                  </div>
+                  {usernameError && (
+                    <p style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>{usernameError}</p>
+                  )}
+                  {!usernameError && username.length >= 3 && !checkingUsername && (
+                    <p style={{ fontSize: 11, color: 'var(--green)', marginTop: 4 }}>Available!</p>
+                  )}
+                  {checkingUsername && (
+                    <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>Checking...</p>
+                  )}
+                  <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>
+                    Friends can find you by your username. Letters, numbers, and underscores only.
+                  </p>
+                </div>
                 <div>
                   <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8 }}>
                     Pick your color
