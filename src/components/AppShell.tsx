@@ -902,9 +902,9 @@ export default function AppShell({
               )}
             </button>
 
-            {/* Profile avatar */}
+            {/* Profile avatar → settings page */}
             <button
-              onClick={() => router.push(`/profile/${currentUser.id}`)}
+              onClick={() => router.push('/settings')}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 width: 36, height: 36, borderRadius: '50%',
@@ -961,7 +961,14 @@ export default function AppShell({
                 return (
                   <button
                     key={c.id}
-                    onClick={() => setActiveCircle(c)}
+                    onClick={() => {
+                      if (isActive) {
+                        setShowCirclePanel(!showCirclePanel)
+                      } else {
+                        setActiveCircle(c)
+                        setShowCirclePanel(false)
+                      }
+                    }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 5,
                       padding: '5px 12px 5px 7px', borderRadius: 20, flexShrink: 0,

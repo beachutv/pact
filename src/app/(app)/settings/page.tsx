@@ -279,23 +279,20 @@ export default function SettingsPage() {
 
   return (
     <div style={{ padding: '12px 16px 100px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <p style={{ fontSize: 18, fontWeight: 800 }}>Settings</p>
-
-      {/* Profile card */}
-      <button
-        onClick={() => router.push(`/profile/${user.id}`)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 12, width: '100%',
-          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16,
-          padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
-        }}
-      >
-        <div style={{
-          width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-          background: user.color, color: txtOn(user.color),
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 18, fontWeight: 800, position: 'relative', overflow: 'hidden',
-        }}>
+      {/* Profile section — centered avatar, name, username */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        padding: '8px 0 16px', gap: 8,
+      }}>
+        <div
+          onClick={() => router.push(`/profile/${user.id}`)}
+          style={{
+            width: 72, height: 72, borderRadius: '50%', cursor: 'pointer',
+            background: user.color, color: txtOn(user.color),
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 28, fontWeight: 800, position: 'relative', overflow: 'hidden',
+          }}
+        >
           {user.name[0]}
           {user.avatar_url && (
             <img src={user.avatar_url} alt="" style={{
@@ -304,12 +301,23 @@ export default function SettingsPage() {
             }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
           )}
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 15, fontWeight: 700 }}>{user.name}</p>
-          <p style={{ fontSize: 12, color: 'var(--text2)' }}>Edit profile →</p>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: 18, fontWeight: 800 }}>{user.name}</p>
+          {(user as any).username && (
+            <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>@{(user as any).username}</p>
+          )}
         </div>
-        <span style={{ color: 'var(--text2)', fontSize: 18 }}>›</span>
-      </button>
+        <button
+          onClick={() => router.push(`/profile/${user.id}`)}
+          style={{
+            padding: '6px 16px', borderRadius: 10, border: '1px solid var(--border)',
+            background: 'var(--surface2)', color: 'var(--text)',
+            fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          Edit profile
+        </button>
+      </div>
 
       {/* Google Calendar */}
       <Section title="Calendar">
