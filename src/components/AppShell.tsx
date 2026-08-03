@@ -927,7 +927,7 @@ export default function AppShell({
                 '/spots': 'Spots',
                 '/friends': 'Friends',
                 '/notifications': 'Notifications',
-                '/settings': 'Settings',
+                '/settings': 'You',
               }
               if (pathname.startsWith('/profile')) return 'Profile'
               if (pathname.startsWith('/circles')) return 'Circles'
@@ -1222,7 +1222,25 @@ export default function AppShell({
                 onClick={() => router.push(tab.key)}
                 style={{ position: 'relative' }}
               >
-                <span className="nav-icon">{IconComp ? <IconComp color={iconColor} /> : null}</span>
+                <span className="nav-icon">
+                  {tab.key === '/settings' ? (
+                    <div style={{
+                      width: 22, height: 22, borderRadius: '50%',
+                      background: currentUser.color, color: txtOn(currentUser.color),
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 9, fontWeight: 800, position: 'relative', overflow: 'hidden',
+                      border: isActive ? '2px solid var(--accent)' : '2px solid transparent',
+                    }}>
+                      {currentUser.name[0]}
+                      {currentUser.avatar_url && (
+                        <img src={currentUser.avatar_url} alt="" style={{
+                          position: 'absolute', inset: 0, width: '100%', height: '100%',
+                          objectFit: 'cover', borderRadius: '50%',
+                        }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      )}
+                    </div>
+                  ) : IconComp ? <IconComp color={iconColor} /> : null}
+                </span>
                 {tab.label}
                 {/* Friends request badge */}
                 {tab.key === '/friends' && pendingFriendRequests > 0 && (

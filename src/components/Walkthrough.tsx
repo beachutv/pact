@@ -5,52 +5,50 @@ import { useState, useEffect } from 'react'
 type Step = {
   title: string
   body: string
-  anchor: 'top-left' | 'top-right' | 'center' | 'bottom'
-  arrow?: 'up-right' | 'up-left' | 'down' | 'none'
+  emoji: string
+  visual?: string // optional illustration description
 }
 
 const STEPS: Step[] = [
   {
-    title: '👋 Welcome to Pact',
-    body: 'Let\'s show you around. This takes 30 seconds.',
-    anchor: 'center',
-    arrow: 'none',
+    emoji: '📅',
+    title: 'Your calendar',
+    body: 'Green days mean your circle is free. The times below each date (like "4p–2a") show when everyone can meet. Tap any day to see the full hour-by-hour breakdown.',
   },
   {
-    title: '💬 Chat & 🔔 Notifications',
-    body: 'These icons at the top are your inbox. Chat has your group and private messages. The bell shows friend requests, pact updates, and sparks.',
-    anchor: 'top-right',
-    arrow: 'up-right',
+    emoji: '🟩',
+    title: 'What the colors mean',
+    body: '🟩 Green border = someone\'s free that window. ⭐ Star = everyone\'s free all day. 🟨 Yellow border = a pact is already set. 🔴 Red border = a birthday or special occasion.',
   },
   {
-    title: '🍻 Your circles',
-    body: 'These chips are your friend groups. Tap one to switch. Tap the active circle again (the one with ▾) to see members, invite friends, and access settings.',
-    anchor: 'top-left',
-    arrow: 'up-left',
+    emoji: '📋',
+    title: 'Tap a day',
+    body: 'When you tap a day, you\'ll see everyone\'s schedule hour by hour. Pick a time window, choose a spot, and propose a plan — all in one flow.',
   },
   {
-    title: '📅 The calendar',
-    body: 'Green days = your circle is free. Tap any day to see the full schedule, pick a time window, and propose a hangout. Red borders = busy. Blue = pending pact. Yellow = confirmed.',
-    anchor: 'center',
-    arrow: 'none',
+    emoji: '🔵',
+    title: 'Circle chips',
+    body: 'These are your friend groups. Tap to switch circles — the calendar, chat, and plans all follow. Tap the active one (with the ▾) to see members and circle settings.',
   },
   {
-    title: '⚡ Sparks',
-    body: 'When you and a friend are nearby and both free, a Spark card appears at the top. Tap "Propose" to send a quick plan — just the two of you.',
-    anchor: 'center',
-    arrow: 'none',
+    emoji: '💬',
+    title: 'Chat & notifications',
+    body: 'The chat bubble (top right) is for messages — group threads and DMs. The bell is for notifications — friend requests, pact updates, and sparks.',
   },
   {
-    title: '🧭 Navigation',
-    body: 'Calendar shows availability. Friends is your contact list. Plans has your locked-in hangouts. Spots finds places near everyone. "You" is your profile and settings.',
-    anchor: 'bottom',
-    arrow: 'down',
+    emoji: '👥',
+    title: 'Friends',
+    body: 'Add friends by their @username. Once connected, you can see each other in circles and plan together. Check the Friends tab at the bottom.',
   },
   {
-    title: '✅ You\'re all set',
-    body: 'Start by syncing your Google Calendar in Settings, then invite friends to a circle. You can replay this tour anytime from You → Show me around.',
-    anchor: 'center',
-    arrow: 'none',
+    emoji: '📌',
+    title: 'Plans & Spots',
+    body: 'Plans shows your locked-in pacts. Spots shows the best upcoming hangout windows with location picks based on where everyone\'s coming from.',
+  },
+  {
+    emoji: '👤',
+    title: 'Your profile',
+    body: 'The "You" tab has your profile, calendar connection, appearance, and account settings. Everything in one place.',
   },
 ]
 
@@ -64,6 +62,7 @@ export default function Walkthrough() {
       const t = setTimeout(() => { setStep(0); setShow(true) }, 1500)
       return () => clearTimeout(t)
     }
+
     const handler = () => { setStep(0); setShow(true) }
     window.addEventListener('pact-start-walkthrough', handler)
     return () => window.removeEventListener('pact-start-walkthrough', handler)
@@ -72,6 +71,10 @@ export default function Walkthrough() {
   function next() {
     if (step < STEPS.length - 1) setStep(step + 1)
     else dismiss()
+  }
+
+  function prev() {
+    if (step > 0) setStep(step - 1)
   }
 
   function dismiss() {
@@ -85,86 +88,64 @@ export default function Walkthrough() {
   const s = STEPS[step]
   const isLast = step === STEPS.length - 1
 
-  // Position the card based on what we're pointing at
-  const cardStyle: React.CSSProperties = {
-    position: 'fixed', left: '50%', transform: 'translateX(-50%)',
-    zIndex: 9991,
-    background: 'var(--surface)', border: '1px solid var(--border)',
-    borderRadius: 20, padding: '20px 18px 16px',
-    width: '88%', maxWidth: 340,
-    boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
-  }
-
-  if (s.anchor === 'top-left' || s.anchor === 'top-right') {
-    cardStyle.top = 120
-  } else if (s.anchor === 'bottom') {
-    cardStyle.bottom = 90
-  } else {
-    cardStyle.top = '50%'
-    cardStyle.transform = 'translate(-50%, -50%)'
-  }
-
   return (
     <>
+      {/* Overlay */}
       <div style={{
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
         zIndex: 9990,
       }} onClick={dismiss} />
 
-      <div style={cardStyle}>
-        {/* Arrow pointer */}
-        {s.arrow === 'up-right' && (
-          <div style={{
-            position: 'absolute', top: -10, right: 40,
-            width: 0, height: 0,
-            borderLeft: '10px solid transparent',
-            borderRight: '10px solid transparent',
-            borderBottom: '10px solid var(--surface)',
-          }} />
-        )}
-        {s.arrow === 'up-left' && (
-          <div style={{
-            position: 'absolute', top: -10, left: 40,
-            width: 0, height: 0,
-            borderLeft: '10px solid transparent',
-            borderRight: '10px solid transparent',
-            borderBottom: '10px solid var(--surface)',
-          }} />
-        )}
-        {s.arrow === 'down' && (
-          <div style={{
-            position: 'absolute', bottom: -10, left: '50%', transform: 'translateX(-50%)',
-            width: 0, height: 0,
-            borderLeft: '10px solid transparent',
-            borderRight: '10px solid transparent',
-            borderTop: '10px solid var(--surface)',
-          }} />
-        )}
-
+      {/* Card */}
+      <div style={{
+        position: 'fixed',
+        left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+        zIndex: 9991,
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 24, padding: '24px 20px 18px',
+        width: '88%', maxWidth: 340,
+        boxShadow: '0 16px 50px rgba(0,0,0,0.4)',
+      }}>
         {/* Step dots */}
-        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 14 }}>
+        <div style={{
+          display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 16,
+        }}>
           {STEPS.map((_, i) => (
             <div key={i} style={{
-              width: i === step ? 18 : 6, height: 6, borderRadius: 3,
-              background: i === step ? 'var(--accent)' : 'var(--border)',
+              width: i === step ? 20 : 6, height: 6, borderRadius: 3,
+              background: i === step ? 'var(--accent)' : i < step ? 'var(--green)' : 'var(--border)',
               transition: 'all .2s',
             }} />
           ))}
         </div>
 
-        <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>{s.title}</h3>
-        <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.55 }}>{s.body}</p>
+        {/* Emoji + content */}
+        <div style={{ textAlign: 'center', marginBottom: 6 }}>
+          <span style={{ fontSize: 36 }}>{s.emoji}</span>
+        </div>
+        <h3 style={{ fontSize: 17, fontWeight: 800, textAlign: 'center', marginBottom: 8 }}>{s.title}</h3>
+        <p style={{ fontSize: 13.5, color: 'var(--text2)', lineHeight: 1.6, textAlign: 'center' }}>{s.body}</p>
 
-        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-          <button onClick={dismiss} style={{
-            flex: 1, padding: '10px 0', border: '1px solid var(--border)', borderRadius: 12,
-            background: 'none', color: 'var(--text2)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-          }}>
-            Skip
-          </button>
+        {/* Buttons */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+          {step > 0 ? (
+            <button onClick={prev} style={{
+              width: 44, padding: '10px 0', border: '1px solid var(--border)', borderRadius: 12,
+              background: 'none', color: 'var(--text2)', fontSize: 16, cursor: 'pointer',
+            }}>
+              ←
+            </button>
+          ) : (
+            <button onClick={dismiss} style={{
+              flex: 1, padding: '10px 0', border: '1px solid var(--border)', borderRadius: 12,
+              background: 'none', color: 'var(--text2)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            }}>
+              Skip
+            </button>
+          )}
           <button onClick={next} style={{
             flex: 2, padding: '10px 0', border: 'none', borderRadius: 12,
-            background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            background: 'var(--accent)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
           }}>
             {isLast ? 'Get started' : `Next (${step + 1}/${STEPS.length})`}
           </button>
