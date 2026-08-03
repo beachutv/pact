@@ -4,8 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
-import { toStr, fmtDate, fmtHour, fmtTiny, fmtWin, txtOn, readableColor, travelMin, travelMinGps, getBrowserTimezone, currentHourInTz, daysUntil, bdaySoon, birthdayMMDD, AREAS, AREA_GPS, DAY_START, DAY_END } from '@/lib/utils'
-import { useLocationUpdate } from '@/lib/useLocationUpdate'
+import { toStr, fmtDate, fmtHour, fmtTiny, fmtWin, txtOn, readableColor, travelMin, travelMinGps, getBrowserTimezone, currentHourInTz, daysUntil, bdaySoon, birthdayMMDD, sanitizeCoords, areaGps, AREAS, AREA_GPS, DAY_START, DAY_END } from '@/lib/utils'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { IconZap, IconPin, IconClock, IconStar, IconCalendar, IconEdit, IconEye, IconSearch, IconGift, IconCheck, IconRefresh, IconUsers } from '@/components/Icons'
 
@@ -182,8 +181,6 @@ export default function CalendarPage() {
 
   const tz = useMemo(() => getBrowserTimezone(), [])
   const todayStr = useMemo(() => toStr(new Date()), [])
-
-  useLocationUpdate(user.id, 'calendar')
 
   // Track circle member IDs for dependency (stable string key)
   const memberIdsKey = useMemo(() => circleMembers.map(m => m.id).sort().join(','), [circleMembers])
@@ -417,19 +414,6 @@ export default function CalendarPage() {
     return { allDay, bestFull, bestPartial, past: false }
   }
 
-  // Helper: sanitize coordinates — if they look like GPS (>12), fall back to area lookup
-  function sanitizeCoords(x: number, y: number, area: string): { x: number; y: number } {
-    if (x > 12 || y > 12) {
-      const areaCoords = area ? AREAS[area] : undefined
-      const fuzzyKey = !areaCoords ? Object.keys(AREAS).find(a =>
-        area.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(area.toLowerCase())
-      ) : undefined
-      const fallback = areaCoords || (fuzzyKey ? AREAS[fuzzyKey] : { x: 4.5, y: 5.5 })
-      return fallback
-    }
-    return { x, y }
-  }
-
   // ================= Sparks =================
   const [sparkStatus, setSparkStatus] = useState<string>('')
 
@@ -617,55 +601,11 @@ export default function CalendarPage() {
 
     const isToday = sheetDate === todayStr
 
-    // Helper: look up GPS coords for an area name (multi-strategy fuzzy matching)
-    function areaGps(area: string): { lat: number; lng: number } | null {
-      if (!area) return null
-      const direct = AREA_GPS[area]
-      if (direct) return direct
-      const lo = area.toLowerCase()
-      // Strategy 1: area contains an AREA_GPS key prefix, or key contains area prefix
-      const fuzzy1 = Object.keys(AREA_GPS).find(a =>
-        lo.includes(a.split(',')[0].toLowerCase()) || a.toLowerCase().includes(lo.split(',')[0].toLowerCase())
-      )
-      if (fuzzy1) return AREA_GPS[fuzzy1]
-      // Strategy 2: check if any city/district word from AREA_GPS keys appears in the area string
-      // e.g. "The Grove by Rockwell, Tower D" → check "Rockwell" → might match nearby areas
-      const areaWords = lo.split(/[\s,/]+/).filter(w => w.length > 3)
-      const fuzzy2 = Object.keys(AREA_GPS).find(a => {
-        const keyWords = a.toLowerCase().split(/[\s,/]+/)
-        return areaWords.some(w => keyWords.some(kw => kw.includes(w) || w.includes(kw)))
-      })
-      if (fuzzy2) return AREA_GPS[fuzzy2]
-      // Strategy 3: check common city names in the string
-      const cityMap: Record<string, string> = {
-        'pasig': 'Kapitolyo, Pasig', 'makati': 'Poblacion, Makati', 'taguig': 'BGC, Taguig',
-        'manila': 'Ermita, Manila', 'quezon': 'Diliman, QC', 'mandaluyong': 'Mandaluyong',
-        'san juan': 'San Juan', 'marikina': 'Marikina', 'parañaque': 'BF Homes, Parañaque',
-        'paranaque': 'BF Homes, Parañaque', 'muntinlupa': 'Alabang, Muntinlupa',
-        'alabang': 'Alabang, Muntinlupa', 'rockwell': 'Kapitolyo, Pasig',
-        'grove': 'C5/Bagong Ilog, Pasig', 'eastwood': 'Eastwood, QC',
-        'ortigas': 'Ortigas, Pasig', 'bgc': 'BGC, Taguig', 'uptown': 'Uptown, Taguig',
-      }
-      for (const [keyword, areaKey] of Object.entries(cityMap)) {
-        if (lo.includes(keyword)) return AREA_GPS[areaKey] || null
-      }
-      return null // No match — caller should use fallback
-    }
-
     return activeMembers.map(m => {
-      let homeX = (m as any).home_x || 0
-      let homeY = (m as any).home_y || 0
       const homeArea = (m as any).home_area || ''
-      // Sanity check: if coords look like GPS (lat/lng ~14/121) instead of grid (0-10), look up area
-      if (homeX > 12 || homeY > 12) {
-        const areaCoords = homeArea ? AREAS[homeArea] : undefined
-        const fuzzyKey = !areaCoords ? Object.keys(AREAS).find(a =>
-          homeArea.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(homeArea.toLowerCase())
-        ) : undefined
-        const fallback = areaCoords || (fuzzyKey ? AREAS[fuzzyKey] : { x: 4.5, y: 5.5 })
-        homeX = fallback.x
-        homeY = fallback.y
-      }
+      const sanitized = sanitizeCoords((m as any).home_x || 0, (m as any).home_y || 0, homeArea)
+      let homeX = sanitized.x
+      let homeY = sanitized.y
 
       // Live location data
       const liveArea = (m as any).live_area as string | null

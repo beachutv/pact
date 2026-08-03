@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useCircle, type UserProfile } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { daysUntil, fmtDate, fmtHour, fmtWin, bdaySoon, toStr, txtOn, travelMin, travelMinGps, getBrowserTimezone, currentHourInTz, DAY_START, DAY_END } from '@/lib/utils'
-import { useLocationUpdate } from '@/lib/useLocationUpdate'
 
 type Pact = {
   id: string
@@ -64,9 +63,6 @@ export default function HomePage() {
 
   const tz = useMemo(() => getBrowserTimezone(), [])
   const todayStr = useMemo(() => toStr(new Date()), [])
-
-  // Update own live location on home page load
-  useLocationUpdate(user.id, 'home')
 
   // Re-fetch circle members to get everyone's latest live location
   useEffect(() => {

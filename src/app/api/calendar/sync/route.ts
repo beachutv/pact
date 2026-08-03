@@ -1,33 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getAccessToken } from '@/lib/google-auth'
 
 const DAYS_AHEAD = 90
-
-async function getAccessToken(conn: any, supabase: any) {
-  const expiry = new Date(conn.token_expiry)
-  if (expiry > new Date(Date.now() + 5 * 60 * 1000)) {
-    return conn.access_token
-  }
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      refresh_token: conn.refresh_token,
-      grant_type: 'refresh_token',
-    }),
-  })
-  const tokens = await res.json()
-  if (!tokens.access_token) return null
-
-  await supabase.from('calendar_connections').update({
-    access_token: tokens.access_token,
-    token_expiry: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-  }).eq('id', conn.id)
-
-  return tokens.access_token
-}
 
 // Fetch events from Google Calendar to get locations
 async function fetchEventLocations(

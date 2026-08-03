@@ -228,9 +228,6 @@ export default function AppShell({
 
   // Unified circle panel (replaces separate members + circles dropdowns)
   const [showCirclePanel, setShowCirclePanel] = useState(false)
-  // Legacy aliases for compatibility (auto-close on nav)
-  const showMembersList = false
-  const showYourCircles = false
 
   // Theme — use localStorage as source of truth to survive SSR staleness
   const [theme, setTheme] = useState(() => {
@@ -339,12 +336,11 @@ export default function AppShell({
 
     async function scanBirthdays() {
       const s = createClient()
-      // Get all circle mates
+      // Get all circle mates in a single query
+      const circleIds = circles.map(c => c.id)
+      const { data: allMembers } = await s.from('circle_members').select('user_id').in('circle_id', circleIds)
       const allMemberIds = new Set<string>()
-      for (const c of circles) {
-        const { data: members } = await s.from('circle_members').select('user_id').eq('circle_id', c.id)
-        members?.forEach(m => { if (m.user_id !== user!.id) allMemberIds.add(m.user_id) })
-      }
+      allMembers?.forEach(m => { if (m.user_id !== user!.id) allMemberIds.add(m.user_id) })
       if (allMemberIds.size === 0) return
 
       const { data: mates } = await s.from('users').select('id, name, birthday').in('id', [...allMemberIds])
@@ -658,21 +654,14 @@ export default function AppShell({
 
       const threadIds = threadMembers.map(tm => tm.thread_id)
 
-      // Get thread reads
-      const { data: reads } = await supabase
-        .from('thread_reads')
-        .select('thread_id, last_read_at')
-        .eq('user_id', user.id)
-        .in('thread_id', threadIds)
+      // Fetch reads and threads in parallel
+      const [{ data: reads }, { data: threads }] = await Promise.all([
+        supabase.from('thread_reads').select('thread_id, last_read_at').eq('user_id', user.id).in('thread_id', threadIds),
+        supabase.from('threads').select('id, last_message_at').in('id', threadIds),
+      ])
 
       const readMap: Record<string, string> = {}
       for (const r of (reads || [])) readMap[r.thread_id] = r.last_read_at
-
-      // Get threads with last_message_at
-      const { data: threads } = await supabase
-        .from('threads')
-        .select('id, last_message_at')
-        .in('id', threadIds)
 
       let count = 0
       for (const t of (threads || [])) {

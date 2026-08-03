@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { txtOn, bdaySoon, AVATAR_COLORS, AREAS } from '@/lib/utils'
 import { useCircle } from '@/components/AppShell'
-import { useLocationUpdate } from '@/lib/useLocationUpdate'
 import LocationPicker from '@/components/LocationPicker'
 
 type FullProfile = {
@@ -31,9 +30,7 @@ export default function ProfilePage() {
   const supabase = createClient()
   const { user, updateUser, circles, activeCircle } = useCircle()
 
-  // Update own location when viewing own profile
   const isMe = id === user.id
-  useLocationUpdate(isMe ? user.id : '', 'profile')
 
   const [profile, setProfile] = useState<FullProfile | null>(null)
   const [editing, setEditing] = useState(false)

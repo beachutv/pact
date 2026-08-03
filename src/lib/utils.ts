@@ -255,6 +255,52 @@ export const AREA_GPS: Record<string, { lat: number; lng: number }> = {
   'Taytay, Rizal': { lat: 14.5590, lng: 121.1350 },
 }
 
+/** Sanitize coordinates — if they look like GPS (>12), fall back to area lookup */
+export function sanitizeCoords(x: number, y: number, area: string): { x: number; y: number } {
+  if (x > 12 || y > 12) {
+    const areaCoords = area ? AREAS[area] : undefined
+    const fuzzyKey = !areaCoords ? Object.keys(AREAS).find(a =>
+      area.toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes(area.toLowerCase())
+    ) : undefined
+    return areaCoords || (fuzzyKey ? AREAS[fuzzyKey] : { x: 4.5, y: 5.5 })
+  }
+  return { x, y }
+}
+
+/** Look up GPS coords for a Metro Manila area name (multi-strategy fuzzy matching) */
+export function areaGps(area: string): { lat: number; lng: number } | null {
+  if (!area) return null
+  const direct = AREA_GPS[area]
+  if (direct) return direct
+  const lo = area.toLowerCase()
+  // Strategy 1: area contains an AREA_GPS key prefix, or key contains area prefix
+  const fuzzy1 = Object.keys(AREA_GPS).find(a =>
+    lo.includes(a.split(',')[0].toLowerCase()) || a.toLowerCase().includes(lo.split(',')[0].toLowerCase())
+  )
+  if (fuzzy1) return AREA_GPS[fuzzy1]
+  // Strategy 2: check if any city/district word from AREA_GPS keys appears in the area string
+  const areaWords = lo.split(/[\s,/]+/).filter(w => w.length > 3)
+  const fuzzy2 = Object.keys(AREA_GPS).find(a => {
+    const keyWords = a.toLowerCase().split(/[\s,/]+/)
+    return areaWords.some(w => keyWords.some(kw => kw.includes(w) || w.includes(kw)))
+  })
+  if (fuzzy2) return AREA_GPS[fuzzy2]
+  // Strategy 3: common city names
+  const cityMap: Record<string, string> = {
+    'pasig': 'Kapitolyo, Pasig', 'makati': 'Poblacion, Makati', 'taguig': 'BGC, Taguig',
+    'manila': 'Ermita, Manila', 'quezon': 'Diliman, QC', 'mandaluyong': 'Mandaluyong',
+    'san juan': 'San Juan', 'marikina': 'Marikina', 'parañaque': 'BF Homes, Parañaque',
+    'paranaque': 'BF Homes, Parañaque', 'muntinlupa': 'Alabang, Muntinlupa',
+    'alabang': 'Alabang, Muntinlupa', 'rockwell': 'Kapitolyo, Pasig',
+    'grove': 'C5/Bagong Ilog, Pasig', 'eastwood': 'Eastwood, QC',
+    'ortigas': 'Ortigas, Pasig', 'bgc': 'BGC, Taguig', 'uptown': 'Uptown, Taguig',
+  }
+  for (const [keyword, areaKey] of Object.entries(cityMap)) {
+    if (lo.includes(keyword)) return AREA_GPS[areaKey] || null
+  }
+  return null
+}
+
 /** Find the nearest Metro Manila area from GPS coordinates */
 export function nearestArea(lat: number, lng: number): { name: string; distKm: number } {
   let best = { name: 'Unknown', distKm: Infinity }

@@ -7,7 +7,7 @@ export const maxDuration = 60
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-// Vercel Cron: runs every 2 hours to sync all users' calendars
+// Vercel Cron: runs daily at 6 AM (Hobby plan only allows daily frequency)
 // This ensures availability stays fresh even when users aren't online
 export async function GET(request: Request) {
   // Verify the request is from Vercel Cron (or has the right secret)
@@ -129,7 +129,7 @@ export async function GET(request: Request) {
 
         const startHour = startLocal.getHours()
         const endHour = endLocal.getDate() !== startLocal.getDate()
-          ? 24 // crosses midnight
+          ? 26 // crosses midnight — matches DAY_END in the calendar UI
           : Math.min(endLocal.getHours() + (endLocal.getMinutes() > 0 ? 1 : 0), 26)
 
         if (startHour < endHour) {
