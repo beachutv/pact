@@ -129,8 +129,8 @@ export async function GET(request: Request) {
 
         const startHour = startLocal.getHours()
         const endHour = endLocal.getDate() !== startLocal.getDate()
-          ? 26 // crosses midnight — matches DAY_END in the calendar UI
-          : Math.min(endLocal.getHours() + (endLocal.getMinutes() > 0 ? 1 : 0), 26)
+          ? 24 // cap at 24 — DB constraint is end_hour <= 24; overnight events continue on next day's row
+          : Math.min(endLocal.getHours() + (endLocal.getMinutes() > 0 ? 1 : 0), 24)
 
         if (startHour < endHour) {
           blocks.push({

@@ -186,7 +186,7 @@ export async function POST(request: Request) {
 
       const endHour = manilaEnd < dayEnd
         ? Math.ceil(manilaEnd.getHours() + manilaEnd.getMinutes() / 60)
-        : 26 // extends to 2 AM next day — matches DAY_END in the calendar UI
+        : 24 // cap at 24 — DB constraint is end_hour <= 24; overnight events continue on next day's row
 
       if (endHour > startHour) {
         // Find location for this block — check the last hour of the block
