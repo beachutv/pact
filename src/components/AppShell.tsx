@@ -515,15 +515,14 @@ export default function AppShell({
     }
     fetchNotifs()
 
-    // Listen for any notification insert (no user_id filter — RLS handles security,
-    // and default replica identity may not propagate the filter correctly)
+    // Listen for any notification change (INSERT, UPDATE, DELETE)
     const channel = supabase
       .channel('notifs')
       .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'notifications',
+        event: '*', schema: 'public', table: 'notifications',
       }, (payload) => {
-        // Only refetch if the notification is for this user
-        if ((payload.new as any)?.user_id === user.id) {
+        const row = (payload.new || payload.old) as any
+        if (row?.user_id === user.id) {
           fetchNotifs()
         }
       })
@@ -535,9 +534,14 @@ export default function AppShell({
     }
     document.addEventListener('visibilitychange', onVisChange)
 
+    // Listen for mark-as-read events from the notifications page
+    function onNotifsRead() { fetchNotifs() }
+    window.addEventListener('pact-notifs-read', onNotifsRead)
+
     return () => {
       supabase.removeChannel(channel)
       document.removeEventListener('visibilitychange', onVisChange)
+      window.removeEventListener('pact-notifs-read', onNotifsRead)
     }
   }, [user.id])
 
