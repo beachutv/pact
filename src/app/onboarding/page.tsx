@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AREAS, AVATAR_COLORS, txtOn } from '@/lib/utils'
@@ -40,6 +40,9 @@ function OnboardingInner() {
   const [birthday, setBirthday] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const usernameTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Track validated username so we know if current value has been confirmed available
+  const [validatedUsername, setValidatedUsername] = useState('')
 
   const activeColor = customColor || color
 
@@ -95,8 +98,8 @@ function OnboardingInner() {
 
   async function validateUsername(val: string): Promise<boolean> {
     const clean = formatUsername(val)
-    if (!clean) { setUsernameError(''); return false }
-    if (clean.length < 3) { setUsernameError('At least 3 characters'); return false }
+    if (!clean) { setUsernameError(''); setValidatedUsername(''); return false }
+    if (clean.length < 3) { setUsernameError('At least 3 characters'); setValidatedUsername(''); return false }
     setCheckingUsername(true)
     const { data } = await supabase
       .from('users')
@@ -106,9 +109,11 @@ function OnboardingInner() {
     setCheckingUsername(false)
     if (data && data.length > 0) {
       setUsernameError('Already taken')
+      setValidatedUsername('')
       return false
     }
     setUsernameError('')
+    setValidatedUsername(clean)
     return true
   }
 
@@ -306,16 +311,21 @@ function OnboardingInner() {
                         const v = formatUsername(e.target.value)
                         setUsername(v)
                         setUsernameError('')
+                        setValidatedUsername('')
+                        // Debounce: check availability as user types
+                        if (usernameTimer.current) clearTimeout(usernameTimer.current)
+                        if (v.length >= 3) {
+                          usernameTimer.current = setTimeout(() => validateUsername(v), 300)
+                        }
                       }}
-                      onBlur={() => { if (username.length >= 3) validateUsername(username) }}
                       style={{ paddingLeft: 30 }}
                     />
                   </div>
                   {usernameError && (
                     <p style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>{usernameError}</p>
                   )}
-                  {!usernameError && username.length >= 3 && !checkingUsername && (
-                    <p style={{ fontSize: 11, color: 'var(--green)', marginTop: 4 }}>Available!</p>
+                  {!usernameError && validatedUsername && validatedUsername === formatUsername(username) && !checkingUsername && (
+                    <p style={{ fontSize: 11, color: 'var(--green)', marginTop: 4 }}>✓ Available</p>
                   )}
                   {checkingUsername && (
                     <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>Checking...</p>
@@ -369,10 +379,22 @@ function OnboardingInner() {
                 </div>
                 <button
                   className="btn-primary"
-                  onClick={() => { if (name.trim()) setStep(2) }}
-                  disabled={!name.trim()}
+                  onClick={() => {
+                    if (!name.trim()) return
+                    const clean = formatUsername(username)
+                    // If username is entered, it must be validated and available
+                    if (clean.length > 0 && clean.length < 3) { setUsernameError('At least 3 characters'); return }
+                    if (clean.length >= 3 && validatedUsername !== clean) {
+                      // Force a check now
+                      validateUsername(clean).then(ok => { if (ok) setStep(2) })
+                      return
+                    }
+                    if (usernameError) return
+                    setStep(2)
+                  }}
+                  disabled={!name.trim() || checkingUsername || !!usernameError || (formatUsername(username).length >= 3 && validatedUsername !== formatUsername(username))}
                 >
-                  Next
+                  {checkingUsername ? 'Checking...' : 'Next'}
                 </button>
               </div>
             )}
