@@ -868,7 +868,7 @@ export default function AppShell({
           ) : (
           <>
           {/* Row 1: Icon buttons top-right */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, marginBottom: 6 }}>
+          <div data-walkthrough="header-actions" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, marginBottom: 6 }}>
             {/* Chat — like Facebook Messenger icon */}
             <button
               onClick={() => router.push('/chat')}
@@ -937,12 +937,12 @@ export default function AppShell({
 
           {/* Row 3: Circle chips — horizontal scroll */}
           {circles.length > 0 && ['/calendar', '/chat', '/plans', '/spots', '/friends'].includes(pathname) && (
-            <div style={{
+            <div data-walkthrough="circle-chips" style={{
               display: 'flex', gap: 6, marginTop: 10, overflowX: 'auto',
               WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
               paddingBottom: 2,
             }}>
-              {circles.map(c => {
+              {orderedCircles.map(c => {
                 const isActive = activeCircle?.id === c.id
                 return (
                   <button
@@ -1017,23 +1017,53 @@ export default function AppShell({
                 display: 'flex', gap: 6, padding: '0 16px 10px',
                 overflowX: 'auto', WebkitOverflowScrolling: 'touch', flexShrink: 0,
               }}>
-                {orderedCircles.map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => setActiveCircle(c)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
-                      padding: '6px 14px', borderRadius: 20, cursor: 'pointer',
-                      border: activeCircle.id === c.id ? '1.5px solid var(--accent)' : '1px solid var(--border)',
-                      background: activeCircle.id === c.id ? 'var(--accent-soft)' : 'var(--surface2)',
-                      color: activeCircle.id === c.id ? 'var(--accent)' : 'var(--text2)',
-                      fontSize: 13, fontWeight: 700,
-                    }}
-                  >
-                    <span style={{ fontSize: 14 }}>{c.emoji}</span>
-                    {c.name}
-                  </button>
-                ))}
+                {orderedCircles.map((c, ci) => {
+                  const isAct = activeCircle.id === c.id
+                  const canLeft = isAct && ci > 0
+                  const canRight = isAct && ci < orderedCircles.length - 1
+                  return (
+                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                      {canLeft && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); moveCircle(c.id, 'up') }}
+                          style={{
+                            width: 24, height: 24, borderRadius: 8, border: '1px solid var(--border)',
+                            background: 'var(--surface)', color: 'var(--text2)',
+                            fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            padding: 0, flexShrink: 0,
+                          }}
+                          title="Move left"
+                        >◀</button>
+                      )}
+                      <button
+                        onClick={() => setActiveCircle(c)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                          padding: '6px 14px', borderRadius: 20, cursor: 'pointer',
+                          border: isAct ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                          background: isAct ? 'var(--accent-soft)' : 'var(--surface2)',
+                          color: isAct ? 'var(--accent)' : 'var(--text2)',
+                          fontSize: 13, fontWeight: 700,
+                        }}
+                      >
+                        <span style={{ fontSize: 14 }}>{c.emoji}</span>
+                        {c.name}
+                      </button>
+                      {canRight && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); moveCircle(c.id, 'down') }}
+                          style={{
+                            width: 24, height: 24, borderRadius: 8, border: '1px solid var(--border)',
+                            background: 'var(--surface)', color: 'var(--text2)',
+                            fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            padding: 0, flexShrink: 0,
+                          }}
+                          title="Move right"
+                        >▶</button>
+                      )}
+                    </div>
+                  )
+                })}
                 <button
                   onClick={() => { setShowCirclePanel(false); router.push('/circles/new') }}
                   style={{
@@ -1053,11 +1083,19 @@ export default function AppShell({
               padding: '8px 16px 10px', borderTop: '1px solid var(--border)',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div
+                onClick={() => { setShowCirclePanel(false); router.push(`/circles/${activeCircle.id}/settings`) }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1, minWidth: 0 }}
+              >
                 <span style={{ fontSize: 18 }}>{activeCircle.emoji}</span>
-                <div>
-                  <p style={{ fontSize: 16, fontWeight: 800 }}>{activeCircle.name}</p>
-                  <p style={{ fontSize: 11, color: 'var(--text2)' }}>{circleMembers.length} members</p>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <p style={{ fontSize: 16, fontWeight: 800 }}>{activeCircle.name}</p>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5, flexShrink: 0 }}>
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--text2)' }}>{circleMembers.length} members · tap for settings</p>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -1221,6 +1259,13 @@ export default function AppShell({
                 className={`nav-tab ${isActive ? 'active' : ''}`}
                 onClick={() => router.push(tab.key)}
                 style={{ position: 'relative' }}
+                data-walkthrough={
+                  tab.key === '/calendar' ? 'nav-calendar'
+                  : tab.key === '/plans' ? 'nav-plans'
+                  : tab.key === '/friends' ? 'nav-friends'
+                  : tab.key === '/settings' ? 'nav-you'
+                  : undefined
+                }
               >
                 <span className="nav-icon">
                   {tab.key === '/settings' ? (

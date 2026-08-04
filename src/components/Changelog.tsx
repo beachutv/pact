@@ -2,11 +2,22 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '6.0'
+export const CURRENT_VERSION = '6.1'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '6.1',
+    date: 'August 4, 2026',
+    title: 'Polish & walkthrough',
+    subtitle: 'Better onboarding and circle management',
+    items: [
+      { icon: '🔦', text: 'Spotlight walkthrough — highlights actual UI elements like GCash/Metrobank' },
+      { icon: '◀▶', text: 'Circle reorder arrows now work in the circle panel' },
+      { icon: '👆', text: 'Tap circle name in panel to open settings (not just the gear icon)' },
+    ],
+  },
   {
     version: '6.0',
     date: 'August 4, 2026',
