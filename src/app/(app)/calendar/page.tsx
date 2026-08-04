@@ -828,7 +828,7 @@ export default function CalendarPage() {
     const cells = []
 
     for (let i = 0; i < blanks; i++) {
-      cells.push(<div key={`b${i}`} style={{ aspectRatio: '0.86' }} />)
+      cells.push(<div key={`b${i}`} style={{ aspectRatio: isLandscape ? '1' : '0.86' }} />)
     }
 
     for (let d = 1; d <= dim; d++) {
@@ -898,13 +898,13 @@ export default function CalendarPage() {
       cells.push(
         <div
           key={d}
-          onClick={() => !isPast && setSheetDate(ds === sheetDate ? null : ds)}
+          onClick={() => !isPast && setSheetDate(ds === sheetDate && !isLandscape ? null : ds)}
           style={{
-            aspectRatio: '0.86', borderRadius: 11,
+            aspectRatio: isLandscape ? '1' : '0.86', borderRadius: isLandscape ? 8 : 11,
             background: isPast ? 'transparent' : bg,
             border: `1.5px solid ${borderColor}`,
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', gap: 1,
+            justifyContent: 'center', gap: isLandscape ? 0 : 1,
             cursor: isPast ? 'default' : 'pointer',
             opacity: isPast ? 0.3 : 1,
             position: 'relative',
@@ -1022,7 +1022,7 @@ export default function CalendarPage() {
               const isToday = ds === todayStr
               return (
                 <div key={d} style={{
-                  aspectRatio: '0.86', borderRadius: 11,
+                  aspectRatio: isLandscape ? '1' : '0.86', borderRadius: isLandscape ? 8 : 11,
                   background: 'var(--surface2)',
                   border: isToday ? '1.5px solid var(--accent)' : '1px solid transparent',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1076,19 +1076,28 @@ export default function CalendarPage() {
       : []),
   ].sort((a, b) => a.s - b.s) : []
 
+  // In landscape, auto-select today so the split view is always populated
+  useEffect(() => {
+    if (isLandscape && !sheetDate) {
+      const todayStr = toStr(new Date())
+      setSheetDate(todayStr)
+    }
+  }, [isLandscape])
+
   return (
     <div style={{
       display: 'flex',
-      flexDirection: isLandscape && sheetDate ? 'row' : 'column',
+      flexDirection: isLandscape ? 'row' : 'column',
       flex: 1, minHeight: 0, position: 'relative',
     }}>
       <div
         ref={calPullRef}
         {...calTouchHandlers}
         style={{
-          padding: '14px 16px 24px', overflowY: 'auto',
-          flex: isLandscape && sheetDate ? '0 0 45%' : 1,
-          borderRight: isLandscape && sheetDate ? '1px solid var(--border)' : 'none',
+          padding: isLandscape ? '10px 12px 16px' : '14px 16px 24px',
+          overflowY: 'auto',
+          flex: isLandscape ? '0 0 42%' : 1,
+          borderRight: isLandscape ? '1px solid var(--border)' : 'none',
         }}
       >
         {(calPullY > 0 || calPullRefreshing) && (
@@ -1100,8 +1109,8 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {/* Upcoming pacts — this week only */}
-        {(() => {
+        {/* Upcoming pacts — this week only (hidden in landscape split view) */}
+        {!isLandscape && (() => {
           const now = new Date()
           const dayOfWeek = now.getDay() // 0=Sun
           const monday = new Date(now)
@@ -1222,8 +1231,8 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {/* Sparks — compact 1-line, show 2 with scroll */}
-        {sparks.length > 0 && (
+        {/* Sparks — compact 1-line, show 2 with scroll (hidden in landscape) */}
+        {!isLandscape && sparks.length > 0 && (
           <div style={{ marginBottom: 14, maxHeight: sparks.length > 2 ? 120 : undefined, overflowY: sparks.length > 2 ? 'auto' : undefined, overflowX: 'hidden' }}>
             {sparks.map(sp => (
               <SparkLine key={sp.member.id} spark={sp} todayStr={todayStr} onDismiss={() => dismissSpark(sp.member.id, sp.window.s, sp.travelTime)} />
@@ -1231,8 +1240,8 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {/* Who's free? button */}
-        {circleMembers.length > 1 && (
+        {/* Who's free? button (hidden in landscape) */}
+        {!isLandscape && circleMembers.length > 1 && (
           <button
             onClick={() => setShowWhosFree(true)}
             style={{
@@ -1322,8 +1331,8 @@ export default function CalendarPage() {
           {renderDays()}
         </div>
 
-        {/* Legend */}
-        <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+        {/* Legend (hidden in landscape) */}
+        <div style={{ display: isLandscape ? 'none' : 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
             <i style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', display: 'inline-block' }} /> free all day
           </span>
@@ -1346,10 +1355,11 @@ export default function CalendarPage() {
           </span>
         </div>
 
-        {/* Hint card */}
+        {/* Hint card (hidden in landscape) */}
         <div style={{
           marginTop: 14, background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 16, padding: '12px 14px', fontSize: 12, color: 'var(--text2)', lineHeight: 1.5,
+          display: isLandscape ? 'none' : undefined,
         }}>
           <b style={{ color: 'var(--text)' }}>Auto-synced.</b> Calendar syncs every time you open this page.
           Tap any day for busy blocks, shared free windows, and to propose a plan.
@@ -1357,8 +1367,8 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Floating spark button + status tooltip */}
-      {!sheetDate && (
+      {/* Floating spark button + status tooltip (hidden in landscape) */}
+      {!isLandscape && !sheetDate && (
         <div style={{ position: 'absolute', bottom: 16, right: 16, zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
           {sparks.length === 0 && sparkStatus && sparkRefreshKey > 0 && (
             <div style={{
@@ -1385,10 +1395,10 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Day sheet — overlay (portrait) or side panel (landscape) */}
-      {sheetDate && (
+      {/* Day sheet — overlay (portrait) or always-visible side panel (landscape) */}
+      {(sheetDate || isLandscape) && (
         <>
-          {!isLandscape && (
+          {!isLandscape && sheetDate && (
             <div
               onClick={() => setSheetDate(null)}
               style={{
@@ -1398,7 +1408,7 @@ export default function CalendarPage() {
             />
           )}
           <div style={isLandscape ? {
-            flex: '1 1 55%', background: 'var(--surface2)',
+            flex: '1 1 58%', background: 'var(--surface2)',
             display: 'flex', flexDirection: 'column', minHeight: 0,
           } : {
             position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 31,
@@ -1407,14 +1417,6 @@ export default function CalendarPage() {
           }}>
             {!isLandscape && (
               <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '12px auto 10px', flexShrink: 0 }} />
-            )}
-            {isLandscape && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px 0', flexShrink: 0 }}>
-                <span style={{ fontSize: 14, fontWeight: 700 }}>{fmtDate(sheetDate)}</span>
-                <button onClick={() => setSheetDate(null)} style={{
-                  background: 'none', border: 'none', color: 'var(--text2)', fontSize: 16, cursor: 'pointer',
-                }}>✕</button>
-              </div>
             )}
             <div style={{ overflowY: 'auto', padding: isLandscape ? '4px 18px 18px' : '0 18px 26px' }}>
               <h3 style={{ fontSize: 16, fontWeight: 700 }}>{fmtDate(sheetDate)}</h3>
