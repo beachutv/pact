@@ -941,9 +941,105 @@ export default function CalendarPage() {
   }
 
   if (!activeCircle) {
-    return <div style={{ padding: 20, color: 'var(--text2)', textAlign: 'center', marginTop: 40 }}>
-      Join or create a circle first!
-    </div>
+    const today = new Date()
+    const soloYear = viewYear
+    const soloMonth = viewMonth
+    const firstDay = new Date(soloYear, soloMonth, 1)
+    const daysInMonth = new Date(soloYear, soloMonth + 1, 0).getDate()
+    const startDow = firstDay.getDay()
+    const todayStr = toStr(today)
+    const weekdays = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+
+    return (
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* CTA banner */}
+        <div style={{
+          background: 'var(--accent-soft)', border: '1px solid rgba(124,92,255,0.3)',
+          borderRadius: 16, padding: '16px 14px', textAlign: 'center',
+        }}>
+          <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+            See when your friends are free
+          </p>
+          <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 14 }}>
+            Add a friend or join a circle to compare availabilities and plan hangouts together.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button
+              onClick={() => router.push('/friends')}
+              style={{
+                padding: '9px 16px', borderRadius: 12, border: 'none',
+                background: 'var(--accent)', color: '#fff',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}
+            >👥 Find friends</button>
+            <button
+              onClick={() => router.push('/circles/new')}
+              style={{
+                padding: '9px 16px', borderRadius: 12,
+                border: '1px solid var(--border)', background: 'var(--surface)',
+                color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}
+            >+ Circle</button>
+          </div>
+        </div>
+
+        {/* Solo month grid */}
+        <div style={{ background: 'var(--surface)', borderRadius: 16, padding: 14, border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <button onClick={() => {
+              let nm = soloMonth - 1, ny = soloYear
+              if (nm < 0) { nm = 11; ny-- }
+              setViewMonth(nm); setViewYear(ny)
+            }} style={{
+              width: 30, height: 30, borderRadius: 10, border: '1px solid var(--border)',
+              background: 'var(--surface2)', color: 'var(--text)', fontSize: 14, cursor: 'pointer',
+            }}>‹</button>
+            <h2 style={{ fontSize: 16, fontWeight: 700 }}>
+              {firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </h2>
+            <button onClick={() => {
+              let nm = soloMonth + 1, ny = soloYear
+              if (nm > 11) { nm = 0; ny++ }
+              setViewMonth(nm); setViewYear(ny)
+            }} style={{
+              width: 30, height: 30, borderRadius: 10, border: '1px solid var(--border)',
+              background: 'var(--surface2)', color: 'var(--text)', fontSize: 14, cursor: 'pointer',
+            }}>›</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+            {weekdays.map((d, i) => (
+              <div key={i} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: 'var(--text2)', padding: '4px 0', textTransform: 'uppercase' }}>
+                {d}
+              </div>
+            ))}
+            {Array.from({ length: startDow }).map((_, i) => (
+              <div key={'b' + i} />
+            ))}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const d = i + 1
+              const ds = toStr(new Date(soloYear, soloMonth, d))
+              const isPast = ds < todayStr
+              const isToday = ds === todayStr
+              return (
+                <div key={d} style={{
+                  aspectRatio: '0.86', borderRadius: 11,
+                  background: 'var(--surface2)',
+                  border: isToday ? '1.5px solid var(--accent)' : '1px solid transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: 600,
+                  opacity: isPast ? 0.3 : 1,
+                }}>
+                  {d}
+                </div>
+              )
+            })}
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 10, textAlign: 'center' }}>
+            Your calendar · join a circle to see shared availability
+          </p>
+        </div>
+      </div>
+    )
   }
 
   if (loading) return <div style={{ padding: 20 }}><div className="spinner" /></div>

@@ -13,7 +13,7 @@ const CHANGELOG: { version: string; date: string; title: string; subtitle: strin
     title: 'Polish & walkthrough',
     subtitle: 'Better onboarding and circle management',
     items: [
-      { icon: '🔦', text: 'Spotlight walkthrough — highlights actual UI elements like GCash/Metrobank' },
+      { icon: '🔦', text: 'Spotlight walkthrough — guided tour that highlights each part of the app' },
       { icon: '◀▶', text: 'Circle reorder arrows now work in the circle panel' },
       { icon: '👆', text: 'Tap circle name in panel to open settings (not just the gear icon)' },
     ],

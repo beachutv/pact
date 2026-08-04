@@ -894,6 +894,7 @@ export default function AppShell({
 
             {/* Notification bell */}
             <button
+              data-walkthrough="header-notif"
               onClick={() => router.push('/notifications')}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
@@ -936,7 +937,8 @@ export default function AppShell({
           </h1>
 
           {/* Row 3: Circle chips — horizontal scroll */}
-          {circles.length > 0 && ['/calendar', '/chat', '/plans', '/spots', '/friends'].includes(pathname) && (
+          <div data-walkthrough="circle-area">
+          {circles.length > 0 && ['/calendar', '/chat', '/plans', '/spots', '/friends'].includes(pathname) ? (
             <div data-walkthrough="circle-chips" style={{
               display: 'flex', gap: 6, marginTop: 10, overflowX: 'auto',
               WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
@@ -987,7 +989,26 @@ export default function AppShell({
                 +
               </button>
             </div>
-          )}
+          ) : ['/calendar', '/chat', '/plans', '/spots', '/friends'].includes(pathname) ? (
+            <div style={{
+              display: 'flex', gap: 8, marginTop: 10, alignItems: 'center',
+            }}>
+              <button
+                onClick={() => router.push('/circles/new')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '6px 14px', borderRadius: 20, flexShrink: 0,
+                  border: '1.5px dashed var(--accent)',
+                  background: 'var(--accent-soft)', color: 'var(--accent)',
+                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                + Join or create a circle
+              </button>
+              <span style={{ fontSize: 11, color: 'var(--text2)' }}>to plan with friends</span>
+            </div>
+          ) : null}
+          </div>
           </>
           )}
         </header>
@@ -1263,6 +1284,7 @@ export default function AppShell({
                   tab.key === '/calendar' ? 'nav-calendar'
                   : tab.key === '/plans' ? 'nav-plans'
                   : tab.key === '/friends' ? 'nav-friends'
+                  : tab.key === '/spots' ? 'nav-spots'
                   : tab.key === '/settings' ? 'nav-you'
                   : undefined
                 }

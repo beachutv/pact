@@ -1,57 +1,58 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 
 type Step = {
   title: string
   body: string
   emoji: string
-  target: string          // data-walkthrough="..." selector
+  target: string
   position: 'below' | 'above' | 'auto'
 }
 
 const STEPS: Step[] = [
   {
-    emoji: '🔵',
-    title: 'Your circles',
-    body: 'These are your friend groups. Tap to switch — the calendar, chat, and plans all follow. Tap the active one to see members and settings.',
-    target: 'circle-chips',
-    position: 'below',
-  },
-  {
-    emoji: '💬',
-    title: 'Chat & notifications',
-    body: 'The chat bubble is for messages — group threads and DMs. The bell is for notifications like friend requests, pact updates, and sparks.',
-    target: 'header-actions',
-    position: 'below',
-  },
-  {
     emoji: '📅',
     title: 'Your calendar',
-    body: 'Green days mean your circle is free. Tap any day to see the full hour-by-hour breakdown, pick a time, and propose a plan.',
+    body: 'This is your availability view. Green means free. Tap any day to see the full hour-by-hour breakdown and propose a plan.',
     target: 'nav-calendar',
-    position: 'above',
-  },
-  {
-    emoji: '📌',
-    title: 'Plans & Spots',
-    body: 'Plans shows your locked-in pacts. Spots shows the best hangout windows with location picks based on where everyone\'s coming from.',
-    target: 'nav-plans',
     position: 'above',
   },
   {
     emoji: '👥',
     title: 'Friends',
-    body: 'Add friends by their @username. Once connected, add each other to circles and plan together.',
+    body: 'Add friends by their @username. Once connected, you can add each other to circles and start planning together.',
     target: 'nav-friends',
     position: 'above',
   },
   {
+    emoji: '📍',
+    title: 'Spots',
+    body: 'Shows the best upcoming hangout windows with smart location picks based on where everyone\'s coming from.',
+    target: 'nav-spots',
+    position: 'above',
+  },
+  {
     emoji: '👤',
-    title: 'Your profile',
-    body: 'Calendar connection, appearance, account settings — everything in one place.',
+    title: 'You',
+    body: 'Your profile, calendar connection, theme, and account settings — all in one place.',
     target: 'nav-you',
     position: 'above',
+  },
+  {
+    emoji: '🔔',
+    title: 'Notifications',
+    body: 'Friend requests, pact updates, and reminders show up here. Tap the bell anytime to check what\'s new.',
+    target: 'header-notif',
+    position: 'below',
+  },
+  {
+    emoji: '🔵',
+    title: 'Circles',
+    body: 'Circles are your friend groups. Create one, join one, or add a friend to get started — the calendar, chat, and plans all follow your active circle.',
+    target: 'circle-area',
+    position: 'below',
   },
 ]
 
@@ -59,8 +60,8 @@ export default function Walkthrough() {
   const [step, setStep] = useState(-1)
   const [show, setShow] = useState(false)
   const [rect, setRect] = useState<DOMRect | null>(null)
+  const router = useRouter()
 
-  // Find and measure the target element for the current step
   const measureTarget = useCallback(() => {
     if (step < 0 || step >= STEPS.length) { setRect(null); return }
     const el = document.querySelector(`[data-walkthrough="${STEPS[step].target}"]`)
@@ -81,16 +82,20 @@ export default function Walkthrough() {
     }
   }, [measureTarget])
 
+  // Listen for start event (from settings replay) — always active
+  useEffect(() => {
+    const handler = () => { setStep(0); setShow(true) }
+    window.addEventListener('pact-start-walkthrough', handler)
+    return () => window.removeEventListener('pact-start-walkthrough', handler)
+  }, [])
+
+  // Auto-show on first visit
   useEffect(() => {
     const seen = localStorage.getItem('pact_walkthrough_seen')
     if (!seen) {
       const t = setTimeout(() => { setStep(0); setShow(true) }, 1500)
       return () => clearTimeout(t)
     }
-
-    const handler = () => { setStep(0); setShow(true) }
-    window.addEventListener('pact-start-walkthrough', handler)
-    return () => window.removeEventListener('pact-start-walkthrough', handler)
   }, [])
 
   function next() {
@@ -109,13 +114,18 @@ export default function Walkthrough() {
     setRect(null)
   }
 
+  function finish() {
+    dismiss()
+    // Navigate to friends or circles/new so they can get started
+    router.push('/friends')
+  }
+
   if (!show || step < 0) return null
 
   const s = STEPS[step]
   const isLast = step === STEPS.length - 1
-  const pad = 6 // padding around highlighted element
+  const pad = 6
 
-  // Determine tooltip position
   const viewH = typeof window !== 'undefined' ? window.innerHeight : 800
   let tooltipTop = 0
   let tooltipBelow = true
@@ -124,13 +134,16 @@ export default function Walkthrough() {
     const spaceAbove = rect.top
     if (s.position === 'above' || (s.position === 'auto' && spaceBelow < 220 && spaceAbove > spaceBelow)) {
       tooltipBelow = false
-      tooltipTop = rect.top - pad - 12 // 12px gap
+      tooltipTop = rect.top - pad - 12
     } else {
       tooltipTop = rect.bottom + pad + 12
     }
+  } else {
+    // No target found — center the card
+    tooltipTop = viewH / 2
+    tooltipBelow = true
   }
 
-  // SVG mask: full viewport with a rounded-rect cutout for the target element
   const vw = typeof window !== 'undefined' ? window.innerWidth : 400
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800
 
@@ -161,7 +174,7 @@ export default function Walkthrough() {
         <rect x="0" y="0" width={vw} height={vh} fill="rgba(0,0,0,0.72)" mask="url(#wt-mask)" />
       </svg>
 
-      {/* Spotlight border glow around target */}
+      {/* Spotlight border glow */}
       {rect && (
         <div style={{
           position: 'fixed',
@@ -182,7 +195,9 @@ export default function Walkthrough() {
       <div style={{
         position: 'fixed',
         left: '50%',
-        transform: tooltipBelow ? 'translateX(-50%)' : 'translateX(-50%) translateY(-100%)',
+        transform: rect
+          ? (tooltipBelow ? 'translateX(-50%)' : 'translateX(-50%) translateY(-100%)')
+          : 'translate(-50%, -50%)',
         top: tooltipTop,
         zIndex: 9992,
         background: 'var(--surface)',
@@ -195,19 +210,22 @@ export default function Walkthrough() {
         transition: 'top .25s ease-out',
       }}>
         {/* Arrow pointing to target */}
-        <div style={{
-          position: 'absolute',
-          left: rect ? Math.min(Math.max(rect.left + rect.width / 2 - 8, 20), 300) : '50%',
-          ...(tooltipBelow
-            ? { top: -8, transform: 'translateX(-50%)' }
-            : { bottom: -8, transform: 'translateX(-50%) rotate(180deg)' }),
-          width: 0, height: 0,
-          borderLeft: '8px solid transparent',
-          borderRight: '8px solid transparent',
-          borderBottom: '8px solid var(--surface)',
-          filter: 'drop-shadow(0 -1px 0 var(--border))',
-          zIndex: 1,
-        }} />
+        {rect && (
+          <div style={{
+            position: 'absolute',
+            left: Math.min(Math.max(rect.left + rect.width / 2, 28), vw - 28),
+            ...(tooltipBelow
+              ? { top: -8 }
+              : { bottom: -8, transform: 'rotate(180deg)' }),
+            marginLeft: -8,
+            width: 0, height: 0,
+            borderLeft: '8px solid transparent',
+            borderRight: '8px solid transparent',
+            borderBottom: '8px solid var(--surface)',
+            filter: 'drop-shadow(0 -1px 0 var(--border))',
+            zIndex: 1,
+          }} />
+        )}
 
         {/* Step dots */}
         <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 12 }}>
@@ -244,11 +262,11 @@ export default function Walkthrough() {
               Skip
             </button>
           )}
-          <button onClick={next} style={{
+          <button onClick={isLast ? finish : next} style={{
             flex: 2, padding: '9px 0', border: 'none', borderRadius: 12,
             background: 'var(--accent)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
           }}>
-            {isLast ? 'Get started' : `Next (${step + 1}/${STEPS.length})`}
+            {isLast ? 'Find friends →' : `Next (${step + 1}/${STEPS.length})`}
           </button>
         </div>
       </div>

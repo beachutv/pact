@@ -162,10 +162,29 @@ export default function SpotsPage() {
 
   if (!activeCircle) {
     return (
-      <div style={{ padding: 20, textAlign: 'center', marginTop: 40, color: 'var(--text2)' }}>
-        <p style={{ fontSize: 40, marginBottom: 8 }}>📍</p>
-        <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Spots</p>
-        <p style={{ fontSize: 13 }}>Join a circle first.</p>
+      <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 16, padding: '24px 16px', textAlign: 'center',
+        }}>
+          <p style={{ fontSize: 36, marginBottom: 8 }}>📍</p>
+          <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Spots</p>
+          <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 16 }}>
+            Smart hangout picks based on where everyone&apos;s coming from. Join a circle or add friends to get started.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <a href="/friends" style={{
+              padding: '9px 16px', borderRadius: 12, border: 'none',
+              background: 'var(--accent)', color: '#fff',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none',
+            }}>👥 Find friends</a>
+            <a href="/circles/new" style={{
+              padding: '9px 16px', borderRadius: 12,
+              border: '1px solid var(--border)', background: 'var(--surface2)',
+              color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none',
+            }}>+ Circle</a>
+          </div>
+        </div>
       </div>
     )
   }

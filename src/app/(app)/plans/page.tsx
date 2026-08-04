@@ -469,10 +469,35 @@ export default function PlansPage() {
   }
 
   if (!activeCircle) {
-    return <div style={{ padding: 20, textAlign: 'center', marginTop: 40, color: 'var(--text2)' }}>
-      <p style={{ marginBottom: 8 }}><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></p>
-      <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Plans</p>
-      <p style={{ fontSize: 13 }}>Join a circle first.</p>
+    return <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
+      <div style={{
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 16, padding: '24px 16px', textAlign: 'center',
+      }}>
+        <p style={{ fontSize: 36, marginBottom: 8 }}>📌</p>
+        <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Plans</p>
+        <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 16 }}>
+          Once everyone taps &quot;I&apos;m in&quot; on a proposal, it lands here — date, time, spot, and who&apos;s coming. No more &quot;so tuloy ba?&quot;
+        </p>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+          <button
+            onClick={() => router.push('/friends')}
+            style={{
+              padding: '9px 16px', borderRadius: 12, border: 'none',
+              background: 'var(--accent)', color: '#fff',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            }}
+          >👥 Find friends</button>
+          <button
+            onClick={() => router.push('/circles/new')}
+            style={{
+              padding: '9px 16px', borderRadius: 12,
+              border: '1px solid var(--border)', background: 'var(--surface2)',
+              color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            }}
+          >+ Circle</button>
+        </div>
+      </div>
     </div>
   }
 
