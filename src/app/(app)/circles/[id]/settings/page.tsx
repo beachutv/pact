@@ -34,6 +34,12 @@ export default function CircleSettingsPage() {
   const [codeError, setCodeError] = useState('')
   const [savingCode, setSavingCode] = useState(false)
 
+  // Secret code editing
+  const [editingSecret, setEditingSecret] = useState(false)
+  const [newSecret, setNewSecret] = useState('')
+  const [secretError, setSecretError] = useState('')
+  const [savingSecret, setSavingSecret] = useState(false)
+
   // Member action state
   const [actionMember, setActionMember] = useState<string | null>(null)
 
@@ -74,12 +80,13 @@ export default function CircleSettingsPage() {
       }
 
       // Load pending join requests
-      const { data: reqs } = await supabase
+      const { data: reqs, error: reqError } = await supabase
         .from('circle_join_requests')
         .select('id, user_id, status, created_at, users(id, name, color, avatar_url)')
         .eq('circle_id', id)
         .eq('status', 'pending')
       if (reqs) setJoinRequests(reqs)
+      // If table doesn't exist, reqError will fire but we can continue gracefully
 
       setLoading(false)
     }
@@ -208,6 +215,21 @@ export default function CircleSettingsPage() {
     if (error) { setCodeError('Failed to update: ' + error.message); setSavingCode(false); return }
     setCircle({ ...circle, invite_code: code })
     setEditingCode(false); setSavingCode(false)
+  }
+
+  async function saveSecretCode() {
+    const code = newSecret.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+    if (!code || code.length < 3) { setSecretError('Code must be at least 3 characters'); return }
+    if (code.length > 20) { setSecretError('Code must be 20 characters or less'); return }
+    setSavingSecret(true); setSecretError('')
+    // Check uniqueness
+    const { data: existing } = await supabase
+      .from('circles').select('id').eq('secret_code', code).neq('id', id).single()
+    if (existing) { setSecretError('This code is already taken — try another'); setSavingSecret(false); return }
+    const { error } = await supabase.from('circles').update({ secret_code: code }).eq('id', id)
+    if (error) { setSecretError('Failed to update: ' + error.message); setSavingSecret(false); return }
+    setCircle({ ...circle, secret_code: code })
+    setEditingSecret(false); setSavingSecret(false)
   }
 
   async function saveName() {
@@ -530,30 +552,75 @@ export default function CircleSettingsPage() {
             )}
           </div>
 
-          {/* Secret invite code */}
+          {/* Secret invite code — editable */}
           <div style={{
             background: 'var(--surface2)', borderRadius: 10, padding: '10px 12px',
           }}>
             <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.3px' }}>
-              Secret invite code
+              Private invite code
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <code style={{ flex: 1, fontSize: 15, fontWeight: 700, color: 'var(--text)', letterSpacing: 1 }}>
-                {circle.secret_code || '—'}
-              </code>
-              {circle.secret_code && (
-                <button
-                  onClick={copySecretCode}
+            {editingSecret ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <input
+                  type="text"
+                  value={newSecret}
+                  onChange={e => { setNewSecret(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); setSecretError('') }}
+                  placeholder="e.g. BARKADA"
+                  autoFocus
+                  maxLength={20}
                   style={{
-                    background: 'none', border: 'none', fontSize: 12,
-                    color: 'var(--accent)', cursor: 'pointer', fontWeight: 600,
-                    whiteSpace: 'nowrap',
+                    padding: '8px 10px', borderRadius: 8, fontSize: 15,
+                    background: 'var(--surface)', border: '1.5px solid var(--accent)',
+                    color: 'var(--text)', outline: 'none', fontFamily: 'monospace',
+                    letterSpacing: 1, fontWeight: 700,
                   }}
-                >
-                  Copy
-                </button>
-              )}
-            </div>
+                />
+                <p style={{ fontSize: 10, color: 'var(--text2)' }}>
+                  Letters and numbers only, uppercase. This is the code people type in &quot;Join with code.&quot;
+                </p>
+                {secretError && <p style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600 }}>{secretError}</p>}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={saveSecretCode} disabled={savingSecret} style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8, border: 'none',
+                    background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  }}>{savingSecret ? 'Saving...' : 'Save'}</button>
+                  <button onClick={() => { setEditingSecret(false); setSecretError('') }} style={{
+                    padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border)',
+                    background: 'transparent', color: 'var(--text2)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <code style={{ flex: 1, fontSize: 15, fontWeight: 700, color: 'var(--text)', letterSpacing: 1 }}>
+                  {circle.secret_code || 'Not set'}
+                </code>
+                {circle.secret_code && (
+                  <button
+                    onClick={copySecretCode}
+                    style={{
+                      background: 'none', border: 'none', fontSize: 12,
+                      color: 'var(--accent)', cursor: 'pointer', fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Copy
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
+                    onClick={() => { setNewSecret(circle.secret_code || ''); setEditingSecret(true) }}
+                    style={{
+                      background: 'none', border: 'none', fontSize: 12,
+                      color: 'var(--text2)', cursor: 'pointer', fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+            )}
             <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 6 }}>
               Share this privately — anyone who enters it in &quot;Join with code&quot; is added directly, even if the circle requires approval.
             </p>

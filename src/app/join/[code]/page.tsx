@@ -71,11 +71,38 @@ export default function JoinPage() {
         }
 
         // Submit join request
-        await supabase.from('circle_join_requests').insert({
+        const { error: reqError } = await supabase.from('circle_join_requests').insert({
           circle_id: circle.id,
           user_id: user.id,
           status: 'pending',
         })
+
+        if (reqError) {
+          // Table might not exist or RLS blocked — fall back to showing error
+          setCircleName(`${circle.emoji || ''} ${circle.name}`)
+          setStatus('invalid')
+          return
+        }
+
+        // Notify circle admins
+        const { data: admins } = await supabase
+          .from('circle_members')
+          .select('user_id')
+          .eq('circle_id', circle.id)
+          .eq('role', 'admin')
+        if (admins) {
+          const { data: { user: authUser } } = await supabase.auth.getUser()
+          const requesterName = authUser?.user_metadata?.full_name || 'Someone'
+          await Promise.all(admins.map(a =>
+            supabase.from('notifications').insert({
+              user_id: a.user_id,
+              type: 'pact_change',
+              title: `${requesterName} wants to join ${circle.name}`,
+              body: 'Tap to review the request in circle settings',
+              link: `/circles/${circle.id}/settings`,
+            })
+          ))
+        }
 
         setStatus('requested')
         return
