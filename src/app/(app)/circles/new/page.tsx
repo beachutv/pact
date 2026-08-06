@@ -370,12 +370,19 @@ export default function NewCirclePage() {
                     Requested {new Date(r.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, color: 'var(--amber)',
-                  background: 'var(--amber-soft)', padding: '3px 8px', borderRadius: 10,
-                }}>
-                  Pending
-                </span>
+                <button
+                  onClick={async () => {
+                    await supabase.from('circle_join_requests').delete().eq('id', r.id)
+                    setPendingRequests(prev => prev.filter(p => p.id !== r.id))
+                  }}
+                  style={{
+                    fontSize: 11, fontWeight: 700, color: 'var(--red)',
+                    background: 'var(--red-soft)', padding: '5px 10px', borderRadius: 10,
+                    border: 'none', cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
               </div>
             ))}
           </div>

@@ -276,6 +276,9 @@ export default function AppShell({
   // Friend request badge
   const [pendingFriendRequests, setPendingFriendRequests] = useState(0)
 
+  // Pending join requests for circles the user admins
+  const [pendingJoinCount, setPendingJoinCount] = useState(0)
+
   // Calendar selection modal (global — works from any tab)
   type GCal = { id: string; summary: string; primary: boolean; backgroundColor: string }
   const [showCalModal, setShowCalModal] = useState(false)
@@ -741,6 +744,36 @@ export default function AppShell({
     return () => { supabase.removeChannel(channel) }
   }, [user.id])
 
+  // Load pending join request count (for circles user admins)
+  useEffect(() => {
+    async function fetchJoinRequests() {
+      // Get circles where user is admin
+      const { data: adminCircles } = await supabase
+        .from('circle_members')
+        .select('circle_id')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+      if (!adminCircles?.length) { setPendingJoinCount(0); return }
+      const circleIds = adminCircles.map(c => c.circle_id)
+      const { count } = await supabase
+        .from('circle_join_requests')
+        .select('id', { count: 'exact', head: true })
+        .in('circle_id', circleIds)
+        .eq('status', 'pending')
+      setPendingJoinCount(count || 0)
+    }
+    fetchJoinRequests()
+
+    const channel = supabase
+      .channel('join-requests-badge')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'circle_join_requests',
+      }, () => { fetchJoinRequests() })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [user.id])
+
   // Theme
   useEffect(() => {
     const applied = theme === 'system'
@@ -1162,13 +1195,25 @@ export default function AppShell({
                   style={{
                     background: 'var(--surface2)', border: '1px solid var(--border)',
                     borderRadius: 10, padding: '7px 9px', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center',
+                    display: 'flex', alignItems: 'center', position: 'relative',
                   }}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="3"/>
                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                   </svg>
+                  {pendingJoinCount > 0 && (
+                    <span style={{
+                      position: 'absolute', top: -4, right: -4,
+                      minWidth: 16, height: 16, borderRadius: 8,
+                      background: 'var(--amber)', color: '#000',
+                      fontSize: 10, fontWeight: 800,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '0 4px',
+                    }}>
+                      {pendingJoinCount}
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
