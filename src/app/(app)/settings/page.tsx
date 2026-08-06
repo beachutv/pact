@@ -41,6 +41,9 @@ export default function SettingsPage() {
   const [isStandalone, setIsStandalone] = useState(false)
   const [isiOS, setIsiOS] = useState(false)
 
+  // Sparks pause
+  const [showSparkPause, setShowSparkPause] = useState(false)
+
   // Toast
   const [toast, setToast] = useState('')
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 2200) }
@@ -514,6 +517,75 @@ export default function SettingsPage() {
           onToggle={handleLocationToggle}
           blocked={locPerm === 'denied'}
         />
+
+        {/* Sparks pause */}
+        {(() => {
+          const paused = user.sparks_paused_until && new Date(user.sparks_paused_until) > new Date()
+          const pausedUntil = paused ? new Date(user.sparks_paused_until!) : null
+          const isIndefinite = pausedUntil && pausedUntil.getFullYear() >= 2099
+          const pauseLabel = paused
+            ? isIndefinite
+              ? 'Paused indefinitely'
+              : `Paused until ${pausedUntil!.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${pausedUntil!.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+            : null
+
+          async function setSpark(until: string | null) {
+            await supabase.from('users').update({ sparks_paused_until: until }).eq('id', user.id)
+            updateUser({ sparks_paused_until: until })
+            showToast(until ? '⚡ Sparks paused' : '⚡ Sparks back on')
+          }
+
+          return (
+            <div style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <span style={{ flexShrink: 0, marginTop: 2, display: 'flex' }}>
+                  <IconZap size={20} color={paused ? 'var(--text2)' : 'var(--amber)'} />
+                </span>
+                <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+                  <p style={{ fontSize: 14, fontWeight: 700 }}>Sparks</p>
+                  <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4, lineHeight: 1.5 }}>
+                    {paused
+                      ? `You won't appear in anyone's sparks and won't see sparks yourself. ${pauseLabel}.`
+                      : "Alerts you when a friend is nearby and you're both free. You can pause this anytime."}
+                  </p>
+                  {paused && (
+                    <button
+                      onClick={() => setSpark(null)}
+                      style={{
+                        marginTop: 8, padding: '6px 14px', borderRadius: 8, border: 'none',
+                        background: 'var(--accent)', color: '#fff',
+                        fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      }}
+                    >
+                      Resume sparks
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    if (!paused) {
+                      setShowSparkPause(true)
+                    } else {
+                      setSpark(null)
+                    }
+                  }}
+                  style={{
+                    width: 48, height: 28, borderRadius: 14, border: 'none', cursor: 'pointer',
+                    background: paused ? 'var(--surface3)' : 'var(--accent)',
+                    position: 'relative', flexShrink: 0, transition: 'background 0.2s', marginTop: 2,
+                  }}
+                >
+                  <div style={{
+                    width: 22, height: 22, borderRadius: '50%', background: '#fff',
+                    position: 'absolute', top: 3,
+                    left: paused ? 3 : 23,
+                    transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                  }} />
+                </button>
+              </div>
+            </div>
+          )
+        })()}
       </Section>
 
       {/* Appearance */}
@@ -645,6 +717,69 @@ export default function SettingsPage() {
               </div>
             )}
             <button onClick={() => setShowA2HS(false)} style={{ ...primaryBtn, marginTop: 16 }}>Got it</button>
+          </div>
+        </div>
+      )}
+
+      {/* Spark pause picker */}
+      {showSparkPause && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) setShowSparkPause(false) }}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50,
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          }}
+        >
+          <div style={{
+            background: 'var(--surface2)', borderRadius: '20px 20px 0 0',
+            padding: '20px 20px calc(20px + env(safe-area-inset-bottom))',
+            width: '100%', maxWidth: 440,
+          }}>
+            <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 16px' }} />
+            <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>⚡ Pause sparks</p>
+            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.5 }}>
+              You won&apos;t appear in anyone&apos;s sparks and won&apos;t see sparks yourself. You can resume anytime.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
+                { label: '1 hour', hours: 1 },
+                { label: '4 hours', hours: 4 },
+                { label: 'Until tomorrow', hours: (() => { const tom = new Date(); tom.setDate(tom.getDate() + 1); tom.setHours(8, 0, 0, 0); return Math.max(1, (tom.getTime() - Date.now()) / 3600000) })() },
+                { label: '1 week', hours: 168 },
+                { label: 'Indefinitely', hours: 876000 },
+              ].map(opt => (
+                <button
+                  key={opt.label}
+                  onClick={async () => {
+                    const until = new Date(Date.now() + opt.hours * 3600000).toISOString()
+                    await supabase.from('users').update({ sparks_paused_until: until }).eq('id', user.id)
+                    updateUser({ sparks_paused_until: until })
+                    setShowSparkPause(false)
+                    showToast(`⚡ Sparks paused — ${opt.label.toLowerCase()}`)
+                  }}
+                  style={{
+                    padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border)',
+                    background: 'var(--surface)', color: 'var(--text)',
+                    fontSize: 14, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  {opt.label}
+                  <span style={{ fontSize: 12, color: 'var(--text2)', marginLeft: 8 }}>
+                    {opt.hours >= 876000 ? 'until you turn it back on' : ''}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowSparkPause(false)}
+              style={{
+                marginTop: 12, width: '100%', padding: 12, borderRadius: 12,
+                border: '1px solid var(--border)', background: 'none',
+                color: 'var(--text2)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

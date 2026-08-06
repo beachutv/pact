@@ -474,8 +474,11 @@ export default function CalendarPage() {
   const SPARK_MAX_TRAVEL = 15
   const LIVE_LOC_STALENESS = 12 * 3600000
 
+  const sparksPaused = user.sparks_paused_until && new Date(user.sparks_paused_until) > new Date()
+
   const sparks = useMemo((): Spark[] => {
     if (!activeCircle) { setSparkStatus('no circle'); return [] }
+    if (sparksPaused) { setSparkStatus('paused'); return [] }
     if (!connectedUserIds.has(user.id)) { setSparkStatus('your calendar is not connected'); return [] }
 
     const myLive = (user as any).live_lat && (user as any).live_lng && (user as any).live_updated_at &&
@@ -485,11 +488,13 @@ export default function CalendarPage() {
     const myCoords = sanitizeCoords(rawMyCoords.x, rawMyCoords.y, (user as any).home_area || '')
     const h = Math.max(DAY_START, Math.min(nowHour, 20))
     const result: Spark[] = []
-    let debugSkips = { noCal: 0, noCoords: 0, tooFar: 0, noWindow: 0 }
+    let debugSkips = { noCal: 0, noCoords: 0, tooFar: 0, noWindow: 0, paused: 0 }
 
     for (const m of circleMembers) {
       if (m.id === user.id) continue
       if (!connectedUserIds.has(m.id)) { debugSkips.noCal++; continue }
+      // Respect other member's spark pause
+      if (m.sparks_paused_until && new Date(m.sparks_paused_until) > new Date()) { debugSkips.paused++; continue }
 
       const theirLive = m.live_lat && m.live_lng && m.live_updated_at &&
         (Date.now() - new Date(m.live_updated_at).getTime()) < LIVE_LOC_STALENESS
@@ -538,13 +543,14 @@ export default function CalendarPage() {
       if (debugSkips.tooFar > 0) reasons.push(`${debugSkips.tooFar} are >15 min away`)
       if (debugSkips.noWindow > 0) reasons.push(`${debugSkips.noWindow} have no shared free time today`)
       if (debugSkips.noCoords > 0) reasons.push(`${debugSkips.noCoords} missing location`)
+      if (debugSkips.paused > 0) reasons.push(`${debugSkips.paused} paused sparks`)
       setSparkStatus(reasons.length > 0 ? reasons.join(', ') : 'no matches right now')
     } else {
       setSparkStatus('')
     }
 
     return result.sort((a, b) => a.travelTime - b.travelTime)
-  }, [activeCircle, circleMembers, busyBlocks, dismissedSparks, todayStr, nowHour, user.id, connectedUserIds, sparkRefreshKey, sparkScanMode])
+  }, [activeCircle, circleMembers, busyBlocks, dismissedSparks, todayStr, nowHour, user.id, connectedUserIds, sparkRefreshKey, sparkScanMode, sparksPaused])
 
   function dismissSpark(memberId: string, windowStart: number, travelTime: number) {
     const key = sparkKey(memberId, windowStart, travelTime)
