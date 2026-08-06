@@ -24,7 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const { data: memberships } = await supabase
     .from('circle_members')
-    .select('circle_id, role, circles(id, name, emoji, invite_code, secret_code, visibility, join_mode, created_by)')
+    .select('circle_id, role, circles(id, name, emoji, invite_code, visibility, join_mode, created_by)')
     .eq('user_id', user.id)
 
   const circles = (memberships || [])
