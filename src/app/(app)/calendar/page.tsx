@@ -1044,6 +1044,19 @@ export default function CalendarPage() {
 
   if (loading) return <div style={{ padding: 20 }}><div className="spinner" /></div>
 
+  if (!activeCircle) {
+    return (
+      <div style={{ padding: 20, textAlign: 'center', marginTop: 40 }}>
+        <p style={{ fontSize: 40, marginBottom: 12 }}>📅</p>
+        <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>No circle yet</h2>
+        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
+          Create or join a circle to start seeing everyone&apos;s availability.
+        </p>
+        <a href="/circles/new"><button className="btn-primary">Create or join a circle</button></a>
+      </div>
+    )
+  }
+
   if (!connected) {
     return (
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1418,6 +1431,11 @@ export default function CalendarPage() {
             {!isLandscape && (
               <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '12px auto 10px', flexShrink: 0 }} />
             )}
+            {!sheetDate ? (
+              <div style={{ padding: '40px 18px', textAlign: 'center', color: 'var(--text2)', fontSize: 13 }}>
+                Tap a day on the calendar to see availability
+              </div>
+            ) : (
             <div style={{ overflowY: 'auto', padding: isLandscape ? '4px 18px 18px' : '0 18px 26px' }}>
               <h3 style={{ fontSize: 16, fontWeight: 700 }}>{fmtDate(sheetDate)}</h3>
               <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
@@ -1791,6 +1809,7 @@ export default function CalendarPage() {
                 </button>
               )}
             </div>
+            )}
           </div>
         </>
       )}

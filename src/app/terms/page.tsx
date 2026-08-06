@@ -1,15 +1,29 @@
+'use client'
+
 export default function TermsPage() {
   return (
     <div style={{
-      maxWidth: 680, margin: '0 auto', padding: '40px 20px',
+      maxWidth: 680, margin: '0 auto', padding: '0 20px 40px',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      color: '#e0e0e0', background: '#141A1F', minHeight: '100vh',
+      color: 'var(--text)', background: 'var(--bg)', minHeight: '100vh',
       lineHeight: 1.7, fontSize: 15,
     }}>
+      {/* Back button — no browser chrome in PWA */}
+      <div style={{ padding: '16px 0 8px' }}>
+        <button
+          onClick={() => window.history.back()}
+          style={{
+            background: 'none', border: 'none', color: 'var(--accent)',
+            fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: '4px 0',
+          }}
+        >
+          ← Back
+        </button>
+      </div>
       <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>
-        <span style={{ color: '#76ACB3' }}>P</span>act — Terms of Service
+        <span style={{ color: 'var(--accent)' }}>P</span>act — Terms of Service
       </h1>
-      <p style={{ color: '#888', fontSize: 13, marginBottom: 32 }}>
+      <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 32 }}>
         Last updated: July 2026
       </p>
 
@@ -84,11 +98,11 @@ export default function TermsPage() {
       <Section title="7. Google Calendar integration">
         <p>
           Pact accesses your Google Calendar data only as described in our{' '}
-          <a href="/privacy" style={{ color: '#76ACB3' }}>Privacy Policy</a>. You can
+          <a href="/privacy" style={{ color: 'var(--accent)' }}>Privacy Policy</a>. You can
           disconnect your calendar at any time. Pact&apos;s use of Google data complies
           with the{' '}
           <a href="https://developers.google.com/terms/api-services-user-data-policy"
-            style={{ color: '#76ACB3' }} target="_blank" rel="noopener noreferrer">
+            style={{ color: 'var(--accent)' }} target="_blank" rel="noopener noreferrer">
             Google API Services User Data Policy
           </a>.
         </p>
@@ -157,7 +171,7 @@ export default function TermsPage() {
       <Section title="15. Contact">
         <p>
           For questions about these terms, contact us at{' '}
-          <a href="mailto:beatricelinchu@gmail.com" style={{ color: '#76ACB3' }}>
+          <a href="mailto:beatricelinchu@gmail.com" style={{ color: 'var(--accent)' }}>
             beatricelinchu@gmail.com
           </a>.
         </p>
@@ -169,7 +183,7 @@ export default function TermsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section style={{ marginBottom: 28 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: '#fff' }}>{title}</h2>
+      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{title}</h2>
       {children}
     </section>
   )

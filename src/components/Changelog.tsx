@@ -2,11 +2,24 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '6.1'
+export const CURRENT_VERSION = '6.2'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '6.2',
+    date: 'August 6, 2026',
+    title: 'Stability & polish',
+    subtitle: 'Bug fixes before wider launch',
+    items: [
+      { icon: '🛡️', text: 'Fixed crash when opening calendar in landscape before selecting a day' },
+      { icon: '📅', text: 'Overnight and multi-day events now sync correctly in background cron' },
+      { icon: '🎨', text: 'Terms of Service page now matches your dark/light theme' },
+      { icon: '📱', text: 'Landscape mode works in PWA home screen installs' },
+      { icon: '🧹', text: 'Empty state screens when you have no circles yet (no more blank pages)' },
+    ],
+  },
   {
     version: '6.1',
     date: 'August 4, 2026',

@@ -55,7 +55,7 @@ export function useLocationUpdate(userId: string, key: string) {
           updateLocation(pos.coords.latitude, pos.coords.longitude)
         },
         (err) => {
-          console.log('Location unavailable:', err.message)
+          // Location unavailable — user denied or timeout, silently ignore
         },
         { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
       )

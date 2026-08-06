@@ -142,8 +142,6 @@ export async function POST(request: Request) {
       calDetails[calId] = 0
     }
   }
-  console.log(`[CalSync] Calendar busy counts:`, calDetails, `Total: ${allBusy.length}, Locations: ${locationMap.size}`)
-
   // Sort and merge overlapping periods
   allBusy.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
   const merged: { start: string; end: string }[] = []

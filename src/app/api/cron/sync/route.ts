@@ -112,34 +112,60 @@ export async function GET(request: Request) {
         if (cal?.busy) allBusy.push(...cal.busy)
       }
 
-      // Convert to hourly blocks
+      // Sort and merge overlapping periods
+      allBusy.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+      const merged: { start: string; end: string }[] = []
+      for (const period of allBusy) {
+        const last = merged[merged.length - 1]
+        if (last && new Date(period.start) <= new Date(last.end)) {
+          if (new Date(period.end) > new Date(last.end)) last.end = period.end
+        } else {
+          merged.push({ ...period })
+        }
+      }
+
+      // Convert to hourly blocks (iterate day-by-day for multi-day events)
       const blocks: { user_id: string; date: string; start_hour: number; end_hour: number; source: string }[] = []
 
-      for (const b of allBusy) {
-        const start = new Date(b.start)
-        const end = new Date(b.end)
+      for (const period of merged) {
+        const start = new Date(period.start)
+        const end = new Date(period.end)
 
         // Convert to Manila timezone
-        const startLocal = new Date(start.toLocaleString('en-US', { timeZone: timezone }))
-        const endLocal = new Date(end.toLocaleString('en-US', { timeZone: timezone }))
+        const manilaStart = new Date(start.toLocaleString('en-US', { timeZone: timezone }))
+        const manilaEnd = new Date(end.toLocaleString('en-US', { timeZone: timezone }))
 
-        const dateStr = startLocal.getFullYear() + '-' +
-          String(startLocal.getMonth() + 1).padStart(2, '0') + '-' +
-          String(startLocal.getDate()).padStart(2, '0')
+        let current = new Date(manilaStart)
+        while (current < manilaEnd) {
+          const dateStr = current.getFullYear() + '-' +
+            String(current.getMonth() + 1).padStart(2, '0') + '-' +
+            String(current.getDate()).padStart(2, '0')
 
-        const startHour = startLocal.getHours()
-        const endHour = endLocal.getDate() !== startLocal.getDate()
-          ? 24 // cap at 24 — DB constraint is end_hour <= 24; overnight events continue on next day's row
-          : Math.min(endLocal.getHours() + (endLocal.getMinutes() > 0 ? 1 : 0), 24)
+          const startHour = current.getDate() === manilaStart.getDate() &&
+            current.getMonth() === manilaStart.getMonth()
+            ? manilaStart.getHours()
+            : 0
 
-        if (startHour < endHour) {
-          blocks.push({
-            user_id: conn.user_id,
-            date: dateStr,
-            start_hour: startHour,
-            end_hour: endHour,
-            source: 'google',
-          })
+          const dayEnd = new Date(current)
+          dayEnd.setDate(dayEnd.getDate() + 1)
+          dayEnd.setHours(0, 0, 0, 0)
+
+          const endHour = manilaEnd < dayEnd
+            ? Math.ceil(manilaEnd.getHours() + manilaEnd.getMinutes() / 60)
+            : 24 // cap at 24 — DB constraint
+
+          if (endHour > startHour) {
+            blocks.push({
+              user_id: conn.user_id,
+              date: dateStr,
+              start_hour: startHour,
+              end_hour: endHour,
+              source: 'google',
+            })
+          }
+
+          current.setDate(current.getDate() + 1)
+          current.setHours(0, 0, 0, 0)
         }
       }
 
