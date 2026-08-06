@@ -188,6 +188,13 @@ export default function CircleSettingsPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  function copySecretCode() {
+    if (!circle?.secret_code) return
+    navigator.clipboard.writeText(circle.secret_code)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   async function saveInviteCode() {
     const code = newCode.trim().toLowerCase().replace(/[^a-z0-9-]/g, '')
     if (!code || code.length < 3) { setCodeError('Code must be at least 3 characters'); return }
@@ -448,12 +455,12 @@ export default function CircleSettingsPage() {
             Add from your other circles
           </button>
 
-          {/* Invite code — editable */}
+          {/* URL Slug — editable */}
           <div style={{
             background: 'var(--surface2)', borderRadius: 10, padding: '10px 12px',
           }}>
             <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.3px' }}>
-              Invite code
+              Link slug
             </p>
             {editingCode ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -470,7 +477,7 @@ export default function CircleSettingsPage() {
                   }}
                 />
                 <p style={{ fontSize: 10, color: 'var(--text2)' }}>
-                  Lowercase letters, numbers, and dashes only. This becomes the end of your invite link.
+                  Lowercase letters, numbers, and dashes only. This is the URL people see when you share the link.
                 </p>
                 {codeError && <p style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600 }}>{codeError}</p>}
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -515,6 +522,40 @@ export default function CircleSettingsPage() {
             )}
             <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 6 }}>
               Link: {typeof window !== 'undefined' ? window.location.origin : ''}/join/{circle.invite_code}
+            </p>
+            {circle.join_mode === 'approval' && (
+              <p style={{ fontSize: 10, color: 'var(--amber)', marginTop: 4 }}>
+                ⚠️ This link requires admin approval to join.
+              </p>
+            )}
+          </div>
+
+          {/* Secret invite code */}
+          <div style={{
+            background: 'var(--surface2)', borderRadius: 10, padding: '10px 12px',
+          }}>
+            <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.3px' }}>
+              Secret invite code
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <code style={{ flex: 1, fontSize: 15, fontWeight: 700, color: 'var(--text)', letterSpacing: 1 }}>
+                {circle.secret_code || '—'}
+              </code>
+              {circle.secret_code && (
+                <button
+                  onClick={copySecretCode}
+                  style={{
+                    background: 'none', border: 'none', fontSize: 12,
+                    color: 'var(--accent)', cursor: 'pointer', fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Copy
+                </button>
+              )}
+            </div>
+            <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 6 }}>
+              Share this privately — anyone who enters it in &quot;Join with code&quot; is added directly, even if the circle requires approval.
             </p>
           </div>
         </div>

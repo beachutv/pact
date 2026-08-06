@@ -33,6 +33,7 @@ export type Circle = {
   name: string
   emoji: string
   invite_code: string
+  secret_code: string
   visibility: string
   join_mode: string
   created_by: string

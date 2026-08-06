@@ -181,11 +181,26 @@ export default function NewCirclePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data: circle } = await supabase
+    // Look up by secret_code (private invite code) — auto-joins since the code IS the invitation
+    // Falls back to invite_code (URL slug) for backwards compat
+    let circle: any = null
+    const { data: bySecret } = await supabase
       .from('circles')
       .select('id, name, emoji')
-      .eq('invite_code', inviteCode.trim())
+      .eq('secret_code', inviteCode.trim().toUpperCase())
       .single()
+
+    if (bySecret) {
+      circle = bySecret
+    } else {
+      // Fallback: try invite_code (URL slug) for older circles
+      const { data: bySlug } = await supabase
+        .from('circles')
+        .select('id, name, emoji')
+        .eq('invite_code', inviteCode.trim())
+        .single()
+      circle = bySlug
+    }
 
     if (!circle) {
       setError('Invalid invite code. Check with whoever shared it.')
