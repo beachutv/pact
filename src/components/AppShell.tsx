@@ -379,12 +379,12 @@ export default function AppShell({
 
         // Check if we already sent a birthday notification for this person this year
         const year = new Date().getFullYear()
-        const notifTag = `bday-${mate.id}-${year}`
         const { data: existing } = await s.from('notifications')
           .select('id')
           .eq('user_id', user!.id)
           .eq('type', 'pact_change')
-          .ilike('title', `%${mate.name?.split(' ')[0]}%birthday%`)
+          .eq('link', `/profile/${mate.id}`)
+          .ilike('title', '%birthday%')
           .gte('created_at', `${year}-01-01`)
           .limit(1)
         if (existing && existing.length > 0) continue

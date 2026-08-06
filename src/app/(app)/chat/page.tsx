@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useCircle, type UserProfile } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { txtOn, fmtDate, fmtHour, AVATAR_COLORS } from '@/lib/utils'
@@ -43,9 +44,14 @@ type Message = {
   pact_id?: string | null
 }
 
-export default function ChatPage() {
+export default function ChatPageWrapper() {
+  return <Suspense><ChatPage /></Suspense>
+}
+
+function ChatPage() {
   const { user, activeCircle, circleMembers } = useCircle()
   const supabase = createClient()
+  const searchParams = useSearchParams()
 
   const [threads, setThreads] = useState<Thread[]>([])
   const [threadReads, setThreadReads] = useState<Record<string, string>>({})
@@ -114,6 +120,41 @@ export default function ChatPage() {
     if (!activeCircle) { setLoading(false); return }
     loadThreads()
   }, [activeCircle?.id])
+
+  // ─── Handle ?dm=userId — find or create DM thread ───
+  const dmHandled = useRef(false)
+  useEffect(() => {
+    if (dmHandled.current) return
+    const dmUserId = searchParams.get('dm')
+    if (!dmUserId || loading || threads.length === 0 && !loading) return
+    // Wait until threads have loaded
+    if (threads.length === 0) return
+
+    dmHandled.current = true
+
+    // Find existing DM with this user
+    const memberIds = [user.id, dmUserId].sort()
+    const existing = threads.find(t =>
+      t.member_ids.length === 2 &&
+      [...t.member_ids].sort().join(',') === memberIds.join(',')
+    )
+    if (existing) {
+      setActiveThreadId(existing.id)
+      return
+    }
+
+    // Create new DM thread
+    async function createDM() {
+      const threadId = crypto.randomUUID()
+      await supabase.from('threads').insert({ id: threadId, name: null, circle_id: null })
+      await supabase.from('thread_members').insert(
+        memberIds.map(uid => ({ thread_id: threadId, user_id: uid }))
+      )
+      await loadThreads()
+      setActiveThreadId(threadId)
+    }
+    createDM()
+  }, [searchParams, threads, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reload threads when exiting a thread (so previews are fresh)
   useEffect(() => {

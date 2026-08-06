@@ -468,7 +468,7 @@ export default function HomePage() {
               </div>
               {!isMe && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); router.push('/chat') }}
+                  onClick={(e) => { e.stopPropagation(); router.push(`/chat?dm=${m.id}`) }}
                   style={{
                     background: 'var(--surface2)', border: 'none', borderRadius: 10,
                     width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -489,7 +489,9 @@ export default function HomePage() {
         onClick={checkSparks}
         disabled={sparkLoading}
         style={{
-          position: 'fixed', bottom: 80, right: 20, zIndex: 20,
+          position: 'fixed',
+          bottom: 'calc(68px + env(safe-area-inset-bottom, 0px))',
+          right: 20, zIndex: 20,
           width: 56, height: 56, borderRadius: '50%',
           background: 'linear-gradient(135deg, #76ACB3, #8BB07E)',
           border: 'none', boxShadow: '0 4px 16px rgba(118,172,179,0.4)',
