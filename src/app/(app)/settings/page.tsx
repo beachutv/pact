@@ -11,7 +11,7 @@ import { CURRENT_VERSION } from '@/components/Changelog'
 type PermState = 'granted' | 'denied' | 'prompt' | 'unsupported'
 
 export default function SettingsPage() {
-  const { user, updateUser, circles } = useCircle()
+  const { user, updateUser, circles, setSparkEnabledMap: setContextSparkMap, activeCircle } = useCircle()
   const supabase = createClient()
   const router = useRouter()
 
@@ -619,6 +619,10 @@ export default function SettingsPage() {
                   onClick={async () => {
                     const next = !enabled
                     setSparkCircleStates(prev => ({ ...prev, [c.id]: next }))
+                    // Sync the context map if this is the currently active circle
+                    if (activeCircle && c.id === activeCircle.id) {
+                      setContextSparkMap(prev => ({ ...prev, [user.id]: next }))
+                    }
                     await supabase.from('circle_members')
                       .update({ sparks_enabled: next })
                       .eq('circle_id', c.id)
