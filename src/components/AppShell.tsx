@@ -793,7 +793,7 @@ export default function AppShell({
   const firstName = currentUser.name.split(' ')[0]
 
   return (
-    <CircleContext.Provider value={{ user: currentUser, updateUser, circles, activeCircle, setActiveCircle, circleMembers, setCircleMembers }}>
+    <CircleContext.Provider value={{ user: currentUser, updateUser, circles: orderedCircles, activeCircle, setActiveCircle, circleMembers, setCircleMembers }}>
       <div id="app-shell" style={isLandscape ? { flexDirection: 'row', maxWidth: '100%' } : {}}>
         {/* Header — portrait: top bar, landscape: left sidebar */}
         <header style={isLandscape ? {

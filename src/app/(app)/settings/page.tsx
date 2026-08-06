@@ -335,22 +335,41 @@ export default function SettingsPage() {
                 <span style={{ fontSize: 18, width: 28, textAlign: 'center' }}>{c.emoji}</span>
                 <span style={{ flex: 1, fontSize: 14, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  {i > 0 && (
-                    <button
-                      onClick={() => {
-                        const order = JSON.parse(localStorage.getItem('pact_circle_order') || '[]') as string[]
-                        const ids = order.length === circles.length ? order : circles.map(x => x.id)
-                        const idx = ids.indexOf(c.id)
-                        if (idx > 0) { [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]] }
-                        localStorage.setItem('pact_circle_order', JSON.stringify(ids))
-                        window.location.reload()
-                      }}
-                      style={{
-                        width: 28, height: 28, borderRadius: 8, border: '1px solid var(--border)',
-                        background: 'var(--surface2)', color: 'var(--text2)', fontSize: 12, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}
-                    >↑</button>
+                  {circles.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => {
+                          if (i === 0) return
+                          const ids = circles.map(x => x.id)
+                          ;[ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]
+                          localStorage.setItem('pact_circle_order', JSON.stringify(ids))
+                          window.location.reload()
+                        }}
+                        disabled={i === 0}
+                        style={{
+                          width: 28, height: 28, borderRadius: 8, border: '1px solid var(--border)',
+                          background: 'var(--surface2)', color: 'var(--text2)', fontSize: 12, cursor: i === 0 ? 'default' : 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          opacity: i === 0 ? 0.3 : 1,
+                        }}
+                      >↑</button>
+                      <button
+                        onClick={() => {
+                          if (i === circles.length - 1) return
+                          const ids = circles.map(x => x.id)
+                          ;[ids[i], ids[i + 1]] = [ids[i + 1], ids[i]]
+                          localStorage.setItem('pact_circle_order', JSON.stringify(ids))
+                          window.location.reload()
+                        }}
+                        disabled={i === circles.length - 1}
+                        style={{
+                          width: 28, height: 28, borderRadius: 8, border: '1px solid var(--border)',
+                          background: 'var(--surface2)', color: 'var(--text2)', fontSize: 12, cursor: i === circles.length - 1 ? 'default' : 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          opacity: i === circles.length - 1 ? 0.3 : 1,
+                        }}
+                      >↓</button>
+                    </>
                   )}
                   <button
                     onClick={() => router.push(`/circles/${c.id}/settings`)}
