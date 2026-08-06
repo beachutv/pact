@@ -145,6 +145,13 @@ export default function CalendarPage() {
     return () => mq.removeEventListener('change', handler)
   }, [])
 
+  // In landscape, auto-select today so the split view is always populated
+  useEffect(() => {
+    if (isLandscape && !sheetDate) {
+      setSheetDate(toStr(new Date()))
+    }
+  }, [isLandscape]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Favorite spots for recommendations
   const [favSpots, setFavSpots] = useState<FavSpot[]>([])
 
@@ -1044,35 +1051,35 @@ export default function CalendarPage() {
 
   if (loading) return <div style={{ padding: 20 }}><div className="spinner" /></div>
 
-  if (!activeCircle) {
-    return (
-      <div style={{ padding: 20, textAlign: 'center', marginTop: 40 }}>
-        <p style={{ fontSize: 40, marginBottom: 12 }}>📅</p>
-        <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>No circle yet</h2>
-        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
-          Create or join a circle to start seeing everyone&apos;s availability.
-        </p>
-        <a href="/circles/new"><button className="btn-primary">Create or join a circle</button></a>
-      </div>
-    )
-  }
-
-  if (!connected) {
+  if (!activeCircle || !connected) {
     return (
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="card" style={{ textAlign: 'center' }}>
           <p style={{ fontSize: 40, marginBottom: 8 }}><IconCalendar size={40} color='var(--text2)' /></p>
           <p style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Calendar</p>
-          <p style={{ fontSize: 13, color: 'var(--text2)' }}>
-            Connect your Google Calendar to see when everyone in {activeCircle.name} is free.
-          </p>
-          <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 8 }}>
-            We only check if you're busy or free — never see event titles or details.
-          </p>
-          <button className="btn-primary" style={{ marginTop: 16 }}
-            onClick={() => window.location.href = '/api/calendar/connect'}>
-            Connect Google Calendar
-          </button>
+          {!activeCircle ? (
+            <>
+              <p style={{ fontSize: 13, color: 'var(--text2)' }}>
+                Create or join a circle to start seeing everyone&apos;s availability.
+              </p>
+              <a href="/circles/new">
+                <button className="btn-primary" style={{ marginTop: 16 }}>Create or join a circle</button>
+              </a>
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: 13, color: 'var(--text2)' }}>
+                Connect your Google Calendar to see when everyone in {activeCircle.name} is free.
+              </p>
+              <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 8 }}>
+                We only check if you&apos;re busy or free — never see event titles or details.
+              </p>
+              <button className="btn-primary" style={{ marginTop: 16 }}
+                onClick={() => window.location.href = '/api/calendar/connect'}>
+                Connect Google Calendar
+              </button>
+            </>
+          )}
         </div>
       </div>
     )
@@ -1088,14 +1095,6 @@ export default function CalendarPage() {
       ? findWindows(sheetDate, activeMembers.length - 1, 2).map(w => ({ ...w, full: false }))
       : []),
   ].sort((a, b) => a.s - b.s) : []
-
-  // In landscape, auto-select today so the split view is always populated
-  useEffect(() => {
-    if (isLandscape && !sheetDate) {
-      const todayStr = toStr(new Date())
-      setSheetDate(todayStr)
-    }
-  }, [isLandscape])
 
   return (
     <div style={{
