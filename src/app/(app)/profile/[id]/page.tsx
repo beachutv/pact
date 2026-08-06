@@ -50,6 +50,7 @@ export default function ProfilePage() {
   const [editShareAddress, setEditShareAddress] = useState('nobody')
   const [editHomeArea, setEditHomeArea] = useState('')
   const [editUsername, setEditUsername] = useState('')
+  const [editBirthday, setEditBirthday] = useState('')
   const [usernameError, setUsernameError] = useState('')
   const [checkingUsername, setCheckingUsername] = useState(false)
 
@@ -78,6 +79,7 @@ export default function ProfilePage() {
         setEditShareAddress(p.share_address || 'nobody')
         setEditHomeArea(p.home_area || '')
         setEditUsername(p.username || '')
+        setEditBirthday(p.birthday || '')
       }
     }
     load()
@@ -273,6 +275,7 @@ export default function ProfilePage() {
       home_area: editHomeArea || profile?.home_area,
       home_x: coords.x,
       home_y: coords.y,
+      birthday: editBirthday || null,
     }).eq('id', user.id)
     // Refresh
     const { data } = await supabase.from('users').select('*').eq('id', id).single()
@@ -439,6 +442,20 @@ export default function ProfilePage() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>Birthday</label>
+          <input
+            className="input"
+            type="date"
+            value={editBirthday}
+            onChange={e => setEditBirthday(e.target.value)}
+            style={{ marginTop: 4 }}
+          />
+          <p style={{ fontSize: 10, color: 'var(--text2)', marginTop: 3 }}>
+            Circle mates get a reminder when it&apos;s coming up
+          </p>
         </div>
 
         <button className="btn-primary" onClick={handleSave} disabled={saving} style={{ marginTop: 8 }}>

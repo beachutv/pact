@@ -1817,8 +1817,10 @@ export default function CalendarPage() {
 
       {/* Who's free? bottom sheet */}
       {showWhosFree && (() => {
-        const otherMembers = circleMembers.filter(m => m.id !== user.id && connectedUserIds.has(m.id))
-        const memberWindows = otherMembers.map(m => ({
+        const otherMembers = circleMembers.filter(m => m.id !== user.id)
+        const connectedMembers = otherMembers.filter(m => connectedUserIds.has(m.id))
+        const disconnectedMembers = otherMembers.filter(m => !connectedUserIds.has(m.id))
+        const memberWindows = connectedMembers.map(m => ({
           member: m,
           window: nextMutualWindow(m.id, whosFreeRange),
         })).sort((a, b) => {
@@ -1937,6 +1939,24 @@ export default function CalendarPage() {
                           💬
                         </button>
                       )}
+                    </div>
+                  ))}
+
+                  {/* Members without calendar connected */}
+                  {disconnectedMembers.map(m => (
+                    <div key={m.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 0', borderBottom: '1px solid var(--border)',
+                      opacity: 0.5,
+                    }}>
+                      <div className="avatar" style={{
+                        background: m.avatar_url ? `url(${m.avatar_url}) center/cover` : m.color,
+                        color: txtOn(m.color),
+                      }}>
+                        {!m.avatar_url && m.name[0]}
+                      </div>
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>{m.name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text2)' }}>calendar not connected</span>
                     </div>
                   ))}
                 </div>
