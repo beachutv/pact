@@ -346,20 +346,30 @@ export default function CalendarPage() {
   // Current hour in user's timezone
   const nowHour = useMemo(() => currentHourInTz(tz), [tz])
 
+  // For hours >= 24 (midnight, 1 AM), check the next day's blocks at hour 0, 1
+  function resolveHour(date: string, hour: number): { date: string; hour: number } {
+    if (hour < 24) return { date, hour }
+    const d = new Date(date + 'T12:00:00')
+    d.setDate(d.getDate() + 1)
+    return { date: toStr(d), hour: hour - 24 }
+  }
+
   // Check if a block is originally busy (ignoring overrides) — for visual display
   const isRawBusy = useCallback((uid: string, date: string, hour: number) => {
+    const r = resolveHour(date, hour)
     return busyBlocks.some(b =>
-      b.user_id === uid && b.date === date && b.start_hour <= hour && b.end_hour > hour
+      b.user_id === uid && b.date === r.date && b.start_hour <= r.hour && b.end_hour > r.hour
     )
   }, [busyBlocks])
 
   // Helpers — past hours today count as busy for everyone; respects overrides for current user
   const isBusy = useCallback((uid: string, date: string, hour: number) => {
-    if (date === todayStr && hour < nowHour) return true
+    const r = resolveHour(date, hour)
+    if (r.date === todayStr && r.hour < nowHour) return true
     // If user overrode this hour, treat as free
-    if (uid === user.id && hourOverrides.has(`${date}-${hour}`)) return false
+    if (uid === user.id && hourOverrides.has(`${r.date}-${r.hour}`)) return false
     return busyBlocks.some(b =>
-      b.user_id === uid && b.date === date && b.start_hour <= hour && b.end_hour > hour
+      b.user_id === uid && b.date === r.date && b.start_hour <= r.hour && b.end_hour > r.hour
     )
   }, [busyBlocks, todayStr, nowHour, hourOverrides, user.id])
 
@@ -768,7 +778,8 @@ export default function CalendarPage() {
 
   // Toggle manual busy/free for own row
   async function toggleManualHour(date: string, hour: number) {
-    const overrideKey = `${date}-${hour}`
+    const r = resolveHour(date, hour)
+    const overrideKey = `${r.date}-${r.hour}`
     const rawBusy = isRawBusy(user.id, date, hour)
     const effectivelyBusy = isBusy(user.id, date, hour)
 
@@ -777,14 +788,14 @@ export default function CalendarPage() {
       const { count } = await supabase.from('busy_blocks')
         .delete({ count: 'exact' })
         .eq('user_id', user.id)
-        .eq('date', date)
+        .eq('date', r.date)
         .eq('source', 'manual')
-        .lte('start_hour', hour)
-        .gt('end_hour', hour)
+        .lte('start_hour', r.hour)
+        .gt('end_hour', r.hour)
       if (count && count > 0) {
         // Was a manual block — remove from local state
         setBusyBlocks(prev => prev.filter(b =>
-          !(b.user_id === user.id && b.date === date && b.start_hour <= hour && b.end_hour > hour)
+          !(b.user_id === user.id && b.date === r.date && b.start_hour <= r.hour && b.end_hour > r.hour)
         ))
       } else {
         // Calendar block — add override to treat as free (green with red border)
@@ -796,7 +807,7 @@ export default function CalendarPage() {
     } else if (!effectivelyBusy) {
       // Free block — mark as manually busy
       const { data } = await supabase.from('busy_blocks')
-        .insert({ user_id: user.id, date, start_hour: hour, end_hour: hour + 1, source: 'manual' })
+        .insert({ user_id: user.id, date: r.date, start_hour: r.hour, end_hour: r.hour + 1, source: 'manual' })
         .select('user_id, date, start_hour, end_hour')
         .single()
       if (data) setBusyBlocks(prev => [...prev, data])
@@ -1543,7 +1554,8 @@ export default function CalendarPage() {
                       const busy = isBusy(m.id, sheetDate!, h)
                       const isMe = m.id === user.id
                       const isPast = sheetDate === todayStr && h < nowHour
-                      const isOverridden = isMe && hourOverrides.has(`${sheetDate}-${h}`)
+                      const rh = resolveHour(sheetDate!, h)
+                      const isOverridden = isMe && hourOverrides.has(`${rh.date}-${rh.hour}`)
                       // Check if this hour falls within any pact's time window
                       const datePacts = sheetDate ? (pactsByDate[sheetDate] || []) : []
                       const pactAtHour = datePacts.find(p => p.win_start !== null && p.win_end !== null && h >= p.win_start! && h < p.win_end!)

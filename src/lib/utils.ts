@@ -206,8 +206,8 @@ export function currentHourInTz(tz: string): number {
   return parseInt(str)
 }
 
-export const DAY_START = 8
-export const DAY_END = 24 // midnight — matches DB constraint (end_hour between 1 and 24)
+export const DAY_START = 6
+export const DAY_END = 26 // 2 AM next day — for night owls
 
 /** Real GPS coordinates for Metro Manila areas (for live location matching) */
 export const AREA_GPS: Record<string, { lat: number; lng: number }> = {
