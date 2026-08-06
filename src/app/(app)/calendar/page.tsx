@@ -104,7 +104,7 @@ function SparkLine({ spark: sp, todayStr, onDismiss }: { spark: Spark; todayStr:
 }
 
 export default function CalendarPage() {
-  const { user, activeCircle, circleMembers, setCircleMembers } = useCircle()
+  const { user, activeCircle, circleMembers, setCircleMembers, sparkEnabledMap } = useCircle()
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -474,11 +474,28 @@ export default function CalendarPage() {
   const SPARK_MAX_TRAVEL = 15
   const LIVE_LOC_STALENESS = 12 * 3600000
 
+  // Silence list for sparks
+  const [silencedUserIds, setSilencedUserIds] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    async function loadSilenced() {
+      const { data } = await supabase
+        .from('spark_silenced')
+        .select('silenced_user_id')
+        .eq('user_id', user.id)
+      if (data) setSilencedUserIds(new Set(data.map(d => d.silenced_user_id)))
+    }
+    loadSilenced()
+  }, [user.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const sparksPaused = user.sparks_paused_until && new Date(user.sparks_paused_until) > new Date()
+
+  // Per-circle: are MY sparks enabled for this circle?
+  const mySparkEnabled = sparkEnabledMap[user.id] !== false
 
   const sparks = useMemo((): Spark[] => {
     if (!activeCircle) { setSparkStatus('no circle'); return [] }
     if (sparksPaused) { setSparkStatus('paused'); return [] }
+    if (!mySparkEnabled) { setSparkStatus('sparks off for this circle'); return [] }
     if (!connectedUserIds.has(user.id)) { setSparkStatus('your calendar is not connected'); return [] }
 
     const myLive = (user as any).live_lat && (user as any).live_lng && (user as any).live_updated_at &&
@@ -488,13 +505,17 @@ export default function CalendarPage() {
     const myCoords = sanitizeCoords(rawMyCoords.x, rawMyCoords.y, (user as any).home_area || '')
     const h = Math.max(DAY_START, Math.min(nowHour, 20))
     const result: Spark[] = []
-    let debugSkips = { noCal: 0, noCoords: 0, tooFar: 0, noWindow: 0, paused: 0 }
+    let debugSkips = { noCal: 0, noCoords: 0, tooFar: 0, noWindow: 0, paused: 0, silenced: 0, circleOff: 0 }
 
     for (const m of circleMembers) {
       if (m.id === user.id) continue
       if (!connectedUserIds.has(m.id)) { debugSkips.noCal++; continue }
-      // Respect other member's spark pause
+      // Respect other member's global spark pause
       if (m.sparks_paused_until && new Date(m.sparks_paused_until) > new Date()) { debugSkips.paused++; continue }
+      // Per-circle: other member has sparks off for this circle
+      if (sparkEnabledMap[m.id] === false) { debugSkips.circleOff++; continue }
+      // Silence list
+      if (silencedUserIds.has(m.id)) { debugSkips.silenced++; continue }
 
       const theirLive = m.live_lat && m.live_lng && m.live_updated_at &&
         (Date.now() - new Date(m.live_updated_at).getTime()) < LIVE_LOC_STALENESS
@@ -544,13 +565,15 @@ export default function CalendarPage() {
       if (debugSkips.noWindow > 0) reasons.push(`${debugSkips.noWindow} have no shared free time today`)
       if (debugSkips.noCoords > 0) reasons.push(`${debugSkips.noCoords} missing location`)
       if (debugSkips.paused > 0) reasons.push(`${debugSkips.paused} paused sparks`)
+      if (debugSkips.silenced > 0) reasons.push(`${debugSkips.silenced} silenced`)
+      if (debugSkips.circleOff > 0) reasons.push(`${debugSkips.circleOff} have sparks off for this circle`)
       setSparkStatus(reasons.length > 0 ? reasons.join(', ') : 'no matches right now')
     } else {
       setSparkStatus('')
     }
 
     return result.sort((a, b) => a.travelTime - b.travelTime)
-  }, [activeCircle, circleMembers, busyBlocks, dismissedSparks, todayStr, nowHour, user.id, connectedUserIds, sparkRefreshKey, sparkScanMode, sparksPaused])
+  }, [activeCircle, circleMembers, busyBlocks, dismissedSparks, todayStr, nowHour, user.id, connectedUserIds, sparkRefreshKey, sparkScanMode, sparksPaused, mySparkEnabled, sparkEnabledMap, silencedUserIds])
 
   function dismissSpark(memberId: string, windowStart: number, travelTime: number) {
     const key = sparkKey(memberId, windowStart, travelTime)

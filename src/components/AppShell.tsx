@@ -48,6 +48,8 @@ type CircleContextType = {
   setActiveCircle: (c: Circle) => void
   circleMembers: UserProfile[]
   setCircleMembers: React.Dispatch<React.SetStateAction<UserProfile[]>>
+  sparkEnabledMap: Record<string, boolean>
+  setSparkEnabledMap: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
 }
 
 const CircleContext = createContext<CircleContextType | null>(null)
@@ -246,6 +248,7 @@ export default function AppShell({
     }
   }
   const [circleMembers, setCircleMembers] = useState<UserProfile[]>([user])
+  const [sparkEnabledMap, setSparkEnabledMap] = useState<Record<string, boolean>>({})
 
   function updateUser(partial: Partial<UserProfile>) {
     setCurrentUser(prev => ({ ...prev, ...partial }))
@@ -466,13 +469,17 @@ export default function AppShell({
     async function fetchMembers() {
       const { data } = await supabase
         .from('circle_members')
-        .select('user_id, users(*)')
+        .select('user_id, sparks_enabled, users(*)')
         .eq('circle_id', activeCircle!.id)
 
       if (data) {
         const members = data.map(d => (d as any).users).filter(Boolean) as UserProfile[]
         setCircleMembers(members)
         memberIds = members.map(m => m.id)
+        // Build spark enabled map for this circle
+        const seMap: Record<string, boolean> = {}
+        data.forEach((d: any) => { seMap[d.user_id] = d.sparks_enabled !== false })
+        setSparkEnabledMap(seMap)
       }
     }
     fetchMembers()
@@ -794,7 +801,7 @@ export default function AppShell({
   const firstName = currentUser.name.split(' ')[0]
 
   return (
-    <CircleContext.Provider value={{ user: currentUser, updateUser, circles: orderedCircles, activeCircle, setActiveCircle, circleMembers, setCircleMembers }}>
+    <CircleContext.Provider value={{ user: currentUser, updateUser, circles: orderedCircles, activeCircle, setActiveCircle, circleMembers, setCircleMembers, sparkEnabledMap, setSparkEnabledMap }}>
       <div id="app-shell" style={isLandscape ? { flexDirection: 'row', maxWidth: '100%' } : {}}>
         {/* Header — portrait: top bar, landscape: left sidebar */}
         <header style={isLandscape ? {

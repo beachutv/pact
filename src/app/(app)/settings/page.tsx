@@ -43,6 +43,36 @@ export default function SettingsPage() {
 
   // Sparks pause
   const [showSparkPause, setShowSparkPause] = useState(false)
+  const [sparkCircleStates, setSparkCircleStates] = useState<Record<string, boolean>>({})
+  const [silencedUsers, setSilencedUsers] = useState<{ id: string; name: string; color: string; avatar_url: string | null }[]>([])
+  const [showSilencePicker, setShowSilencePicker] = useState(false)
+  const [allCircleMates, setAllCircleMates] = useState<{ id: string; name: string; color: string; avatar_url: string | null }[]>([])
+
+  // Load per-circle spark states + silenced users
+  useEffect(() => {
+    async function loadSparkSettings() {
+      // Per-circle toggle states
+      const { data: cms } = await supabase
+        .from('circle_members')
+        .select('circle_id, sparks_enabled')
+        .eq('user_id', user.id)
+      if (cms) {
+        const states: Record<string, boolean> = {}
+        cms.forEach(cm => { states[cm.circle_id] = cm.sparks_enabled !== false })
+        setSparkCircleStates(states)
+      }
+
+      // Silenced users
+      const { data: silenced } = await supabase
+        .from('spark_silenced')
+        .select('silenced_user_id, users!silenced_user_id(id, name, color, avatar_url)')
+        .eq('user_id', user.id)
+      if (silenced) {
+        setSilencedUsers(silenced.map((s: any) => s.users).filter(Boolean))
+      }
+    }
+    loadSparkSettings()
+  }, [user.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Toast
   const [toast, setToast] = useState('')
@@ -518,74 +548,166 @@ export default function SettingsPage() {
           blocked={locPerm === 'denied'}
         />
 
-        {/* Sparks pause */}
-        {(() => {
-          const paused = user.sparks_paused_until && new Date(user.sparks_paused_until) > new Date()
-          const pausedUntil = paused ? new Date(user.sparks_paused_until!) : null
-          const isIndefinite = pausedUntil && pausedUntil.getFullYear() >= 2099
-          const pauseLabel = paused
-            ? isIndefinite
-              ? 'Paused indefinitely'
-              : `Paused until ${pausedUntil!.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${pausedUntil!.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
-            : null
+        {/* Sparks — per-circle toggles + global pause + silence list */}
+        <div style={{ padding: '10px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+            <span style={{ flexShrink: 0, display: 'flex' }}>
+              <IconZap size={20} color="var(--amber)" />
+            </span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 14, fontWeight: 700 }}>Sparks</p>
+              <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2, lineHeight: 1.5 }}>
+                Alerts you when a friend is nearby and you&apos;re both free. Control per circle or pause everything.
+              </p>
+            </div>
+          </div>
 
-          async function setSpark(until: string | null) {
-            await supabase.from('users').update({ sparks_paused_until: until }).eq('id', user.id)
-            updateUser({ sparks_paused_until: until })
-            showToast(until ? '⚡ Sparks paused' : '⚡ Sparks back on')
-          }
-
-          return (
-            <div style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <span style={{ flexShrink: 0, marginTop: 2, display: 'flex' }}>
-                  <IconZap size={20} color={paused ? 'var(--text2)' : 'var(--amber)'} />
-                </span>
-                <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
-                  <p style={{ fontSize: 14, fontWeight: 700 }}>Sparks</p>
-                  <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4, lineHeight: 1.5 }}>
-                    {paused
-                      ? `You won't appear in anyone's sparks and won't see sparks yourself. ${pauseLabel}.`
-                      : "Alerts you when a friend is nearby and you're both free. You can pause this anytime."}
-                  </p>
-                  {paused && (
-                    <button
-                      onClick={() => setSpark(null)}
-                      style={{
-                        marginTop: 8, padding: '6px 14px', borderRadius: 8, border: 'none',
-                        background: 'var(--accent)', color: '#fff',
-                        fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                      }}
-                    >
-                      Resume sparks
-                    </button>
-                  )}
+          {/* Global pause */}
+          {(() => {
+            const paused = user.sparks_paused_until && new Date(user.sparks_paused_until) > new Date()
+            const pausedUntil = paused ? new Date(user.sparks_paused_until!) : null
+            const isIndefinite = pausedUntil && pausedUntil.getFullYear() >= 2099
+            const pauseLabel = paused
+              ? isIndefinite ? 'Paused indefinitely'
+                : `Until ${pausedUntil!.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${pausedUntil!.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+              : null
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                borderRadius: 12, background: paused ? 'var(--red-soft)' : 'var(--surface2)',
+                border: paused ? '1px solid rgba(248,113,113,0.3)' : '1px solid var(--border)',
+                marginBottom: 10,
+              }}>
+                <span style={{ fontSize: 14 }}>{paused ? '⏸️' : '🌐'}</span>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 12, fontWeight: 700 }}>{paused ? `All sparks paused` : 'Global pause'}</p>
+                  {paused && <p style={{ fontSize: 11, color: 'var(--text2)' }}>{pauseLabel}</p>}
                 </div>
+                {paused ? (
+                  <button onClick={async () => {
+                    await supabase.from('users').update({ sparks_paused_until: null }).eq('id', user.id)
+                    updateUser({ sparks_paused_until: null })
+                    showToast('⚡ Sparks resumed')
+                  }} style={{
+                    padding: '5px 12px', borderRadius: 8, border: 'none',
+                    background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  }}>Resume</button>
+                ) : (
+                  <button onClick={() => setShowSparkPause(true)} style={{
+                    padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)',
+                    background: 'var(--surface)', color: 'var(--text2)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  }}>Pause all</button>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Per-circle toggles */}
+          <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6, marginTop: 4 }}>
+            Per circle
+          </p>
+          {circles.map(c => {
+            const enabled = sparkCircleStates[c.id] !== false
+            return (
+              <div key={c.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0',
+                borderBottom: '1px solid var(--border)',
+              }}>
+                <span style={{ fontSize: 16 }}>{c.emoji}</span>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{c.name}</span>
                 <button
-                  onClick={() => {
-                    if (!paused) {
-                      setShowSparkPause(true)
-                    } else {
-                      setSpark(null)
-                    }
+                  onClick={async () => {
+                    const next = !enabled
+                    setSparkCircleStates(prev => ({ ...prev, [c.id]: next }))
+                    await supabase.from('circle_members')
+                      .update({ sparks_enabled: next })
+                      .eq('circle_id', c.id)
+                      .eq('user_id', user.id)
+                    showToast(next ? `⚡ Sparks on for ${c.name}` : `⚡ Sparks off for ${c.name}`)
                   }}
                   style={{
-                    width: 48, height: 28, borderRadius: 14, border: 'none', cursor: 'pointer',
-                    background: paused ? 'var(--surface3)' : 'var(--accent)',
-                    position: 'relative', flexShrink: 0, transition: 'background 0.2s', marginTop: 2,
+                    width: 42, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                    background: enabled ? 'var(--accent)' : 'var(--surface3)',
+                    position: 'relative', flexShrink: 0, transition: 'background 0.2s',
                   }}
                 >
                   <div style={{
-                    width: 22, height: 22, borderRadius: '50%', background: '#fff',
-                    position: 'absolute', top: 3,
-                    left: paused ? 3 : 23,
+                    width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                    position: 'absolute', top: 3, left: enabled ? 21 : 3,
                     transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
                   }} />
                 </button>
               </div>
-            </div>
-          )
-        })()}
+            )
+          })}
+
+          {/* Silence list */}
+          <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6, marginTop: 14 }}>
+            Silence list
+          </p>
+          <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8, lineHeight: 1.5 }}>
+            People on this list won&apos;t trigger sparks for you, regardless of circle settings.
+          </p>
+          {silencedUsers.length === 0 ? (
+            <p style={{ fontSize: 12, color: 'var(--text2)', fontStyle: 'italic', padding: '4px 0' }}>Nobody silenced</p>
+          ) : (
+            silencedUsers.map(s => (
+              <div key={s.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0',
+                borderBottom: '1px solid var(--border)',
+              }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', background: s.color || '#666',
+                  color: txtOn(s.color || '#666'), display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 700, flexShrink: 0, position: 'relative',
+                }}>
+                  {s.avatar_url && <img src={s.avatar_url} alt="" style={{ position: 'absolute', inset: 0, borderRadius: '50%', width: '100%', height: '100%', objectFit: 'cover' }} onError={e => (e.currentTarget.style.display = 'none')} />}
+                  {s.name?.[0] || '?'}
+                </div>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{s.name}</span>
+                <button onClick={async () => {
+                  await supabase.from('spark_silenced').delete()
+                    .eq('user_id', user.id).eq('silenced_user_id', s.id)
+                  setSilencedUsers(prev => prev.filter(u => u.id !== s.id))
+                  showToast(`${s.name} removed from silence list`)
+                }} style={{
+                  padding: '4px 10px', borderRadius: 8, border: 'none',
+                  background: 'var(--surface2)', color: 'var(--text2)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                }}>Remove</button>
+              </div>
+            ))
+          )}
+          <button
+            onClick={async () => {
+              setShowSilencePicker(true)
+              if (allCircleMates.length === 0) {
+                // Load all unique circle mates across all circles
+                const { data: cms } = await supabase
+                  .from('circle_members')
+                  .select('user_id, users!user_id(id, name, color, avatar_url)')
+                  .in('circle_id', circles.map(c => c.id))
+                if (cms) {
+                  const seen = new Set<string>()
+                  const mates: typeof allCircleMates = []
+                  cms.forEach((cm: any) => {
+                    if (cm.users && !seen.has(cm.users.id)) {
+                      seen.add(cm.users.id)
+                      mates.push(cm.users)
+                    }
+                  })
+                  setAllCircleMates(mates.sort((a, b) => a.name.localeCompare(b.name)))
+                }
+              }
+            }}
+            style={{
+              marginTop: 8, width: '100%', padding: '8px 0', borderRadius: 10,
+              border: '1px dashed var(--border)', background: 'none',
+              color: 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            + Add someone to silence list
+          </button>
+        </div>
       </Section>
 
       {/* Appearance */}
@@ -772,6 +894,77 @@ export default function SettingsPage() {
             </div>
             <button
               onClick={() => setShowSparkPause(false)}
+              style={{
+                marginTop: 12, width: '100%', padding: 12, borderRadius: 12,
+                border: '1px solid var(--border)', background: 'none',
+                color: 'var(--text2)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Silence list picker */}
+      {showSilencePicker && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) setShowSilencePicker(false) }}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50,
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          }}
+        >
+          <div style={{
+            background: 'var(--surface2)', borderRadius: '20px 20px 0 0',
+            padding: '20px 20px calc(20px + env(safe-area-inset-bottom))',
+            width: '100%', maxWidth: 440, maxHeight: '70vh', display: 'flex', flexDirection: 'column',
+          }}>
+            <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 16px' }} />
+            <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>🔇 Silence from sparks</p>
+            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 14, lineHeight: 1.5 }}>
+              Pick someone — they won&apos;t trigger sparks for you regardless of circle settings. They won&apos;t know they&apos;re silenced.
+            </p>
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {allCircleMates.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--text2)', padding: 8 }}>Loading...</p>
+              ) : (
+                allCircleMates
+                  .filter(m => m.id !== user.id && !silencedUsers.some(s => s.id === m.id))
+                  .map(m => (
+                    <button
+                      key={m.id}
+                      onClick={async () => {
+                        await supabase.from('spark_silenced').insert({
+                          user_id: user.id,
+                          silenced_user_id: m.id,
+                        })
+                        setSilencedUsers(prev => [...prev, m])
+                        setShowSilencePicker(false)
+                        showToast(`🔇 ${m.name} silenced from sparks`)
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', width: '100%',
+                        borderBottom: '1px solid var(--border)', background: 'none', border: 'none',
+                        borderBottomWidth: 1, borderBottomStyle: 'solid', borderBottomColor: 'var(--border)',
+                        cursor: 'pointer', textAlign: 'left',
+                      }}
+                    >
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%', background: m.color || '#666',
+                        color: txtOn(m.color || '#666'), display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 13, fontWeight: 700, flexShrink: 0, position: 'relative',
+                      }}>
+                        {m.avatar_url && <img src={m.avatar_url} alt="" style={{ position: 'absolute', inset: 0, borderRadius: '50%', width: '100%', height: '100%', objectFit: 'cover' }} onError={e => (e.currentTarget.style.display = 'none')} />}
+                        {m.name?.[0] || '?'}
+                      </div>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{m.name}</span>
+                    </button>
+                  ))
+              )}
+            </div>
+            <button
+              onClick={() => setShowSilencePicker(false)}
               style={{
                 marginTop: 12, width: '100%', padding: 12, borderRadius: 12,
                 border: '1px solid var(--border)', background: 'none',
