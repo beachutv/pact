@@ -41,13 +41,28 @@ export default function NewCirclePage() {
     async function loadPending() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase
-        .from('circle_join_requests')
-        .select('id, created_at, status, circles(name, emoji)')
-        .eq('user_id', user.id)
-        .eq('status', 'pending')
+      const [{ data }, { data: myMemberships }] = await Promise.all([
+        supabase
+          .from('circle_join_requests')
+          .select('id, circle_id, created_at, status, circles(name, emoji)')
+          .eq('user_id', user.id)
+          .eq('status', 'pending'),
+        supabase
+          .from('circle_members')
+          .select('circle_id')
+          .eq('user_id', user.id),
+      ])
+      const joinedIds = new Set((myMemberships || []).map(m => m.circle_id))
       if (data) {
-        setPendingRequests(data.map((r: any) => ({
+        // Filter out stale requests for circles user already joined (and clean them up)
+        const stale = data.filter((r: any) => joinedIds.has(r.circle_id))
+        const active = data.filter((r: any) => !joinedIds.has(r.circle_id))
+        if (stale.length) {
+          await supabase.from('circle_join_requests')
+            .update({ status: 'approved', resolved_at: new Date().toISOString() })
+            .in('id', stale.map((r: any) => r.id))
+        }
+        setPendingRequests(active.map((r: any) => ({
           id: r.id,
           circle_name: r.circles?.name || 'Unknown',
           circle_emoji: r.circles?.emoji || '👥',
@@ -226,6 +241,13 @@ export default function NewCirclePage() {
       user_id: user.id,
       role: 'member',
     })
+
+    // Clean up any pending join request for this circle (user may have requested before getting the code)
+    await supabase.from('circle_join_requests')
+      .update({ status: 'approved', resolved_at: new Date().toISOString() })
+      .eq('circle_id', circle.id)
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
 
     // Full page reload to refresh circle context (server component fetches circles)
     window.location.href = '/calendar'

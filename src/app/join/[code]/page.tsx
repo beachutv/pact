@@ -115,6 +115,13 @@ export default function JoinPage() {
         role: 'member',
       })
 
+      // Clean up any pending join request (user may have requested before the join mode changed or before getting the link)
+      await supabase.from('circle_join_requests')
+        .update({ status: 'approved', resolved_at: new Date().toISOString() })
+        .eq('circle_id', circle.id)
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+
       setStatus('done')
       // Full page load to refresh circle context
       setTimeout(() => { window.location.href = '/calendar' }, 800)
