@@ -2,11 +2,25 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '6.2'
+export const CURRENT_VERSION = '7.0'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '7.0',
+    date: 'August 7, 2026',
+    title: 'Sparks on your terms',
+    subtitle: 'New controls for when you want to be found',
+    items: [
+      { icon: '⚡', text: 'Pause Sparks — opt out for 1 hour, 4 hours, until tomorrow, 1 week, or indefinitely' },
+      { icon: '🙈', text: 'When paused, you won\'t see sparks and nobody will see sparks about you' },
+      { icon: '⏰', text: 'Resume anytime from Settings — your spark toggle remembers when the pause ends' },
+      { icon: '🔔', text: 'Admins now see a badge when someone\'s waiting to join their circle' },
+      { icon: '❌', text: 'Cancel pending join requests you no longer want' },
+      { icon: '🔧', text: 'Fixed: pending join requests now visible to admins in circle settings' },
+    ],
+  },
   {
     version: '6.2',
     date: 'August 6, 2026',
