@@ -1937,19 +1937,34 @@ export default function CalendarPage() {
                         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>nothing mutual</span>
                       )}
                       {w && (
-                        <button
-                          onClick={() => {
-                            setShowWhosFree(false)
-                            window.location.href = `/plans/new?date=${w.ds}&hour=${w.s}&end=${w.e}`
-                          }}
-                          style={{
-                            border: '1px solid var(--border)', background: 'var(--surface3)',
-                            color: 'var(--text)', fontSize: 11, fontWeight: 800,
-                            padding: '6px 10px', borderRadius: 14, cursor: 'pointer', flexShrink: 0,
-                          }}
-                        >
-                          💬
-                        </button>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                          <button
+                            onClick={() => {
+                              setShowWhosFree(false)
+                              window.location.href = `/chat?dm=${m.id}`
+                            }}
+                            style={{
+                              border: '1px solid var(--border)', background: 'var(--surface3)',
+                              color: 'var(--text)', fontSize: 11, fontWeight: 800,
+                              padding: '6px 10px', borderRadius: 14, cursor: 'pointer',
+                            }}
+                          >
+                            💬
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowWhosFree(false)
+                              window.location.href = `/plans/new?date=${w.ds}&hour=${w.s}&end=${w.e}`
+                            }}
+                            style={{
+                              border: '1px solid var(--border)', background: 'var(--surface3)',
+                              color: 'var(--text)', fontSize: 11, fontWeight: 800,
+                              padding: '6px 10px', borderRadius: 14, cursor: 'pointer',
+                            }}
+                          >
+                            📌
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}

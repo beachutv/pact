@@ -34,6 +34,30 @@ export default function NewCirclePage() {
   const [friendsLoading, setFriendsLoading] = useState(false)
   const [addingFriends, setAddingFriends] = useState(false)
 
+  // Pending join requests (user's own)
+  const [pendingRequests, setPendingRequests] = useState<{ id: string; circle_name: string; circle_emoji: string; created_at: string }[]>([])
+
+  useEffect(() => {
+    async function loadPending() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from('circle_join_requests')
+        .select('id, created_at, status, circles(name, emoji)')
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+      if (data) {
+        setPendingRequests(data.map((r: any) => ({
+          id: r.id,
+          circle_name: r.circles?.name || 'Unknown',
+          circle_emoji: r.circles?.emoji || '👥',
+          created_at: r.created_at,
+        })))
+      }
+    }
+    loadPending()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Load friends from other circles — returns the list directly
   async function loadFriends(circleId: string): Promise<Friend[]> {
     setFriendsLoading(true)
@@ -287,6 +311,39 @@ export default function NewCirclePage() {
         <button className="btn-secondary" onClick={() => { setMode('browse'); browsePublic() }} style={{ width: '100%' }}>
           🔎 Browse public circles
         </button>
+
+        {/* Pending join requests */}
+        {pendingRequests.length > 0 && (
+          <div style={{
+            background: 'var(--surface)', border: '1.5px solid var(--amber)',
+            borderRadius: 16, padding: '14px 16px', marginTop: 4,
+          }}>
+            <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--amber)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+              Pending requests · {pendingRequests.length}
+            </p>
+            {pendingRequests.map(r => (
+              <div key={r.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 0', borderBottom: '1px solid var(--border)',
+              }}>
+                <span style={{ fontSize: 20 }}>{r.circle_emoji}</span>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 13, fontWeight: 700 }}>{r.circle_name}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text2)' }}>
+                    Requested {new Date(r.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: 'var(--amber)',
+                  background: 'var(--amber-soft)', padding: '3px 8px', borderRadius: 10,
+                }}>
+                  Pending
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <button
           className="btn-secondary"
           onClick={() => router.back()}

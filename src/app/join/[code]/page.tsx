@@ -52,10 +52,8 @@ export default function JoinPage() {
         return
       }
 
-      // Private circles with invite code — always allow direct join (the code IS the invite)
-      // Public circles with approval mode via direct link — also allow (link = explicit invite)
-      // The approval gate only applies to browsing/searching for public circles
-      if (circle.visibility === 'public' && circle.join_mode === 'approval') {
+      // If circle requires approval, submit a join request instead of auto-joining
+      if (circle.join_mode === 'approval') {
         // Check for existing pending request
         const { data: existingReq } = await supabase
           .from('circle_join_requests')
@@ -69,12 +67,21 @@ export default function JoinPage() {
             setStatus('already_requested')
             return
           }
+          // If previously rejected, allow re-request
         }
 
-        // For invite links, join directly even for approval circles
-        // The invite link IS the approval
+        // Submit join request
+        await supabase.from('circle_join_requests').insert({
+          circle_id: circle.id,
+          user_id: user.id,
+          status: 'pending',
+        })
+
+        setStatus('requested')
+        return
       }
 
+      // Open join mode — join directly
       await supabase.from('circle_members').insert({
         circle_id: circle.id,
         user_id: user.id,
