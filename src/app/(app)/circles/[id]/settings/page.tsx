@@ -80,13 +80,13 @@ export default function CircleSettingsPage() {
       }
 
       // Load pending join requests
-      const { data: reqs, error: reqError } = await supabase
+      // Note: must disambiguate users FK — table has both user_id and resolved_by referencing users
+      const { data: reqs } = await supabase
         .from('circle_join_requests')
-        .select('id, user_id, status, created_at, users(id, name, color, avatar_url)')
+        .select('id, user_id, status, created_at, users!user_id(id, name, color, avatar_url)')
         .eq('circle_id', id)
         .eq('status', 'pending')
       if (reqs) setJoinRequests(reqs)
-      // If table doesn't exist, reqError will fire but we can continue gracefully
 
       setLoading(false)
     }
