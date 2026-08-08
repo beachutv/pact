@@ -16,14 +16,17 @@ function NewPlanContent() {
   const router = useRouter()
   const params = useSearchParams()
 
-  // Pre-fill from URL params
   const preDate = params.get('date') || ''
   const preHour = parseInt(params.get('hour') || '0')
   const preEnd = parseInt(params.get('end') || '0')
 
-  // Step state: 0=type, 1=date/range, 2=invite, 3=availability, 4=details+confirm, 5=confirmed
   const [step, setStep] = useState(preDate ? 2 : 0)
   const [planType, setPlanType] = useState<'date' | 'find' | null>(preDate ? 'date' : null)
+
+  // All invitable friends (across circles + friendships)
+  const [allFriends, setAllFriends] = useState<UserProfile[]>([])
+  const [loadingFriends, setLoadingFriends] = useState(true)
+  const [selectedCircleId, setSelectedCircleId] = useState<string | null>(activeCircle?.id || null)
 
   // Date state
   const [selectedDate, setSelectedDate] = useState(preDate)
@@ -35,19 +38,39 @@ function NewPlanContent() {
   // Range state (for "find a time")
   const [selectedRange, setSelectedRange] = useState<string | null>(null)
 
-  // Invite state
-  const [invitedIds, setInvitedIds] = useState<Set<string>>(() => {
-    // Pre-select all circle members if we have a circle
-    if (circleMembers.length > 0) return new Set(circleMembers.filter(m => m.id !== user.id).map(m => m.id))
-    return new Set()
-  })
+  const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set())
 
-  // Update invitedIds when circleMembers loads
+  // Load all friends across circles + friendships
   useEffect(() => {
-    if (circleMembers.length > 0 && invitedIds.size === 0) {
-      setInvitedIds(new Set(circleMembers.filter(m => m.id !== user.id).map(m => m.id)))
+    async function load() {
+      setLoadingFriends(true)
+      const seen = new Set<string>()
+      const friends: UserProfile[] = []
+      const cIds = circles.map(c => c.id)
+      if (cIds.length > 0) {
+        const { data: cms } = await supabase
+          .from('circle_members').select('user_id, users!user_id(*)').in('circle_id', cIds)
+        if (cms) cms.forEach((cm: any) => {
+          if (cm.users && cm.users.id !== user.id && !seen.has(cm.users.id)) {
+            seen.add(cm.users.id); friends.push(cm.users)
+          }
+        })
+      }
+      const { data: fships } = await supabase
+        .from('friendships').select('requester_id, addressee_id')
+        .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`).eq('status', 'accepted')
+      if (fships) {
+        const fIds = fships.map(f => f.requester_id === user.id ? f.addressee_id : f.requester_id).filter(id => !seen.has(id))
+        if (fIds.length > 0) {
+          const { data: profiles } = await supabase.from('users').select('*').in('id', fIds)
+          if (profiles) profiles.forEach((p: any) => { if (!seen.has(p.id)) { seen.add(p.id); friends.push(p) } })
+        }
+      }
+      setAllFriends(friends.sort((a, b) => a.name.localeCompare(b.name)))
+      setLoadingFriends(false)
     }
-  }, [circleMembers])
+    load()
+  }, [user.id, circles.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Details state
   const [title, setTitle] = useState('')
@@ -81,9 +104,9 @@ function NewPlanContent() {
 
   // Load group favs
   useEffect(() => {
-    if (!activeCircle) return
+    if (!selectedCircleId) return
     supabase.from('favorite_spots').select('name, emoji, area')
-      .eq('circle_id', activeCircle.id).eq('visibility', 'group').limit(10)
+      .eq('circle_id', selectedCircleId!).eq('visibility', 'group').limit(10)
       .then(({ data }) => { if (data) setGroupFavs(data) })
   }, [activeCircle?.id])
 
@@ -104,12 +127,10 @@ function NewPlanContent() {
     })
   }
 
-  function inviteCircle(cid: string) {
-    const c = circles.find(x => x.id === cid)
-    if (!c) return
-    // Get members of that circle from all circle members we know
-    // For now, select all current circleMembers (since we're in active circle context)
-    setInvitedIds(new Set(circleMembers.filter(m => m.id !== user.id).map(m => m.id)))
+  async function inviteCircle(cid: string) {
+    setSelectedCircleId(cid)
+    const { data: cms } = await supabase.from('circle_members').select('user_id').eq('circle_id', cid)
+    if (cms) setInvitedIds(new Set(cms.map(cm => cm.user_id).filter(id => id !== user.id)))
   }
 
   function handleLocationSelect(name: string, area: string) {
@@ -132,17 +153,18 @@ function NewPlanContent() {
 
   async function createPlan() {
     const date = effectiveDate()
-    if (!activeCircle || !date) return
+    if (!date) return
+    const circleId = selectedCircleId || circles[0]?.id
+    if (!circleId) { setError('Join or create a circle first'); return }
     setSending(true); setError('')
 
     try {
       const pactId = crypto.randomUUID()
-
       const { error: pactErr } = await supabase.from('pacts').insert({
         id: pactId, date,
         win_start: startHour, win_end: endHour,
         spot_name: spotName || 'TBD', spot_area: spotArea || '',
-        circle_id: activeCircle.id,
+        circle_id: circleId,
         occasion: title || null,
         created_by: user.id,
       })
@@ -154,7 +176,7 @@ function NewPlanContent() {
       if (pmErr) { setError(pmErr.message); throw pmErr }
 
       // Push to Google Calendar
-      const otherMembers = circleMembers
+      const otherMembers = allFriends
         .filter(m => m.id !== user.id && invitedIds.has(m.id))
         .map(m => m.name.split(' ')[0])
       fetch('/api/calendar/push-event', {
@@ -162,16 +184,16 @@ function NewPlanContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pactId, occasion: title || null, spotName: spotName || null,
-          otherNames: otherMembers, circleName: activeCircle.name,
+          otherNames: otherMembers, circleName: circles.find(c => c.id === circleId)?.name || '',
           date, startHour, endHour,
           location: spotName && spotArea ? `${spotName}, ${spotArea}` : spotName || undefined,
           calendarId: targetCalId, confirmed: false,
-          totalCircleMembers: circleMembers.length, pactMemberCount: invitedIds.size + 1,
+          totalCircleMembers: allFriends.length + 1, pactMemberCount: invitedIds.size + 1,
         }),
       }).catch(() => {})
 
       // Push notifications
-      const pushTargets = circleMembers.filter(m => m.id !== user.id && invitedIds.has(m.id)).map(m => m.id)
+      const pushTargets = allFriends.filter(m => m.id !== user.id && invitedIds.has(m.id)).map(m => m.id)
       const pactTitle = title.trim() || `Pact on ${fmtDate(date)}`
       for (const uid of pushTargets) {
         await supabase.from('notifications').insert({
@@ -392,12 +414,24 @@ function NewPlanContent() {
             Invite friends from your circle or share a link to your group chat.
           </p>
 
-          {/* Quick circle invite */}
-          {circles.length > 1 && (
-            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginTop: 4 }}>
+          {/* Circle selector */}
+          {circles.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginTop: 4, scrollbarWidth: 'none' }}>
+              <button className="chip" style={{
+                flexShrink: 0, fontSize: 12,
+                borderColor: !selectedCircleId ? 'var(--accent)' : 'var(--border)',
+                background: !selectedCircleId ? 'var(--accent-soft)' : 'var(--surface)',
+                fontWeight: !selectedCircleId ? 700 : 600,
+              }} onClick={() => { setSelectedCircleId(null); setInvitedIds(new Set()) }}>
+                All friends
+              </button>
               {circles.map(c => (
-                <button key={c.id} className="chip" style={{ flexShrink: 0 }}
-                  onClick={() => inviteCircle(c.id)}>
+                <button key={c.id} className="chip" style={{
+                  flexShrink: 0, fontSize: 12,
+                  borderColor: selectedCircleId === c.id ? 'var(--accent)' : 'var(--border)',
+                  background: selectedCircleId === c.id ? 'var(--accent-soft)' : 'var(--surface)',
+                  fontWeight: selectedCircleId === c.id ? 700 : 600,
+                }} onClick={() => inviteCircle(c.id)}>
                   {c.emoji} {c.name}
                 </button>
               ))}
@@ -406,7 +440,12 @@ function NewPlanContent() {
 
           {/* Friend list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginTop: 8 }}>
-            {circleMembers.filter(m => m.id !== user.id).map(m => {
+            {loadingFriends ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}><div className="spinner" /></div>
+            ) : allFriends.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text2)', textAlign: 'center', padding: 20 }}>No friends found. Add friends or join a circle first.</p>
+            ) : (
+            allFriends.map(m => {
               const isInvited = invitedIds.has(m.id)
               return (
                 <button
@@ -444,7 +483,8 @@ function NewPlanContent() {
                   </div>
                 </button>
               )
-            })}
+            })
+            )}
           </div>
 
           {/* Share link button (placeholder — functional in Phase 3) */}
@@ -454,10 +494,10 @@ function NewPlanContent() {
                 navigator.share({
                   title: 'Pact — join the plan!',
                   text: `${user.name?.split(' ')[0]} wants to plan something. Tap to join:`,
-                  url: window.location.origin + '/join/' + (activeCircle?.invite_code || ''),
+                  url: window.location.origin + '/join/' + (circles.find(c => c.id === selectedCircleId)?.invite_code || ''),
                 }).catch(() => {})
               } else {
-                navigator.clipboard.writeText(window.location.origin + '/join/' + (activeCircle?.invite_code || ''))
+                navigator.clipboard.writeText(window.location.origin + '/join/' + (circles.find(c => c.id === selectedCircleId)?.invite_code || ''))
                 setToast('Link copied!')
                 setTimeout(() => setToast(''), 2000)
               }
@@ -492,7 +532,7 @@ function NewPlanContent() {
               Invited ({invitedIds.size})
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {circleMembers.filter(m => invitedIds.has(m.id)).map(m => (
+              {allFriends.filter(m => invitedIds.has(m.id)).map(m => (
                 <div key={m.id} style={{
                   display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0',
                   borderBottom: '1px solid var(--border)',
@@ -635,7 +675,7 @@ function NewPlanContent() {
               Inviting {invitedIds.size} friend{invitedIds.size === 1 ? '' : 's'}
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {circleMembers.filter(m => invitedIds.has(m.id) || m.id === user.id).map(m => (
+              {[user, ...allFriends.filter(m => invitedIds.has(m.id))].map(m => (
                 <div key={m.id} className="avatar" style={{
                   background: m.color, color: txtOn(m.color), width: 28, height: 28, fontSize: 11,
                   position: 'relative', overflow: 'hidden',
@@ -700,10 +740,10 @@ function NewPlanContent() {
                   navigator.share({
                     title: 'Pact — join the plan!',
                     text: `${user.name?.split(' ')[0]} wants to plan something. Tap to join:`,
-                    url: window.location.origin + '/join/' + (activeCircle?.invite_code || ''),
+                    url: window.location.origin + '/join/' + (circles.find(c => c.id === selectedCircleId)?.invite_code || ''),
                   }).catch(() => {})
                 } else {
-                  navigator.clipboard.writeText(window.location.origin + '/join/' + (activeCircle?.invite_code || ''))
+                  navigator.clipboard.writeText(window.location.origin + '/join/' + (circles.find(c => c.id === selectedCircleId)?.invite_code || ''))
                   setToast('Link copied!')
                 }
               }}

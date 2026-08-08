@@ -257,7 +257,6 @@ export default function HomePage() {
                   <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }} onClick={() => router.push('/plans')}>
                     {p.spot_name && (
                       <p style={{ fontSize: 12, marginBottom: 4 }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: -2, marginRight: 4 }}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                         {p.spot_emoji} {p.spot_name} · {p.spot_area}
                       </p>
                     )}
@@ -358,7 +357,6 @@ export default function HomePage() {
               <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }} onClick={() => router.push('/plans')}>
                 {p.spot_name && (
                   <p style={{ fontSize: 12, marginBottom: 4 }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: -2, marginRight: 4 }}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                     {p.spot_emoji} {p.spot_name} · {p.spot_area}
                   </p>
                 )}

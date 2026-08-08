@@ -91,6 +91,9 @@ export default function PlansPage() {
   // Track locally declined pacts (user tapped "Can't make it")
   const [declinedPacts, setDeclinedPacts] = useState<Set<string>>(new Set())
 
+  // Cache of all member profiles seen across all loaded pacts
+  const [allMembersCache, setAllMembersCache] = useState<Map<string, MemberInfo>>(new Map())
+
   // Hold-to-break pact
   const [breakPactId, setBreakPactId] = useState<string | null>(null)
   const [holdProgress, setHoldProgress] = useState(0)
@@ -232,6 +235,25 @@ export default function PlansPage() {
     const { data: past } = await pastQuery.gte('date', pastDate.toISOString().slice(0, 10))
     const all = [...(upcoming || []), ...(past || [])]
     setPacts(all.map(p => ({ ...p, declines: p.declines || [] })))
+
+    // Build member cache from all pact members for cross-circle lookup
+    const mIds = new Set<string>()
+    all.forEach(p => {
+      p.members?.forEach((m: any) => mIds.add(m.user_id))
+      p.declines?.forEach((d: any) => mIds.add(d.user_id))
+      if (p.created_by) mIds.add(p.created_by)
+    })
+    const unknownIds = [...mIds].filter(id => !circleMembers.find(m => m.id === id) && id !== user.id)
+    if (unknownIds.length > 0) {
+      const { data: profiles } = await supabase.from('users').select('id, name, color, avatar_url').in('id', unknownIds)
+      if (profiles) {
+        setAllMembersCache(prev => {
+          const next = new Map(prev)
+          profiles.forEach((p: any) => next.set(p.id, { id: p.id, name: p.name, color: p.color }))
+          return next
+        })
+      }
+    }
     // Load comments for all pacts
     const pactIds = all.map(p => p.id)
     if (pactIds.length > 0) {
@@ -305,7 +327,7 @@ export default function PlansPage() {
   }
 
   function getMember(uid: string): MemberInfo | undefined {
-    return circleMembers.find(m => m.id === uid)
+    return circleMembers.find(m => m.id === uid) || allMembersCache.get(uid) || (uid === user.id ? { id: user.id, name: user.name, color: user.color } : undefined)
   }
 
   function canEdit(pact: Pact): boolean {
@@ -641,9 +663,6 @@ export default function PlansPage() {
           return (
             <div key={p.id} style={{ position: 'relative' }}>
               <div
-                onTouchStart={() => onPactLongPressStart(p.id)}
-                onTouchEnd={onPactLongPressEnd}
-                onTouchCancel={onPactLongPressEnd}
                 className="card" style={{
                   display: 'flex', flexDirection: 'column', gap: 8,
                   position: 'relative',
@@ -849,9 +868,17 @@ export default function PlansPage() {
                         dateStr={p.date}
                         userId={user.id}
                         editable={true}
-                        pactStart={p.win_start}
-                        pactEnd={p.win_end}
+                        pactStart={p.status === 'confirmed' ? p.win_start : undefined}
+                        pactEnd={p.status === 'confirmed' ? p.win_end : undefined}
                         compact={true}
+                        pactId={p.id}
+                        members={[
+                          ...p.members.map(m => m.user_id),
+                          ...(p.declines || []).map(d => d.user_id),
+                        ].filter((v, i, a) => a.indexOf(v) === i).map(uid => {
+                          const m = getMember(uid)
+                          return m ? { id: m.id, name: m.name, color: m.color, avatar_url: (m as any).avatar_url } : { id: uid, name: '?', color: '#999' }
+                        })}
                       />
 
                       {/* Member list with voting */}
@@ -1081,10 +1108,20 @@ export default function PlansPage() {
                               color: 'var(--red)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
                             }}
                           >
-                            I&apos;m out
+                            Can&apos;t make it
                           </button>
                         )}
                       </div>
+                      {/* Delete for plan creator */}
+                      {editable && (
+                        <button onClick={() => deletePact(p.id)} style={{
+                          width: '100%', padding: '8px 0', borderRadius: 10, border: 'none',
+                          background: 'none', color: 'var(--red)', fontSize: 11, fontWeight: 600,
+                          cursor: 'pointer', marginTop: 2,
+                        }}>
+                          {p.status === 'confirmed' ? 'Cancel this plan' : 'Delete this plan'}
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -1177,51 +1214,6 @@ export default function PlansPage() {
                 </>
               )}
 
-              {/* Long press quick actions */}
-              {longPressPactId === p.id && (
-                <div
-                  onClick={e => e.stopPropagation()}
-                  style={{
-                    position: 'absolute', top: 0, right: 0, zIndex: 20,
-                    background: 'var(--surface)', border: '1px solid var(--border)',
-                    borderRadius: 14, padding: 6, minWidth: 140,
-                    boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
-                  }}
-                >
-                  {editable && (
-                    <button onClick={() => { setLongPressPactId(null); startEditing(p) }} style={{
-                      display: 'block', width: '100%', padding: '8px 12px', border: 'none',
-                      background: 'transparent', fontSize: 13, fontWeight: 600,
-                      color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                    }}>Edit</button>
-                  )}
-                  <button onClick={() => {
-                    setLongPressPactId(null)
-                    if (navigator.share) {
-                      const pact = pacts.find(x => x.id === p.id)
-                      navigator.share({
-                        title: pact?.occasion || 'Pact plan',
-                        text: `${fmtDate(p.date)} · ${fmtHour(p.win_start)}-${fmtHour(p.win_end)}`,
-                        url: window.location.origin + '/plans',
-                      }).catch(() => {})
-                    }
-                  }} style={{
-                    display: 'block', width: '100%', padding: '8px 12px', border: 'none',
-                    background: 'transparent', fontSize: 13, fontWeight: 600,
-                    color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                  }}>Share</button>
-                  <button onClick={() => { setLongPressPactId(null); deletePact(p.id) }} style={{
-                    display: 'block', width: '100%', padding: '8px 12px', border: 'none',
-                    background: 'transparent', fontSize: 13, fontWeight: 600,
-                    color: 'var(--red)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                  }}>{p.status === 'confirmed' ? 'Cancel Pact' : 'Delete'}</button>
-                  <button onClick={() => setLongPressPactId(null)} style={{
-                    display: 'block', width: '100%', padding: '8px 12px', border: 'none',
-                    background: 'transparent', fontSize: 13, fontWeight: 600,
-                    color: 'var(--text2)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                  }}>Cancel</button>
-                </div>
-              )}
             </div>
             </div>
           )
