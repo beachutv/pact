@@ -9,6 +9,7 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { sendPushNotification } from '@/lib/push'
 import LocationPicker from '@/components/LocationPicker'
 import SlideToConfirm from '@/components/SlideToConfirm'
+import CalendarBars from '@/components/CalendarBars'
 
 type Pact = {
   id: string
@@ -725,6 +726,20 @@ export default function PlansPage() {
                       marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
                       display: 'flex', flexDirection: 'column', gap: 8,
                     }}>
+                      {/* Calendar bars — group + your availability */}
+                      <CalendarBars
+                        memberIds={[
+                          ...p.members.map(m => m.user_id),
+                          ...(p.declines || []).filter(d => !p.members.some(m => m.user_id === d.user_id)).map(d => d.user_id),
+                        ].filter((v, i, a) => a.indexOf(v) === i)}
+                        dateStr={p.date}
+                        userId={user.id}
+                        editable={true}
+                        pactStart={p.win_start}
+                        pactEnd={p.win_end}
+                        compact={true}
+                      />
+
                       {/* Member list with names + declined */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {p.members.map(pm => {
