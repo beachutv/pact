@@ -75,6 +75,9 @@ export default function PlansPage() {
 
   // Expandable pact cards
   const [expandedPactId, setExpandedPactId] = useState<string | null>(null)
+
+  // Plan tabs
+  const [planTab, setPlanTab] = useState<'active' | 'upcoming' | 'past'>('active')
   
   // Track locally declined pacts (user tapped "Can't make it")
   const [declinedPacts, setDeclinedPacts] = useState<Set<string>>(new Set())
@@ -189,30 +192,41 @@ export default function PlansPage() {
 
   async function loadPacts() {
     const today = new Date().toISOString().slice(0, 10)
-    const { data } = await supabase
+    // Fetch upcoming + today
+    const { data: upcoming } = await supabase
       .from('pacts')
       .select('*, members:pact_members(user_id), declines:pact_declines(user_id)')
       .eq('circle_id', activeCircle!.id)
       .gte('date', today)
       .order('date', { ascending: true })
-    if (data) {
-      setPacts(data.map(p => ({ ...p, declines: p.declines || [] })))
-      // Load comments for all pacts
-      const pactIds = data.map(p => p.id)
-      if (pactIds.length > 0) {
-        const { data: cmts } = await supabase
-          .from('pact_comments')
-          .select('*')
-          .in('pact_id', pactIds)
-          .order('created_at', { ascending: true })
-        if (cmts) {
-          const grouped: Record<string, PactComment[]> = {}
-          cmts.forEach((c: PactComment) => {
-            if (!grouped[c.pact_id]) grouped[c.pact_id] = []
-            grouped[c.pact_id].push(c)
-          })
-          setComments(grouped)
-        }
+    // Fetch past (last 30 days)
+    const pastDate = new Date()
+    pastDate.setDate(pastDate.getDate() - 30)
+    const { data: past } = await supabase
+      .from('pacts')
+      .select('*, members:pact_members(user_id), declines:pact_declines(user_id)')
+      .eq('circle_id', activeCircle!.id)
+      .lt('date', today)
+      .gte('date', pastDate.toISOString().slice(0, 10))
+      .order('date', { ascending: false })
+      .limit(20)
+    const all = [...(upcoming || []), ...(past || [])]
+    setPacts(all.map(p => ({ ...p, declines: p.declines || [] })))
+    // Load comments for all pacts
+    const pactIds = all.map(p => p.id)
+    if (pactIds.length > 0) {
+      const { data: cmts } = await supabase
+        .from('pact_comments')
+        .select('*')
+        .in('pact_id', pactIds)
+        .order('created_at', { ascending: true })
+      if (cmts) {
+        const grouped: Record<string, PactComment[]> = {}
+        cmts.forEach((c: PactComment) => {
+          if (!grouped[c.pact_id]) grouped[c.pact_id] = []
+          grouped[c.pact_id].push(c)
+        })
+        setComments(grouped)
       }
     }
     setLoading(false)
@@ -538,15 +552,43 @@ export default function PlansPage() {
         </button>
       </div>
 
-      {pacts.length === 0 ? (
-        <div style={{ textAlign: 'center', marginTop: 30, color: 'var(--text2)' }}>
-          <p style={{ marginBottom: 8 }}><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></p>
-          <p style={{ fontSize: 13 }}>
-            No plans yet. Tap + New plan to propose one!
-          </p>
-        </div>
-      ) : (
-        pacts.map(p => {
+      {/* Plan tabs */}
+      <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+        {(['active', 'upcoming', 'past'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setPlanTab(tab)}
+            style={{
+              padding: '7px 14px', borderRadius: 18, fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+              border: planTab === tab ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
+              background: planTab === tab ? 'var(--accent-soft)' : 'var(--surface)',
+              color: planTab === tab ? 'var(--accent)' : 'var(--text2)',
+            }}
+          >
+            {tab === 'active' ? 'Active' : tab === 'upcoming' ? 'Upcoming' : 'Past'}
+          </button>
+        ))}
+      </div>
+
+      {(() => {
+        const today = new Date().toISOString().slice(0, 10)
+        const filtered = pacts.filter(p => {
+          if (planTab === 'active') return p.date >= today && p.status === 'pending'
+          if (planTab === 'upcoming') return p.date >= today && p.status === 'confirmed'
+          return p.date < today // past
+        })
+
+        if (filtered.length === 0) return (
+          <div style={{ textAlign: 'center', marginTop: 30, color: 'var(--text2)' }}>
+            <p style={{ fontSize: 13 }}>
+              {planTab === 'active' ? 'No active plans. Start one with + New plan!'
+                : planTab === 'upcoming' ? 'Nothing locked in yet.'
+                : 'No past plans yet — they show up here after the event.'}
+            </p>
+          </div>
+        )
+
+        return filtered.map(p => {
           const isIn = p.members.some(m => m.user_id === user.id)
           const isEditing = editingId === p.id
           const editable = canEdit(p)
@@ -661,17 +703,32 @@ export default function PlansPage() {
                             ? `${p.spot_emoji || '📍'} ${p.spot_name}${p.spot_area ? ` — ${p.spot_area}` : ''}`
                             : 'To be set'}
                         </p>
+                        {p.created_by && (
+                          <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
+                            Created by {getMember(p.created_by)?.name?.split(' ')[0] || 'someone'}
+                          </p>
+                        )}
                       </div>
-                      {editable && (
-                        <button onClick={(e) => { e.stopPropagation(); startEditing(p) }}
-                          style={{
-                            background: 'var(--surface2)', border: 'none', borderRadius: 8,
-                            padding: '4px 10px', fontSize: 11, fontWeight: 700,
-                            color: 'var(--text2)', cursor: 'pointer',
-                          }}>
-                          Edit
-                        </button>
-                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 800, padding: '4px 10px', borderRadius: 12,
+                          textTransform: 'uppercase', letterSpacing: '.4px',
+                          background: p.status === 'confirmed' ? 'var(--green-soft)' : 'var(--amber-soft)',
+                          color: p.status === 'confirmed' ? 'var(--green)' : 'var(--amber)',
+                        }}>
+                          {p.status === 'confirmed' ? 'locked' : 'open'}
+                        </span>
+                        {editable && (
+                          <button onClick={(e) => { e.stopPropagation(); startEditing(p) }}
+                            style={{
+                              background: 'var(--surface2)', border: 'none', borderRadius: 8,
+                              padding: '4px 10px', fontSize: 11, fontWeight: 700,
+                              color: 'var(--text2)', cursor: 'pointer',
+                            }}>
+                            Edit
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Who's in + who's out — always visible */}
@@ -1035,7 +1092,7 @@ export default function PlansPage() {
             </div>
           )
         })
-      )}
+      })()}
 
       {/* Hold-to-break pact modal */}
       {breakPactId && (

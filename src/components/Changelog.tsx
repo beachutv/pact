@@ -2,11 +2,24 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '8.1'
+export const CURRENT_VERSION = '8.2'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '8.2',
+    date: 'August 8, 2026',
+    title: 'Plans, polished',
+    subtitle: 'Comments, tabs, and the details that matter',
+    items: [
+      { icon: '💬', text: 'Comment threads on plans — discuss details right inside the plan card' },
+      { icon: '📋', text: 'Plan tabs — Active, Upcoming, and Past plans organized by status' },
+      { icon: '🏷️', text: 'Status badges on plan cards — see at a glance what is open vs locked' },
+      { icon: '👤', text: '"Created by" line on each plan so you know who proposed it' },
+      { icon: '📆', text: 'Visibility window now saves to your account (not just this device)' },
+    ],
+  },
   {
     version: '8.1',
     date: 'August 8, 2026',
