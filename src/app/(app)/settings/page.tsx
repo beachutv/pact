@@ -548,16 +548,16 @@ export default function SettingsPage() {
           blocked={locPerm === 'denied'}
         />
 
-        {/* Sparks — per-circle toggles + global pause + silence list */}
+        {/* Take a break — reuses sparks_paused_until infrastructure */}
         <div style={{ padding: '10px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
             <span style={{ flexShrink: 0, display: 'flex' }}>
               <IconZap size={20} color="var(--amber)" />
             </span>
             <div style={{ flex: 1 }}>
-              <p style={{ fontSize: 14, fontWeight: 700 }}>Sparks</p>
+              <p style={{ fontSize: 14, fontWeight: 700 }}>Take a break</p>
               <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2, lineHeight: 1.5 }}>
-                Alerts you when a friend is nearby and you&apos;re both free. Control per circle or pause everything.
+                When on, you will not appear as available to friends. Use when you need time off from planning.
               </p>
             </div>
           </div>
@@ -580,14 +580,14 @@ export default function SettingsPage() {
               }}>
                 <span style={{ fontSize: 14 }}>{paused ? '⏸️' : '🌐'}</span>
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 12, fontWeight: 700 }}>{paused ? `All sparks paused` : 'Global pause'}</p>
+                  <p style={{ fontSize: 12, fontWeight: 700 }}>{paused ? `On a break` : 'Start a break'}</p>
                   {paused && <p style={{ fontSize: 11, color: 'var(--text2)' }}>{pauseLabel}</p>}
                 </div>
                 {paused ? (
                   <button onClick={async () => {
                     await supabase.from('users').update({ sparks_paused_until: null }).eq('id', user.id)
                     updateUser({ sparks_paused_until: null })
-                    showToast('⚡ Sparks resumed')
+                    showToast('Welcome back!')
                   }} style={{
                     padding: '5px 12px', borderRadius: 8, border: 'none',
                     background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer',

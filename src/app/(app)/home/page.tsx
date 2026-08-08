@@ -144,6 +144,29 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* Break mode banner */}
+      {user.sparks_paused_until && new Date(user.sparks_paused_until) > new Date() && (
+        <div style={{
+          background: 'var(--amber-soft)', border: '1px solid rgba(255,184,84,0.35)',
+          borderRadius: 12, padding: '10px 14px', marginBottom: 6,
+          fontSize: 12, fontWeight: 600, color: 'var(--amber)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span>😴 You are on a break</span>
+          <button
+            onClick={async () => {
+              const supabase = createClient()
+              await supabase.from('users').update({ sparks_paused_until: null }).eq('id', user.id)
+              window.location.reload()
+            }}
+            style={{
+              border: 'none', background: 'none', color: 'var(--amber)',
+              fontWeight: 700, cursor: 'pointer', fontSize: 12, textDecoration: 'underline',
+            }}
+          >End break</button>
+        </div>
+      )}
+
       {/* Greeting + prompt */}
       <div style={{ marginBottom: 6 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800 }}>

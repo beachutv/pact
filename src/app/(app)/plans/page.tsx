@@ -481,13 +481,13 @@ export default function PlansPage() {
         </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
           <button
-            onClick={() => router.push('/friends')}
+            onClick={() => router.push('/circles/new')}
             style={{
               padding: '9px 16px', borderRadius: 12, border: 'none',
               background: 'var(--accent)', color: '#fff',
               fontSize: 13, fontWeight: 700, cursor: 'pointer',
             }}
-          >👥 Find friends</button>
+          >+ Create circle</button>
           <button
             onClick={() => router.push('/circles/new')}
             style={{
@@ -518,16 +518,16 @@ export default function PlansPage() {
         </div>
       )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <p style={{ fontSize: 15, fontWeight: 800 }}>{activeCircle.emoji} Plans</p>
+        <p style={{ fontSize: 18, fontWeight: 800 }}>Plans</p>
         <button
-          onClick={() => router.push('/calendar')}
+          onClick={() => router.push('/plans/new')}
           style={{
             background: 'var(--accent)', border: 'none', borderRadius: 20,
             padding: '6px 14px', fontSize: 12, fontWeight: 700,
             color: '#fff', cursor: 'pointer',
           }}
         >
-          + New
+          + New plan
         </button>
       </div>
 
@@ -535,7 +535,7 @@ export default function PlansPage() {
         <div style={{ textAlign: 'center', marginTop: 30, color: 'var(--text2)' }}>
           <p style={{ marginBottom: 8 }}><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></p>
           <p style={{ fontSize: 13 }}>
-            No plans yet. Tap a free slot in the Calendar to propose one!
+            No plans yet. Tap + New plan to propose one!
           </p>
         </div>
       ) : (
