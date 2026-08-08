@@ -104,20 +104,24 @@ function ProfileIcon({ color }: { color: string }) {
   )
 }
 
+function HomeIcon({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+  )
+}
+
 const NAV_ICONS: Record<string, (props: { color: string }) => React.ReactNode> = {
-  '/calendar': CalendarIcon,
-  '/friends': FriendsIcon,
+  '/home': HomeIcon,
   '/plans': PlansIcon,
-  '/spots': SpotsIcon,
   '/settings': ProfileIcon,
 }
 
-// ---- Nav tabs (5 tabs) ----
+// ---- Nav tabs (3 tabs — reimagined) ----
 const TABS = [
-  { key: '/calendar', label: 'Calendar' },
-  { key: '/friends', label: 'Friends' },
+  { key: '/home', label: 'Home' },
   { key: '/plans', label: 'Plans' },
-  { key: '/spots', label: 'Spots' },
   { key: '/settings', label: 'You' },
 ]
 
@@ -1339,10 +1343,8 @@ export default function AppShell({
                 onClick={() => router.push(tab.key)}
                 style={{ position: 'relative' }}
                 data-walkthrough={
-                  tab.key === '/calendar' ? 'nav-calendar'
+                  tab.key === '/home' ? 'nav-home'
                   : tab.key === '/plans' ? 'nav-plans'
-                  : tab.key === '/friends' ? 'nav-friends'
-                  : tab.key === '/spots' ? 'nav-spots'
                   : tab.key === '/settings' ? 'nav-you'
                   : undefined
                 }
