@@ -2,11 +2,22 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '8.2'
+export const CURRENT_VERSION = '8.3'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '8.3',
+    date: 'August 8, 2026',
+    title: 'Vote on plans',
+    subtitle: 'Signal before you commit',
+    items: [
+      { icon: '🗳️', text: 'Voting on plans — tap "works", "maybe", or "can\'t" before committing' },
+      { icon: '📊', text: 'Vote tally shows how many are in, maybe, or out at a glance' },
+      { icon: '🕐', text: 'Past plans tab — see plans from the last 30 days' },
+    ],
+  },
   {
     version: '8.2',
     date: 'August 8, 2026',

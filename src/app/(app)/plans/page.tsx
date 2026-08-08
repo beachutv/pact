@@ -37,6 +37,12 @@ type PactComment = {
   created_at: string
 }
 
+type PactResponse = {
+  pact_id: string
+  user_id: string
+  response: 'yes' | 'maybe' | 'no'
+}
+
 export default function PlansPage() {
   const { user, activeCircle, circleMembers } = useCircle()
   const supabase = createClient()
@@ -49,6 +55,9 @@ export default function PlansPage() {
   const [comments, setComments] = useState<Record<string, PactComment[]>>({})
   const [commentText, setCommentText] = useState('')
   const [sendingComment, setSendingComment] = useState(false)
+
+  // Voting / responses
+  const [responses, setResponses] = useState<Record<string, PactResponse[]>>({})
 
   // Edit form state
   const [editDate, setEditDate] = useState('')
@@ -228,8 +237,33 @@ export default function PlansPage() {
         })
         setComments(grouped)
       }
+      // Load responses/votes
+      const { data: resps } = await supabase
+        .from('pact_responses')
+        .select('*')
+        .in('pact_id', pactIds)
+      if (resps) {
+        const groupedR: Record<string, PactResponse[]> = {}
+        resps.forEach((r: PactResponse) => {
+          if (!groupedR[r.pact_id]) groupedR[r.pact_id] = []
+          groupedR[r.pact_id].push(r)
+        })
+        setResponses(groupedR)
+      }
     }
     setLoading(false)
+  }
+
+  async function votePact(pactId: string, vote: 'yes' | 'maybe' | 'no') {
+    // Optimistic update
+    setResponses(prev => {
+      const existing = (prev[pactId] || []).filter(r => r.user_id !== user.id)
+      return { ...prev, [pactId]: [...existing, { pact_id: pactId, user_id: user.id, response: vote }] }
+    })
+    await supabase.from('pact_responses').upsert(
+      { pact_id: pactId, user_id: user.id, response: vote },
+      { onConflict: 'pact_id,user_id' }
+    )
   }
 
   async function addComment(pactId: string) {
@@ -803,43 +837,126 @@ export default function PlansPage() {
                         compact={true}
                       />
 
-                      {/* Member list with names + declined */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {p.members.map(pm => {
-                          const m = getMember(pm.user_id)
-                          if (!m) return null
-                          return (
-                            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                      {/* Member list with voting */}
+                      {(() => {
+                        const pactResponses = responses[p.id] || []
+                        const getVote = (uid: string) => pactResponses.find(r => r.user_id === uid)?.response || null
+                        const isPending = p.status === 'pending'
+                        const yesCount = pactResponses.filter(r => r.response === 'yes').length + p.members.length
+                        const maybeCount = pactResponses.filter(r => r.response === 'maybe').length
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {/* Vote tally for pending plans */}
+                            {isPending && pactResponses.length > 0 && (
+                              <p style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>
+                                {yesCount} in{maybeCount > 0 ? ` · ${maybeCount} maybe` : ''}
+                                {(p.declines || []).length > 0 ? ` · ${p.declines.length} out` : ''}
+                              </p>
+                            )}
+
+                            {/* Committed members */}
+                            {p.members.map(pm => {
+                              const m = getMember(pm.user_id)
+                              if (!m) return null
+                              return (
+                                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                                  <div style={{
+                                    width: 20, height: 20, borderRadius: '50%', background: m.color,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 8, fontWeight: 800, color: txtOn(m.color), flexShrink: 0,
+                                  }}>
+                                    {m.name[0]}
+                                  </div>
+                                  <span style={{ flex: 1, fontWeight: 600 }}>{m.name}{m.id === user.id ? ' (you)' : ''}</span>
+                                  <span style={{ color: 'var(--green)', fontSize: 11, fontWeight: 700 }}>✓ In</span>
+                                </div>
+                              )
+                            })}
+
+                            {/* Members who voted but haven't committed */}
+                            {isPending && pactResponses
+                              .filter(r => !p.members.some(m => m.user_id === r.user_id) && !p.declines?.some(d => d.user_id === r.user_id))
+                              .map(r => {
+                                const m = getMember(r.user_id)
+                                if (!m) return null
+                                const voteStyle = r.response === 'yes'
+                                  ? { bg: 'var(--green-soft)', color: 'var(--green)', label: '✓ works' }
+                                  : r.response === 'maybe'
+                                  ? { bg: 'var(--amber-soft)', color: 'var(--amber)', label: '~ maybe' }
+                                  : { bg: 'var(--red-soft)', color: 'var(--red)', label: "✕ can't" }
+                                return (
+                                  <div key={`vote-${m.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                                    <div style={{
+                                      width: 20, height: 20, borderRadius: '50%', background: m.color,
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      fontSize: 8, fontWeight: 800, color: txtOn(m.color), flexShrink: 0,
+                                    }}>
+                                      {m.name[0]}
+                                    </div>
+                                    <span style={{ flex: 1, fontWeight: 600 }}>{m.name}{m.id === user.id ? ' (you)' : ''}</span>
+                                    <span style={{
+                                      fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 8,
+                                      background: voteStyle.bg, color: voteStyle.color,
+                                    }}>{voteStyle.label}</span>
+                                  </div>
+                                )
+                              })
+                            }
+
+                            {/* Declined */}
+                            {(p.declines || []).map(d => {
+                              const m = getMember(d.user_id)
+                              if (!m) return null
+                              return (
+                                <div key={`out-${m.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, opacity: 0.6 }}>
+                                  <div style={{
+                                    width: 20, height: 20, borderRadius: '50%', background: m.color,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 8, fontWeight: 800, color: txtOn(m.color), flexShrink: 0,
+                                  }}>
+                                    {m.name[0]}
+                                  </div>
+                                  <span style={{ fontWeight: 600 }}>{m.name}{m.id === user.id ? ' (you)' : ''}</span>
+                                  <span style={{ color: 'var(--red)', marginLeft: 'auto', fontSize: 11, fontWeight: 700 }}>✕ Out</span>
+                                </div>
+                              )
+                            })}
+
+                            {/* Your vote buttons — show for pending plans where you haven't committed */}
+                            {isPending && !isIn && !declinedPacts.has(p.id) && !p.declines?.some(d => d.user_id === user.id) && (
                               <div style={{
-                                width: 20, height: 20, borderRadius: '50%', background: m.color,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: 8, fontWeight: 800, color: txtOn(m.color), flexShrink: 0,
+                                display: 'flex', gap: 6, marginTop: 6, padding: '8px 0',
+                                borderTop: '1px solid var(--border)',
                               }}>
-                                {m.name[0]}
+                                {([
+                                  { key: 'yes' as const, label: '✓ works', border: 'var(--green)', bg: 'var(--green-soft)', color: 'var(--green)' },
+                                  { key: 'maybe' as const, label: '~ maybe', border: 'var(--amber)', bg: 'var(--amber-soft)', color: 'var(--amber)' },
+                                  { key: 'no' as const, label: "✕ can't", border: 'var(--red)', bg: 'var(--red-soft)', color: 'var(--red)' },
+                                ] as const).map(opt => {
+                                  const myVote = getVote(user.id)
+                                  const isSelected = myVote === opt.key
+                                  return (
+                                    <button
+                                      key={opt.key}
+                                      onClick={() => votePact(p.id, opt.key)}
+                                      style={{
+                                        flex: 1, padding: '6px 0', borderRadius: 10,
+                                        border: isSelected ? `1.5px solid ${opt.border}` : '1.5px solid var(--border)',
+                                        background: isSelected ? opt.bg : 'var(--surface2)',
+                                        color: isSelected ? opt.color : 'var(--text2)',
+                                        fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                                      }}
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  )
+                                })}
                               </div>
-                              <span style={{ fontWeight: 600 }}>{m.name}{m.id === user.id ? ' (you)' : ''}</span>
-                              <span style={{ color: 'var(--green)', marginLeft: 'auto', fontSize: 11, fontWeight: 700 }}>✓ In</span>
-                            </div>
-                          )
-                        })}
-                        {(p.declines || []).map(d => {
-                          const m = getMember(d.user_id)
-                          if (!m) return null
-                          return (
-                            <div key={`out-${m.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, opacity: 0.6 }}>
-                              <div style={{
-                                width: 20, height: 20, borderRadius: '50%', background: m.color,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: 8, fontWeight: 800, color: txtOn(m.color), flexShrink: 0,
-                              }}>
-                                {m.name[0]}
-                              </div>
-                              <span style={{ fontWeight: 600 }}>{m.name}{m.id === user.id ? ' (you)' : ''}</span>
-                              <span style={{ color: 'var(--red)', marginLeft: 'auto', fontSize: 11, fontWeight: 700 }}>✕ Out</span>
-                            </div>
-                          )
-                        })}
-                      </div>
+                            )}
+                          </div>
+                        )
+                      })()}
 
                       {/* Comment thread */}
                       {(() => {
