@@ -41,6 +41,15 @@ export default function SettingsPage() {
   const [isStandalone, setIsStandalone] = useState(false)
   const [isiOS, setIsiOS] = useState(false)
 
+  // Visibility window
+  const [visWindow, setVisWindow] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pact_vis_window')
+      return saved ? parseInt(saved) : 7
+    }
+    return 7
+  })
+
   // Sparks pause
   const [showSparkPause, setShowSparkPause] = useState(false)
   const [sparkCircleStates, setSparkCircleStates] = useState<Record<string, boolean>>({})
@@ -731,6 +740,35 @@ export default function SettingsPage() {
         </div>
       </Section>
 
+      {/* Visibility Window */}
+      <Section title="Visibility">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+          <span style={{ fontSize: 18 }}>📆</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 13, fontWeight: 700 }}>Availability window</p>
+            <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2, lineHeight: 1.5 }}>
+              Friends see your availability for the next {visWindow} days
+            </p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[7, 14].map(days => (
+            <button key={days} onClick={() => {
+              setVisWindow(days)
+              localStorage.setItem('pact_vis_window', String(days))
+              showToast(`Visibility: ${days} days`)
+            }} style={{
+              flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: visWindow === days ? 'var(--accent)' : 'var(--surface2)',
+              color: visWindow === days ? '#fff' : 'var(--text2)',
+              fontSize: 12, fontWeight: 700,
+            }}>
+              {days} days
+            </button>
+          ))}
+        </div>
+      </Section>
+
       {/* Add to Home Screen */}
       {!isStandalone && (
         <Section title="Add to Home Screen">
@@ -774,7 +812,7 @@ export default function SettingsPage() {
         }}>Privacy policy →</button>
         <button onClick={() => {
           localStorage.removeItem('pact_walkthrough_seen')
-          router.push('/calendar')
+          router.push('/home')
           setTimeout(() => window.dispatchEvent(new CustomEvent('pact-start-walkthrough')), 500)
         }} style={{
           width: '100%', padding: '8px 0', border: 'none', background: 'transparent',

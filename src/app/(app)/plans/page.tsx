@@ -58,10 +58,7 @@ export default function PlansPage() {
   const [longPressPactId, setLongPressPactId] = useState<string | null>(null)
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Share pact to chat
-  const [sharePactId, setSharePactId] = useState<string | null>(null)
-  const [shareThreads, setShareThreads] = useState<{ id: string; name: string }[]>([])
-  const [sharing, setSharing] = useState(false)
+
 
   // Expandable pact cards
   const [expandedPactId, setExpandedPactId] = useState<string | null>(null)
@@ -165,56 +162,6 @@ export default function PlansPage() {
   }
   function onPactLongPressEnd() {
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
-  }
-
-  async function openShareModal(pactId: string) {
-    setLongPressPactId(null)
-    setSharePactId(pactId)
-    // Load user's threads
-    const { data: tms } = await supabase
-      .from('thread_members').select('thread_id').eq('user_id', user.id)
-    if (!tms) return
-    const threadIds = tms.map(t => t.thread_id)
-    const { data: threads } = await supabase
-      .from('threads').select('id, name, circle_id').in('id', threadIds)
-    if (!threads) return
-    const result: { id: string; name: string }[] = []
-    for (const t of threads) {
-      if (t.name) {
-        result.push({ id: t.id, name: t.name })
-      } else {
-        const { data: members } = await supabase
-          .from('thread_members').select('user_id').eq('thread_id', t.id)
-        const others = (members || []).filter(m => m.user_id !== user.id)
-        const names = others.map(o => {
-          const cm = circleMembers.find(cm => cm.id === o.user_id)
-          return cm?.name?.split(' ')[0] || 'Unknown'
-        })
-        result.push({ id: t.id, name: names.join(', ') || 'Chat' })
-      }
-    }
-    setShareThreads(result)
-  }
-
-  async function sharePactToThread(threadId: string) {
-    if (!sharePactId) return
-    setSharing(true)
-    const pact = pacts.find(p => p.id === sharePactId)
-    if (!pact) { setSharing(false); return }
-    await supabase.from('messages').insert({
-      thread_id: threadId,
-      from_user: user.id,
-      date_card: pact.date,
-      win_start: pact.win_start,
-      win_end: pact.win_end,
-      spot_name: pact.spot_name !== 'TBD' ? pact.spot_name : null,
-      spot_emoji: pact.spot_emoji || null,
-      spot_area: pact.spot_area || null,
-      text: `pact:${pact.id}`,
-    })
-    setSharing(false)
-    setSharePactId(null)
-    showToast('Pact shared to chat')
   }
 
   const onRefresh = useCallback(async () => {
@@ -781,14 +728,27 @@ export default function PlansPage() {
                       {/* Action buttons */}
                       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                         <button
-                          onClick={() => openShareModal(p.id)}
+                          onClick={() => {
+                            const pactTitle = p.occasion || fmtDate(p.date)
+                            const shareText = `${pactTitle} — ${fmtDate(p.date)}, ${fmtWin(p.win_start, p.win_end)}`
+                            if (navigator.share) {
+                              navigator.share({
+                                title: pactTitle,
+                                text: shareText,
+                                url: window.location.origin + '/join/' + (activeCircle?.invite_code || ''),
+                              }).catch(() => {})
+                            } else {
+                              navigator.clipboard.writeText(shareText)
+                              showToast('Copied to clipboard')
+                            }
+                          }}
                           style={{
                             flex: 1, padding: '8px 0', borderRadius: 10,
                             border: '1px solid var(--border)', background: 'var(--surface2)',
                             color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
                           }}
                         >
-                          Send to Chat
+                          Share
                         </button>
                         {isIn && (
                           <button
@@ -1005,47 +965,6 @@ export default function PlansPage() {
       )}
 
       {/* Share pact to chat modal */}
-      {sharePactId && (
-        <div
-          onClick={e => { if (e.target === e.currentTarget) setSharePactId(null) }}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-            zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <div style={{ background: 'var(--surface)', borderRadius: 20, padding: 20, width: '90%', maxWidth: 360 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Send pact to chat</h3>
-            <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>
-              Pick a chat to share this pact with.
-            </p>
-            {shareThreads.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--text2)', textAlign: 'center', padding: '12px 0' }}>
-                No chats yet. Start a chat first!
-              </p>
-            ) : (
-              shareThreads.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => sharePactToThread(t.id)}
-                  disabled={sharing}
-                  style={{
-                    display: 'block', width: '100%', padding: '10px 14px', marginBottom: 6,
-                    borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface2)',
-                    fontSize: 13, fontWeight: 600, color: 'var(--text)', cursor: 'pointer', textAlign: 'left',
-                  }}
-                >
-                  {t.name}
-                </button>
-              ))
-            )}
-            <button onClick={() => setSharePactId(null)} style={{
-              marginTop: 8, width: '100%', padding: 10, border: 'none', borderRadius: 12,
-              background: 'transparent', color: 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            }}>Cancel</button>
-          </div>
-        </div>
-      )}
-
       {/* Toast */}
       {toast && (
         <div style={{

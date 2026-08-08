@@ -67,13 +67,7 @@ function CalendarIcon({ color }: { color: string }) {
     </svg>
   )
 }
-function ChatIcon({ color }: { color: string }) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-    </svg>
-  )
-}
+
 function PlansIcon({ color }: { color: string }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -81,13 +75,7 @@ function PlansIcon({ color }: { color: string }) {
     </svg>
   )
 }
-function SpotsIcon({ color }: { color: string }) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-    </svg>
-  )
-}
+
 function FriendsIcon({ color }: { color: string }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -115,13 +103,15 @@ function HomeIcon({ color }: { color: string }) {
 const NAV_ICONS: Record<string, (props: { color: string }) => React.ReactNode> = {
   '/home': HomeIcon,
   '/plans': PlansIcon,
+  '/friends': FriendsIcon,
   '/settings': ProfileIcon,
 }
 
-// ---- Nav tabs (3 tabs — reimagined) ----
+// ---- Nav tabs (4 tabs — reimagined) ----
 const TABS = [
   { key: '/home', label: 'Home' },
   { key: '/plans', label: 'Plans' },
+  { key: '/friends', label: 'Friends' },
   { key: '/settings', label: 'You' },
 ]
 
@@ -277,9 +267,6 @@ export default function AppShell({
   // Toast
   const [appToast, setAppToast] = useState('')
   function showAppToast(msg: string) { setAppToast(msg); setTimeout(() => setAppToast(''), 2200) }
-
-  // Chat unread badge
-  const [chatUnreadCount, setChatUnreadCount] = useState(0)
 
   // Friend request badge
   const [pendingFriendRequests, setPendingFriendRequests] = useState(0)
@@ -688,52 +675,6 @@ export default function AppShell({
     welcomeNext()
   }
 
-  // Chat unread count
-  useEffect(() => {
-    async function fetchChatUnread() {
-      // Get user's threads
-      const { data: threadMembers } = await supabase
-        .from('thread_members')
-        .select('thread_id')
-        .eq('user_id', user.id)
-      if (!threadMembers || threadMembers.length === 0) return
-
-      const threadIds = threadMembers.map(tm => tm.thread_id)
-
-      // Fetch reads and threads in parallel
-      const [{ data: reads }, { data: threads }] = await Promise.all([
-        supabase.from('thread_reads').select('thread_id, last_read_at').eq('user_id', user.id).in('thread_id', threadIds),
-        supabase.from('threads').select('id, last_message_at').in('id', threadIds),
-      ])
-
-      const readMap: Record<string, string> = {}
-      for (const r of (reads || [])) readMap[r.thread_id] = r.last_read_at
-
-      let count = 0
-      for (const t of (threads || [])) {
-        if (!t.last_message_at) continue
-        const lastRead = readMap[t.id]
-        if (!lastRead || new Date(t.last_message_at) > new Date(lastRead)) count++
-      }
-      setChatUnreadCount(count)
-    }
-    fetchChatUnread()
-
-    // Realtime updates for messages
-    const channel = supabase
-      .channel('chat-unread-badge')
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'messages',
-      }, () => { fetchChatUnread() })
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'thread_reads',
-        filter: `user_id=eq.${user.id}`,
-      }, () => { fetchChatUnread() })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [user.id])
-
   // Load pending friend request count
   useEffect(() => {
     async function fetchFriendRequests() {
@@ -857,15 +798,6 @@ export default function AppShell({
                       {IconComp ? <IconComp color={iconColor} /> : null}
                     </span>
                     <span style={{ fontSize: 8, fontWeight: 700, color: isActive ? 'var(--accent)' : 'var(--text2)' }}>{tab.label}</span>
-                    {tab.key === '/chat' && chatUnreadCount > 0 && (
-                      <span style={{
-                        position: 'absolute', top: 2, right: 2,
-                        width: 14, height: 14, borderRadius: '50%',
-                        background: 'var(--red)', color: '#fff',
-                        fontSize: 8, fontWeight: 800,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>{chatUnreadCount > 9 ? '9+' : chatUnreadCount}</span>
-                    )}
                   </button>
                 )
               })}
@@ -917,72 +849,81 @@ export default function AppShell({
             </>
           ) : (
           <>
-          {/* Row 1: Icon buttons top-right */}
-          <div data-walkthrough="header-actions" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, marginBottom: 6 }}>
-            {/* Chat — like Facebook Messenger icon */}
-            <button
-              onClick={() => router.push('/chat')}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                width: 36, height: 36, borderRadius: '50%', position: 'relative',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-              </svg>
-              {chatUnreadCount > 0 && (
-                <span style={{
-                  position: 'absolute', top: 2, right: 2,
-                  minWidth: 16, height: 16, borderRadius: 8,
-                  background: 'var(--red)', color: '#fff', fontSize: 9, fontWeight: 800,
+          {/* Row 1: Logo left, action buttons right */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div onClick={() => router.push('/home')} style={{ cursor: 'pointer' }}>
+              <span style={{ fontSize: 20, fontWeight: 900, letterSpacing: -0.5 }}>
+                Pact<span style={{ color: 'var(--accent)' }}>.</span>
+              </span>
+            </div>
+            <div data-walkthrough="header-actions" style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {/* Theme toggle */}
+              <button
+                onClick={() => {
+                  const next = theme === 'dark' ? 'light' : 'dark'
+                  selectTheme(next)
+                }}
+                style={{
+                  background: 'var(--surface2)', border: '1px solid var(--border)', cursor: 'pointer',
+                  width: 36, height: 36, borderRadius: 12,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  padding: '0 4px',
-                }}>{chatUnreadCount > 9 ? '9+' : chatUnreadCount}</span>
-              )}
-            </button>
+                  color: 'var(--text)', fontSize: 16,
+                }}
+              >
+                {theme === 'light' ? '☀️' : '🌙'}
+              </button>
 
-            {/* Notification bell */}
-            <button
-              data-walkthrough="header-notif"
-              onClick={() => router.push('/notifications')}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                width: 36, height: 36, borderRadius: '50%', position: 'relative',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-              {unreadNotifCount > 0 && (
-                <span style={{
-                  position: 'absolute', top: 2, right: 2,
-                  minWidth: 16, height: 16, borderRadius: 8,
-                  background: 'var(--red)', color: '#fff', fontSize: 9, fontWeight: 800,
+              {/* Notification bell */}
+              <button
+                data-walkthrough="header-notif"
+                onClick={() => router.push('/notifications')}
+                style={{
+                  background: 'var(--surface2)', border: '1px solid var(--border)', cursor: 'pointer',
+                  width: 36, height: 36, borderRadius: 12, position: 'relative',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  padding: '0 4px',
-                }}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
-              )}
-            </button>
+                  color: 'var(--text)', fontSize: 16,
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                {unreadNotifCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: 4, right: 4,
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: 'var(--red)',
+                  }} />
+                )}
+              </button>
+
+              {/* Profile avatar */}
+              <button
+                onClick={() => router.push('/settings')}
+                style={{
+                  background: 'var(--surface2)', border: '1px solid var(--border)', cursor: 'pointer',
+                  width: 36, height: 36, borderRadius: 12,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: 0, overflow: 'hidden',
+                }}
+              >
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  background: currentUser.color, color: txtOn(currentUser.color),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 800, position: 'relative', overflow: 'hidden',
+                }}>
+                  {currentUser.name[0]}
+                  {currentUser.avatar_url && (
+                    <img src={currentUser.avatar_url} alt="" style={{
+                      position: 'absolute', inset: 0, width: '100%', height: '100%',
+                      objectFit: 'cover', borderRadius: '50%',
+                    }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  )}
+                </div>
+              </button>
+            </div>
           </div>
-
-          {/* Row 2: Bold page title */}
-          <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1 }}>
-            {(() => {
-              const titles: Record<string, string> = {
-                '/home': 'Home',
-                '/plans': 'Plans',
-                '/friends': 'Friends',
-                '/notifications': 'Notifications',
-                '/settings': 'You',
-              }
-              if (pathname.startsWith('/profile')) return 'Profile'
-              if (pathname.startsWith('/circles')) return 'Circles'
-              return titles[pathname] || 'Pact'
-            })()}
-          </h1>
 
           {/* Row 3: Circle chips — horizontal scroll */}
           <div data-walkthrough="circle-area">

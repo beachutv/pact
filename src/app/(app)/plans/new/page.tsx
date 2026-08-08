@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { fmtDate, fmtHour, toStr, txtOn } from '@/lib/utils'
 import LocationPicker from '@/components/LocationPicker'
 import SlideToConfirm from '@/components/SlideToConfirm'
+import CalendarBars from '@/components/CalendarBars'
 import { sendPushNotification } from '@/lib/push'
 
 function NewPlanContent() {
@@ -15,12 +16,12 @@ function NewPlanContent() {
   const router = useRouter()
   const params = useSearchParams()
 
-  // Pre-fill from URL params (from old calendar flow — still works)
+  // Pre-fill from URL params
   const preDate = params.get('date') || ''
   const preHour = parseInt(params.get('hour') || '0')
   const preEnd = parseInt(params.get('end') || '0')
 
-  // Step state: 0=type, 1=date/range, 2=invite, 3=details+confirm
+  // Step state: 0=type, 1=date/range, 2=invite, 3=availability, 4=details+confirm, 5=confirmed
   const [step, setStep] = useState(preDate ? 2 : 0)
   const [planType, setPlanType] = useState<'date' | 'find' | null>(preDate ? 'date' : null)
 
@@ -188,8 +189,7 @@ function NewPlanContent() {
         }).catch(() => {})
       }
 
-      setToast('Pact proposed!')
-      setTimeout(() => { window.location.href = '/plans' }, 1500)
+      setStep(5)
     } catch (e: any) {
       setSending(false)
       if (!error) setError(e.message || 'Failed to create plan')
@@ -258,28 +258,32 @@ function NewPlanContent() {
   // ---- RENDER STEPS ----
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 80 }}>
-      {/* Back button */}
-      <button
-        onClick={() => step > 0 ? setStep(step - 1) : router.back()}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6, background: 'none',
-          border: 'none', color: 'var(--text2)', fontSize: 13, fontWeight: 600,
-          cursor: 'pointer', padding: 0,
-        }}
-      >
-        ← {step === 0 ? 'Back' : 'Previous step'}
-      </button>
+      {/* Back button — hide on confirmed step */}
+      {step < 5 && (
+        <button
+          onClick={() => step > 0 ? setStep(step - 1) : router.back()}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, background: 'none',
+            border: 'none', color: 'var(--text2)', fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', padding: 0,
+          }}
+        >
+          ← {step === 0 ? 'Back' : 'Previous step'}
+        </button>
+      )}
 
-      {/* Step indicator */}
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        {[0, 1, 2, 3].map(s => (
-          <div key={s} style={{
-            height: 3, flex: 1, borderRadius: 2,
-            background: s <= step ? 'var(--accent)' : 'var(--border)',
-            transition: 'background 0.2s',
-          }} />
-        ))}
-      </div>
+      {/* Step indicator — hide on confirmed step */}
+      {step < 5 && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {[0, 1, 2, 3, 4].map(s => (
+            <div key={s} style={{
+              height: 3, flex: 1, borderRadius: 2,
+              background: s <= step ? 'var(--accent)' : 'var(--border)',
+              transition: 'background 0.2s',
+            }} />
+          ))}
+        </div>
+      )}
 
       {/* ---- STEP 0: Type ---- */}
       {step === 0 && (
@@ -469,13 +473,81 @@ function NewPlanContent() {
           </button>
 
           <button className="btn-primary" disabled={invitedIds.size === 0} onClick={() => setStep(3)}>
-            Next — {invitedIds.size} friend{invitedIds.size === 1 ? '' : 's'} selected →
+            Invite {invitedIds.size} friend{invitedIds.size === 1 ? '' : 's'} →
           </button>
         </>
       )}
 
-      {/* ---- STEP 3: Details + Confirm ---- */}
+      {/* ---- STEP 3: Availability ---- */}
       {step === 3 && (
+        <>
+          <h2 style={{ fontSize: 20, fontWeight: 800 }}>Check availability</h2>
+          <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
+            See when everyone is free. Tap your bar to adjust your own availability.
+          </p>
+
+          {/* Who responded */}
+          <div style={{ marginTop: 4 }}>
+            <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+              Invited ({invitedIds.size})
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {circleMembers.filter(m => invitedIds.has(m.id)).map(m => (
+                <div key={m.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0',
+                  borderBottom: '1px solid var(--border)',
+                }}>
+                  <div className="avatar" style={{
+                    background: m.color, color: txtOn(m.color), width: 28, height: 28, fontSize: 11,
+                    position: 'relative', overflow: 'hidden',
+                  }}>
+                    {m.name[0]}
+                    {m.avatar_url && (
+                      <img src={m.avatar_url} alt="" style={{
+                        position: 'absolute', inset: 0, width: '100%', height: '100%',
+                        objectFit: 'cover', borderRadius: '50%',
+                      }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                    )}
+                  </div>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{m.name}</span>
+                  <span style={{
+                    fontSize: 10.5, fontWeight: 700, padding: '4px 9px', borderRadius: 10,
+                    background: 'var(--green-soft)', color: 'var(--green)',
+                  }}>invited</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Calendar bars for the selected date */}
+          {(() => {
+            const date = effectiveDate()
+            const memberIds = [user.id, ...Array.from(invitedIds)]
+            return date ? (
+              <div style={{ marginTop: 16 }}>
+                <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+                  📅 {fmtDate(date)}
+                </p>
+                <CalendarBars
+                  memberIds={memberIds}
+                  dateStr={date}
+                  userId={user.id}
+                  editable={true}
+                  pactStart={startHour}
+                  pactEnd={endHour}
+                />
+              </div>
+            ) : null
+          })()}
+
+          <button className="btn-primary" onClick={() => setStep(4)} style={{ marginTop: 16 }}>
+            Continue to details →
+          </button>
+        </>
+      )}
+
+      {/* ---- STEP 4: Details + Confirm ---- */}
+      {step === 4 && (
         <>
           <h2 style={{ fontSize: 20, fontWeight: 800 }}>Plan details</h2>
 
@@ -593,9 +665,68 @@ function NewPlanContent() {
         </>
       )}
 
+      {/* ---- STEP 5: Confirmed! ---- */}
+      {step === 5 && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          textAlign: 'center', padding: '40px 0',
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(139,176,126,0.12), rgba(118,172,179,0.1))',
+            border: '1.5px solid rgba(139,176,126,0.4)', borderRadius: 20, padding: 24,
+            width: '100%', maxWidth: 320,
+          }}>
+            <p style={{ fontSize: 42, marginBottom: 8 }}>🎉</p>
+            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Plan proposed!</h2>
+            <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 4 }}>
+              {title || `Plan for ${planType === 'date' && selectedDate ? fmtDate(selectedDate) : 'soon'}`}
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
+              {invitedIds.size} friend{invitedIds.size === 1 ? '' : 's'} invited
+              {spotName ? ` · 📍 ${spotName}` : ''}
+            </p>
+          </div>
+
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 8, marginTop: 20, width: '100%', maxWidth: 320,
+          }}>
+            <button className="btn-primary" onClick={() => router.push('/plans')}>
+              View your plans
+            </button>
+            <button
+              className="btn-secondary"
+              onClick={() => {
+                if (navigator.share) {
+                  navigator.share({
+                    title: 'Pact — join the plan!',
+                    text: `${user.name?.split(' ')[0]} wants to plan something. Tap to join:`,
+                    url: window.location.origin + '/join/' + (activeCircle?.invite_code || ''),
+                  }).catch(() => {})
+                } else {
+                  navigator.clipboard.writeText(window.location.origin + '/join/' + (activeCircle?.invite_code || ''))
+                  setToast('Link copied!')
+                }
+              }}
+              style={{ width: '100%' }}
+            >
+              🔗 Share with more people
+            </button>
+            <button
+              onClick={() => router.push('/home')}
+              style={{
+                background: 'none', border: 'none', color: 'var(--text2)',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '8px 0',
+              }}
+            >
+              Back to home
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Toast */}
       {toast && (
-        <div className="toast">🎉 {toast}</div>
+        <div className="toast">{toast}</div>
       )}
     </div>
   )
