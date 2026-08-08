@@ -122,7 +122,8 @@ export default function CalendarBars({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       {/* Group bar */}
       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 6 }}>
-        👥 <b style={{ color: 'var(--text)' }}>Group</b>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <b style={{ color: 'var(--text)' }}>Group</b>
         {pactStart !== undefined && <span style={{ fontSize: 10 }}> — locked time highlighted</span>}
       </div>
       <div style={{ display: 'flex', gap: 2, borderRadius: 8, overflow: 'hidden' }}>
@@ -155,7 +156,8 @@ export default function CalendarBars({
 
       {/* Your bar */}
       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-        🙋 <b style={{ color: 'var(--text)' }}>You</b>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <b style={{ color: 'var(--text)' }}>You</b>
         {editable && <span style={{ fontSize: 10 }}> — tap to adjust</span>}
       </div>
       <div style={{ display: 'flex', gap: 2, borderRadius: 8, overflow: 'hidden' }}>
@@ -188,13 +190,13 @@ export default function CalendarBars({
         })}
       </div>
 
-      {/* Time axis */}
+      {/* Time axis — show every 2nd hour label */}
       <div style={{ display: 'flex', gap: 2 }}>
         {hours.map(h => (
           <span key={h} style={{
             flex: 1, fontSize: 7.5, color: 'var(--text2)', textAlign: 'center', fontWeight: 600,
           }}>
-            {(h - VIS_START) % 3 === 0 ? fmtTiny(h) : ''}
+            {(h - VIS_START) % 2 === 0 ? fmtTiny(h) : ''}
           </span>
         ))}
       </div>

@@ -154,7 +154,10 @@ export default function HomePage() {
           fontSize: 12, fontWeight: 600, color: 'var(--amber)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span>😴 You are on a break</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            You are on a break
+          </span>
           <button
             onClick={async () => {
               const supabase = createClient()
@@ -189,7 +192,7 @@ export default function HomePage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         }}
       >
-        Plan something ✨
+        Plan something +
       </button>
 
       {/* Active plans (pending/in-progress) */}

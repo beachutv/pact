@@ -620,7 +620,11 @@ export default function SettingsPage() {
                 border: paused ? '1px solid rgba(248,113,113,0.3)' : '1px solid var(--border)',
                 marginBottom: 10,
               }}>
-                <span style={{ fontSize: 14 }}>{paused ? '⏸️' : '🌐'}</span>
+                <span style={{ fontSize: 14, display: 'flex', alignItems: 'center' }}>{paused ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                )}</span>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: 12, fontWeight: 700 }}>{paused ? `On a break` : 'Start a break'}</p>
                   {paused && <p style={{ fontSize: 11, color: 'var(--text2)' }}>{pauseLabel}</p>}

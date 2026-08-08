@@ -763,18 +763,24 @@ export default function PlansPage() {
                         }}>
                           {p.status === 'confirmed' ? 'locked' : 'open'}
                         </span>
-                        {editable && (
-                          <button onClick={(e) => { e.stopPropagation(); startEditing(p) }}
-                            style={{
-                              background: 'var(--surface2)', border: 'none', borderRadius: 8,
-                              padding: '4px 10px', fontSize: 11, fontWeight: 700,
-                              color: 'var(--text2)', cursor: 'pointer',
-                            }}>
-                            Edit
-                          </button>
-                        )}
                       </div>
                     </div>
+
+                    {/* Edit button — separate from status */}
+                    {editable && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                        <button onClick={(e) => { e.stopPropagation(); startEditing(p) }}
+                          style={{
+                            background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10,
+                            padding: '5px 14px', fontSize: 11, fontWeight: 700,
+                            color: 'var(--text2)', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 5,
+                          }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                          Edit
+                        </button>
+                      </div>
+                    )}
 
                     {/* Who's in + who's out — always visible */}
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>

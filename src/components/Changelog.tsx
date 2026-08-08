@@ -2,11 +2,25 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '8.3'
+export const CURRENT_VERSION = '9.0'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '9.0',
+    date: 'August 8, 2026',
+    title: 'Filter & Focus',
+    subtitle: 'Circles filter everything, cleaner cards, break mode improved',
+    items: [
+      { icon: '🔍', text: 'Circle filtering — select a circle on Plans or Friends to filter by that group, or tap All to see everything' },
+      { icon: '📋', text: 'Compact home cards — circle tag and status visible at a glance, tap to expand details' },
+      { icon: '⏸️', text: 'Break mode now auto-disables all circle availability toggles' },
+      { icon: '🔔', text: 'Circle join notifications — existing members get notified when someone new joins' },
+      { icon: '🎨', text: 'Minimalist SVG icons replace emoji throughout for a cleaner look' },
+      { icon: '⚙️', text: 'Settings reorganized — Visibility moved under Calendar & Permissions' },
+    ],
+  },
   {
     version: '8.3',
     date: 'August 8, 2026',
