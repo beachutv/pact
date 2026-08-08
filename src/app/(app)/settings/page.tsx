@@ -444,7 +444,7 @@ export default function SettingsPage() {
       </Section>
 
       {/* Google Calendar */}
-      <Section title="Calendar">
+      <Section title="Calendar & Permissions">
         {calLoading ? (
           <p style={{ fontSize: 13, color: 'var(--text2)', padding: '8px 0' }}>Checking...</p>
         ) : calConnected ? (
@@ -558,7 +558,39 @@ export default function SettingsPage() {
           blocked={locPerm === 'denied'}
         />
 
-        {/* Take a break — reuses sparks_paused_until infrastructure */}
+        {/* Availability window */}
+        <div style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+            <span style={{ flexShrink: 0, display: 'flex' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 14, fontWeight: 700 }}>Availability window</p>
+              <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
+                Friends see your availability for the next {visWindow} days
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[7, 14].map(days => (
+              <button key={days} onClick={async () => {
+                setVisWindow(days)
+                localStorage.setItem('pact_vis_window', String(days))
+                await supabase.from('users').update({ visibility_window: days }).eq('id', user.id)
+                showToast(`Visibility: ${days} days`)
+              }} style={{
+                flex: 1, padding: '8px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
+                background: visWindow === days ? 'var(--accent)' : 'var(--surface2)',
+                color: visWindow === days ? '#fff' : 'var(--text2)',
+                fontSize: 12, fontWeight: 700,
+              }}>
+                {days} days
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Take a break */}
         <div style={{ padding: '10px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
             <span style={{ flexShrink: 0, display: 'flex' }}>
@@ -612,55 +644,61 @@ export default function SettingsPage() {
             )
           })()}
 
-          {/* Per-circle toggles */}
+          {/* Per-circle availability toggles */}
           <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6, marginTop: 4 }}>
             Per circle
           </p>
-          {circles.map(c => {
-            const enabled = sparkCircleStates[c.id] !== false
-            return (
-              <div key={c.id} style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0',
-                borderBottom: '1px solid var(--border)',
-              }}>
-                <span style={{ fontSize: 16 }}>{c.emoji}</span>
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{c.name}</span>
-                <button
-                  onClick={async () => {
-                    const next = !enabled
-                    setSparkCircleStates(prev => ({ ...prev, [c.id]: next }))
-                    // Sync the context map if this is the currently active circle
-                    if (activeCircle && c.id === activeCircle.id) {
-                      setContextSparkMap(prev => ({ ...prev, [user.id]: next }))
-                    }
-                    await supabase.from('circle_members')
-                      .update({ sparks_enabled: next })
-                      .eq('circle_id', c.id)
-                      .eq('user_id', user.id)
-                    showToast(next ? `✓ Available in ${c.name}` : `Unavailable in ${c.name}`)
-                  }}
-                  style={{
-                    width: 42, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                    background: enabled ? 'var(--accent)' : 'var(--surface3)',
-                    position: 'relative', flexShrink: 0, transition: 'background 0.2s',
-                  }}
-                >
-                  <div style={{
-                    width: 18, height: 18, borderRadius: '50%', background: '#fff',
-                    position: 'absolute', top: 3, left: enabled ? 21 : 3,
-                    transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                  }} />
-                </button>
-              </div>
-            )
-          })}
+          {(() => {
+            const globalBreakOn = user.sparks_paused_until && new Date(user.sparks_paused_until) > new Date()
+            return circles.map(c => {
+              const enabled = !globalBreakOn && sparkCircleStates[c.id] !== false
+              return (
+                <div key={c.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0',
+                  borderBottom: '1px solid var(--border)',
+                  opacity: globalBreakOn ? 0.45 : 1,
+                }}>
+                  <span style={{ fontSize: 16 }}>{c.emoji}</span>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{c.name}</span>
+                  <button
+                    disabled={!!globalBreakOn}
+                    onClick={async () => {
+                      if (globalBreakOn) return
+                      const next = !enabled
+                      setSparkCircleStates(prev => ({ ...prev, [c.id]: next }))
+                      if (activeCircle && c.id === activeCircle.id) {
+                        setContextSparkMap(prev => ({ ...prev, [user.id]: next }))
+                      }
+                      await supabase.from('circle_members')
+                        .update({ sparks_enabled: next })
+                        .eq('circle_id', c.id)
+                        .eq('user_id', user.id)
+                      showToast(next ? `Available in ${c.name}` : `Unavailable in ${c.name}`)
+                    }}
+                    style={{
+                      width: 42, height: 24, borderRadius: 12, border: 'none',
+                      cursor: globalBreakOn ? 'not-allowed' : 'pointer',
+                      background: enabled ? 'var(--accent)' : 'var(--surface3)',
+                      position: 'relative', flexShrink: 0, transition: 'background 0.2s',
+                    }}
+                  >
+                    <div style={{
+                      width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                      position: 'absolute', top: 3, left: enabled ? 21 : 3,
+                      transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                    }} />
+                  </button>
+                </div>
+              )
+            })
+          })()}
 
           {/* Silence list */}
           <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6, marginTop: 14 }}>
             Silence list
           </p>
           <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8, lineHeight: 1.5 }}>
-            People on this list won&apos;t trigger sparks for you, regardless of circle settings.
+            People on this list won&apos;t appear as available to you, regardless of circle settings.
           </p>
           {silencedUsers.length === 0 ? (
             <p style={{ fontSize: 12, color: 'var(--text2)', fontStyle: 'italic', padding: '4px 0' }}>Nobody silenced</p>
@@ -742,35 +780,6 @@ export default function SettingsPage() {
       </Section>
 
       {/* Visibility Window */}
-      <Section title="Visibility">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-          <span style={{ fontSize: 18 }}>📆</span>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontSize: 13, fontWeight: 700 }}>Availability window</p>
-            <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2, lineHeight: 1.5 }}>
-              Friends see your availability for the next {visWindow} days
-            </p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[7, 14].map(days => (
-            <button key={days} onClick={async () => {
-              setVisWindow(days)
-              localStorage.setItem('pact_vis_window', String(days))
-              await supabase.from('users').update({ visibility_window: days }).eq('id', user.id)
-              showToast(`Visibility: ${days} days`)
-            }} style={{
-              flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
-              background: visWindow === days ? 'var(--accent)' : 'var(--surface2)',
-              color: visWindow === days ? '#fff' : 'var(--text2)',
-              fontSize: 12, fontWeight: 700,
-            }}>
-              {days} days
-            </button>
-          ))}
-        </div>
-      </Section>
-
       {/* Add to Home Screen */}
       {!isStandalone && (
         <Section title="Add to Home Screen">

@@ -122,6 +122,26 @@ export default function JoinPage() {
         .eq('user_id', user.id)
         .eq('status', 'pending')
 
+      // Notify existing circle members about the new member
+      const { data: existingMembers } = await supabase
+        .from('circle_members')
+        .select('user_id')
+        .eq('circle_id', circle.id)
+        .neq('user_id', user.id)
+      if (existingMembers) {
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        const joinerName = authUser?.user_metadata?.full_name || 'Someone'
+        await Promise.all(existingMembers.map(m =>
+          supabase.from('notifications').insert({
+            user_id: m.user_id,
+            type: 'pact_change',
+            title: `${joinerName} joined ${circle.name}!`,
+            body: `${circle.emoji} Your circle has a new member`,
+            link: '/home',
+          })
+        ))
+      }
+
       setStatus('done')
       // Full page load to refresh circle context
       setTimeout(() => { window.location.href = '/home' }, 800)

@@ -19,6 +19,7 @@ type Pact = {
   circle_id: string
   created_by: string | null
   members: { user_id: string }[]
+  notes: string | null
 }
 
 const PROMPTS = [
@@ -37,6 +38,7 @@ export default function HomePage() {
   const supabase = createClient()
   const [pacts, setPacts] = useState<Pact[]>([])
   const [loading, setLoading] = useState(true)
+  const [expandedCard, setExpandedCard] = useState<string | null>(null)
 
   // Pull-down refresh
   const [refreshing, setRefreshing] = useState(false)
@@ -202,56 +204,91 @@ export default function HomePage() {
           {activePacts.map(p => {
             const du = daysUntil(p.date)
             const when = du === 0 ? 'Today' : du === 1 ? 'Tomorrow' : fmtDate(p.date)
-            const cName = circleName(p.circle_id)
+            const circle = circles.find(x => x.id === p.circle_id)
+            const isExpanded = expandedCard === p.id
             return (
               <div
                 key={p.id}
                 className="card"
-                onClick={() => router.push('/plans')}
-                style={{ cursor: 'pointer', marginBottom: 8 }}
+                style={{ cursor: 'pointer', marginBottom: 8, padding: '12px 14px' }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <p style={{ fontSize: 14, fontWeight: 700 }}>
+                {/* Row 1: Title + circle tag + status */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <p style={{ fontSize: 14, fontWeight: 700, flex: 1, minWidth: 0 }} onClick={() => router.push('/plans')}>
                     {p.occasion || when}
                   </p>
+                  {circle && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                      background: 'var(--accent-soft)', color: 'var(--accent)',
+                      whiteSpace: 'nowrap', flexShrink: 0,
+                    }}>
+                      {circle.emoji} {circle.name}
+                    </span>
+                  )}
                   <span style={{
-                    fontSize: 10, fontWeight: 800, padding: '4px 10px', borderRadius: 12,
+                    fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 10,
                     background: 'var(--amber-soft)', color: 'var(--amber)',
-                    textTransform: 'uppercase', letterSpacing: '.4px',
+                    textTransform: 'uppercase', letterSpacing: '.3px', flexShrink: 0,
                   }}>pending</span>
                 </div>
-                <p style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 4 }}>
-                  {fmtHour(p.win_start)} – {fmtHour(p.win_end)}
-                  {cName && <span> · {cName}</span>}
-                </p>
-                {p.spot_name && (
-                  <p style={{ fontSize: 12.5, marginTop: 2 }}>
-                    {p.spot_emoji} {p.spot_name} · {p.spot_area}
+                {/* Row 2: Time + member count + expand toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                  <p style={{ fontSize: 12, color: 'var(--text2)' }} onClick={() => router.push('/plans')}>
+                    {when} · {fmtHour(p.win_start)}–{fmtHour(p.win_end)} · {(p.members || []).length} going
                   </p>
-                )}
-                <div style={{ display: 'flex', marginTop: 8 }}>
-                  {(p.members || []).slice(0, 6).map((m, i) => {
-                    const mem = circleMembers.find(cm => cm.id === m.user_id)
-                    if (!mem) return null
-                    return (
-                      <div key={m.user_id} className="avatar" style={{
-                        background: mem.color, color: txtOn(mem.color),
-                        width: 24, height: 24, fontSize: 10,
-                        marginLeft: i > 0 ? -6 : 0,
-                        border: '2px solid var(--surface)',
-                        position: 'relative', overflow: 'hidden',
-                      }}>
-                        {mem.name[0]}
-                        {mem.avatar_url && (
-                          <img src={mem.avatar_url} alt="" style={{
-                            position: 'absolute', inset: 0, width: '100%', height: '100%',
-                            objectFit: 'cover', borderRadius: '50%',
-                          }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                        )}
-                      </div>
-                    )
-                  })}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setExpandedCard(isExpanded ? null : p.id) }}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px',
+                      color: 'var(--text2)', display: 'flex', alignItems: 'center',
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      {isExpanded ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
+                    </svg>
+                  </button>
                 </div>
+                {/* Expanded details */}
+                {isExpanded && (
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }} onClick={() => router.push('/plans')}>
+                    {p.spot_name && (
+                      <p style={{ fontSize: 12, marginBottom: 4 }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: -2, marginRight: 4 }}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        {p.spot_emoji} {p.spot_name} · {p.spot_area}
+                      </p>
+                    )}
+                    {p.notes && (
+                      <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: -2, marginRight: 4 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        {p.notes}
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', marginTop: 6 }}>
+                      {(p.members || []).slice(0, 6).map((m, i) => {
+                        const mem = circleMembers.find(cm => cm.id === m.user_id)
+                        if (!mem) return null
+                        return (
+                          <div key={m.user_id} className="avatar" style={{
+                            background: mem.color, color: txtOn(mem.color),
+                            width: 24, height: 24, fontSize: 10,
+                            marginLeft: i > 0 ? -6 : 0,
+                            border: '2px solid var(--surface)',
+                            position: 'relative', overflow: 'hidden',
+                          }}>
+                            {mem.name[0]}
+                            {mem.avatar_url && (
+                              <img src={mem.avatar_url} alt="" style={{
+                                position: 'absolute', inset: 0, width: '100%', height: '100%',
+                                objectFit: 'cover', borderRadius: '50%',
+                              }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -268,33 +305,67 @@ export default function HomePage() {
       {upcomingPacts.length > 0 ? upcomingPacts.slice(0, 3).map(p => {
         const du = daysUntil(p.date)
         const countdown = du === 0 ? 'today!' : du === 1 ? 'tomorrow' : `in ${du} days`
-        const cName = circleName(p.circle_id)
+        const circle = circles.find(x => x.id === p.circle_id)
+        const isExpanded = expandedCard === p.id
         return (
           <div
             key={p.id}
             className="card"
-            onClick={() => router.push('/plans')}
-            style={{ cursor: 'pointer', marginBottom: 8 }}
+            style={{ cursor: 'pointer', marginBottom: 8, padding: '12px 14px' }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <p style={{ fontSize: 14, fontWeight: 700 }}>
+            {/* Row 1: Title + circle tag + countdown */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <p style={{ fontSize: 14, fontWeight: 700, flex: 1, minWidth: 0 }} onClick={() => router.push('/plans')}>
                 {p.occasion || fmtDate(p.date)}
               </p>
+              {circle && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                  background: 'var(--accent-soft)', color: 'var(--accent)',
+                  whiteSpace: 'nowrap', flexShrink: 0,
+                }}>
+                  {circle.emoji} {circle.name}
+                </span>
+              )}
               <span style={{
-                fontSize: 10, fontWeight: 800, padding: '4px 10px', borderRadius: 12,
+                fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 10,
                 background: 'var(--green-soft)', color: 'var(--green)',
+                flexShrink: 0,
               }}>{countdown}</span>
             </div>
-            <p style={{ fontSize: 12.5, color: 'var(--green)', fontWeight: 700, marginTop: 4 }}>
-              ⏰ {fmtHour(p.win_start)} – {fmtHour(p.win_end)}
-            </p>
-            {p.spot_name && (
-              <p style={{ fontSize: 12.5, marginTop: 2 }}>
-                {p.spot_emoji} {p.spot_name} · {p.spot_area}
+            {/* Row 2: Time + expand */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+              <p style={{ fontSize: 12, color: 'var(--green)', fontWeight: 700 }} onClick={() => router.push('/plans')}>
+                {fmtHour(p.win_start)}–{fmtHour(p.win_end)}
               </p>
-            )}
-            {cName && (
-              <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>{cName}</p>
+              <button
+                onClick={(e) => { e.stopPropagation(); setExpandedCard(isExpanded ? null : p.id) }}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px',
+                  color: 'var(--text2)', display: 'flex', alignItems: 'center',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  {isExpanded ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
+                </svg>
+              </button>
+            </div>
+            {/* Expanded */}
+            {isExpanded && (
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }} onClick={() => router.push('/plans')}>
+                {p.spot_name && (
+                  <p style={{ fontSize: 12, marginBottom: 4 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: -2, marginRight: 4 }}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    {p.spot_emoji} {p.spot_name} · {p.spot_area}
+                  </p>
+                )}
+                {p.notes && (
+                  <p style={{ fontSize: 12, color: 'var(--text2)' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: -2, marginRight: 4 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    {p.notes}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         )

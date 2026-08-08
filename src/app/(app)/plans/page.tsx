@@ -44,7 +44,7 @@ type PactResponse = {
 }
 
 export default function PlansPage() {
-  const { user, activeCircle, circleMembers } = useCircle()
+  const { user, activeCircle, circleMembers, circleFilter, circles } = useCircle()
   const supabase = createClient()
   const router = useRouter()
   const [pacts, setPacts] = useState<Pact[]>([])
@@ -190,35 +190,46 @@ export default function PlansPage() {
   }
 
   const onRefresh = useCallback(async () => {
-    if (activeCircle) await loadPacts()
-  }, [activeCircle?.id])
+    if (circles.length > 0) await loadPacts()
+  }, [circleFilter, circles.length]) // eslint-disable-line react-hooks/exhaustive-deps
   const { containerRef: pullRef, refreshing: pullRefreshing, pullY, indicatorText, touchHandlers } = usePullToRefresh(onRefresh)
 
   useEffect(() => {
-    if (!activeCircle) { setLoading(false); return }
+    if (circles.length === 0) { setLoading(false); return }
     loadPacts()
-  }, [activeCircle?.id])
+  }, [circleFilter, circles.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadPacts() {
     const today = new Date().toISOString().slice(0, 10)
-    // Fetch upcoming + today
-    const { data: upcoming } = await supabase
+    // Build query - filter by specific circle or all user circles
+    let upcomingQuery = supabase
       .from('pacts')
       .select('*, members:pact_members(user_id), declines:pact_declines(user_id)')
-      .eq('circle_id', activeCircle!.id)
       .gte('date', today)
       .order('date', { ascending: true })
+
+    let pastQuery = supabase
+      .from('pacts')
+      .select('*, members:pact_members(user_id), declines:pact_declines(user_id)')
+      .lt('date', today)
+      .order('date', { ascending: false })
+      .limit(20)
+
+    if (circleFilter) {
+      upcomingQuery = upcomingQuery.eq('circle_id', circleFilter)
+      pastQuery = pastQuery.eq('circle_id', circleFilter)
+    } else {
+      const circleIds = circles.map(c => c.id)
+      upcomingQuery = upcomingQuery.in('circle_id', circleIds)
+      pastQuery = pastQuery.in('circle_id', circleIds)
+    }
+
+    // Fetch upcoming + today
+    const { data: upcoming } = await upcomingQuery
     // Fetch past (last 30 days)
     const pastDate = new Date()
     pastDate.setDate(pastDate.getDate() - 30)
-    const { data: past } = await supabase
-      .from('pacts')
-      .select('*, members:pact_members(user_id), declines:pact_declines(user_id)')
-      .eq('circle_id', activeCircle!.id)
-      .lt('date', today)
-      .gte('date', pastDate.toISOString().slice(0, 10))
-      .order('date', { ascending: false })
-      .limit(20)
+    const { data: past } = await pastQuery.gte('date', pastDate.toISOString().slice(0, 10))
     const all = [...(upcoming || []), ...(past || [])]
     setPacts(all.map(p => ({ ...p, declines: p.declines || [] })))
     // Load comments for all pacts
@@ -523,7 +534,7 @@ export default function PlansPage() {
     setSaving(false)
   }
 
-  if (!activeCircle) {
+  if (circles.length === 0) {
     return <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
       <div style={{
         background: 'var(--surface)', border: '1px solid var(--border)',

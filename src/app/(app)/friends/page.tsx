@@ -28,7 +28,7 @@ type FriendWithProfile = Friendship & { profile: FriendUser }
 export default function FriendsPage() {
   const router = useRouter()
   const supabase = createClient()
-  const { user } = useCircle()
+  const { user, circleFilter, circles } = useCircle()
 
   const [tab, setTab] = useState<'friends' | 'requests' | 'search'>('friends')
   const [friends, setFriends] = useState<FriendWithProfile[]>([])
@@ -42,6 +42,7 @@ export default function FriendsPage() {
   const [searching, setSearching] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null) // friendship ID pending confirm
+  const [circleMemberIds, setCircleMemberIds] = useState<Set<string> | null>(null)
 
   const loadFriendships = useCallback(async () => {
     setLoading(true)
@@ -86,6 +87,21 @@ export default function FriendsPage() {
   }, [user.id])
 
   useEffect(() => { loadFriendships() }, [loadFriendships])
+
+  // Load circle member IDs when filter is active
+  useEffect(() => {
+    if (!circleFilter) { setCircleMemberIds(null); return }
+    async function loadCircleMembers() {
+      const { data } = await supabase
+        .from('circle_members')
+        .select('user_id')
+        .eq('circle_id', circleFilter!)
+      if (data) {
+        setCircleMemberIds(new Set(data.map(d => d.user_id)))
+      }
+    }
+    loadCircleMembers()
+  }, [circleFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Realtime subscription for friendship changes
   useEffect(() => {
@@ -204,6 +220,12 @@ export default function FriendsPage() {
     setActionLoading(null)
   }
 
+  // Filter friends by circle if active
+  const filteredFriends = circleMemberIds
+    ? friends.filter(f => circleMemberIds.has(f.profile.id))
+    : friends
+  const filterCircle = circleFilter ? circles.find(c => c.id === circleFilter) : null
+
   const requestCount = incoming.length
 
   function Avatar({ u, size = 36 }: { u: FriendUser; size?: number }) {
@@ -239,7 +261,7 @@ export default function FriendsPage() {
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 6 }}>
         {([
-          { key: 'friends' as const, label: 'My friends', count: friends.length },
+          { key: 'friends' as const, label: 'My friends', count: filteredFriends.length },
           { key: 'requests' as const, label: 'Requests', count: requestCount },
           { key: 'search' as const, label: '+ Add', count: 0 },
         ]).map(t => (
@@ -270,20 +292,26 @@ export default function FriendsPage() {
       {/* Friends list */}
       {tab === 'friends' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* Circle filter label */}
+          {filterCircle && (
+            <p style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600, marginBottom: -6 }}>
+              Showing friends in {filterCircle.emoji} {filterCircle.name}
+            </p>
+          )}
           {loading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
               <div className="spinner" />
             </div>
-          ) : friends.length === 0 ? (
+          ) : filteredFriends.length === 0 ? (
             <div style={{
               textAlign: 'center', padding: '32px 16px',
               color: 'var(--text2)', fontSize: 13,
             }}>
               <p style={{ fontSize: 24, marginBottom: 8 }}>👥</p>
-              <p>No friends yet — tap <b>+ Add</b> to search by username</p>
+              <p>{filterCircle ? `No friends in ${filterCircle.name} yet` : 'No friends yet — tap + Add to search by username'}</p>
             </div>
           ) : (
-            friends.map(f => (
+            filteredFriends.map(f => (
               <div
                 key={f.id}
                 style={{

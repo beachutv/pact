@@ -51,6 +51,8 @@ type CircleContextType = {
   setCircleMembers: React.Dispatch<React.SetStateAction<UserProfile[]>>
   sparkEnabledMap: Record<string, boolean>
   setSparkEnabledMap: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
+  circleFilter: string | null // null = 'All', string = circle id
+  setCircleFilter: React.Dispatch<React.SetStateAction<string | null>>
 }
 
 const CircleContext = createContext<CircleContextType | null>(null)
@@ -244,6 +246,7 @@ export default function AppShell({
   }
   const [circleMembers, setCircleMembers] = useState<UserProfile[]>([user])
   const [sparkEnabledMap, setSparkEnabledMap] = useState<Record<string, boolean>>({})
+  const [circleFilter, setCircleFilter] = useState<string | null>(null) // null = All
 
   function updateUser(partial: Partial<UserProfile>) {
     setCurrentUser(prev => ({ ...prev, ...partial }))
@@ -747,7 +750,7 @@ export default function AppShell({
   const firstName = currentUser.name.split(' ')[0]
 
   return (
-    <CircleContext.Provider value={{ user: currentUser, updateUser, circles: orderedCircles, activeCircle, setActiveCircle, circleMembers, setCircleMembers, sparkEnabledMap, setSparkEnabledMap }}>
+    <CircleContext.Provider value={{ user: currentUser, updateUser, circles: orderedCircles, activeCircle, setActiveCircle, circleMembers, setCircleMembers, sparkEnabledMap, setSparkEnabledMap, circleFilter, setCircleFilter }}>
       <div id="app-shell" style={isLandscape ? { flexDirection: 'row', maxWidth: '100%' } : {}}>
         {/* Header — portrait: top bar, landscape: left sidebar */}
         <header style={isLandscape ? {
@@ -897,52 +900,42 @@ export default function AppShell({
                   }} />
                 )}
               </button>
-
-              {/* Profile avatar */}
-              <button
-                onClick={() => router.push('/settings')}
-                style={{
-                  background: 'var(--surface2)', border: '1px solid var(--border)', cursor: 'pointer',
-                  width: 36, height: 36, borderRadius: 12,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  padding: 0, overflow: 'hidden',
-                }}
-              >
-                <div style={{
-                  width: 28, height: 28, borderRadius: '50%',
-                  background: currentUser.color, color: txtOn(currentUser.color),
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 800, position: 'relative', overflow: 'hidden',
-                }}>
-                  {currentUser.name[0]}
-                  {currentUser.avatar_url && (
-                    <img src={currentUser.avatar_url} alt="" style={{
-                      position: 'absolute', inset: 0, width: '100%', height: '100%',
-                      objectFit: 'cover', borderRadius: '50%',
-                    }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                  )}
-                </div>
-              </button>
             </div>
           </div>
 
           {/* Row 3: Circle chips — horizontal scroll */}
           <div data-walkthrough="circle-area">
-          {circles.length > 0 && ['/home', '/plans', '/friends'].includes(pathname) ? (
+          {circles.length > 0 && ['/plans', '/friends'].includes(pathname) ? (
             <div data-walkthrough="circle-chips" style={{
               display: 'flex', gap: 6, marginTop: 10, overflowX: 'auto',
               WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
               paddingBottom: 2,
             }}>
+              {/* All chip */}
+              <button
+                onClick={() => setCircleFilter(null)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '5px 12px', borderRadius: 20, flexShrink: 0,
+                  border: circleFilter === null ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
+                  background: circleFilter === null ? 'var(--accent-soft)' : 'var(--surface2)',
+                  color: circleFilter === null ? 'var(--text)' : 'var(--text2)',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                All
+              </button>
               {orderedCircles.map(c => {
-                const isActive = activeCircle?.id === c.id
+                const isSelected = circleFilter === c.id
                 return (
                   <button
                     key={c.id}
                     onClick={() => {
-                      if (isActive) {
+                      if (isSelected) {
                         setShowCirclePanel(!showCirclePanel)
+                        setActiveCircle(c)
                       } else {
+                        setCircleFilter(c.id)
                         setActiveCircle(c)
                         setShowCirclePanel(false)
                       }
@@ -950,15 +943,15 @@ export default function AppShell({
                     style={{
                       display: 'flex', alignItems: 'center', gap: 5,
                       padding: '5px 12px 5px 7px', borderRadius: 20, flexShrink: 0,
-                      border: isActive ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
-                      background: isActive ? 'var(--accent-soft)' : 'var(--surface2)',
-                      color: isActive ? 'var(--text)' : 'var(--text2)',
+                      border: isSelected ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
+                      background: isSelected ? 'var(--accent-soft)' : 'var(--surface2)',
+                      color: isSelected ? 'var(--text)' : 'var(--text2)',
                       fontSize: 12, fontWeight: 600, cursor: 'pointer',
                     }}
                   >
                     <span style={{ fontSize: 14 }}>{c.emoji}</span>
                     {c.name}
-                    {isActive && (
+                    {isSelected && (
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: -2, opacity: 0.5 }}>
                         {showCirclePanel ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
                       </svg>
@@ -979,7 +972,7 @@ export default function AppShell({
                 +
               </button>
             </div>
-          ) : ['/home', '/plans', '/friends'].includes(pathname) ? (
+          ) : ['/plans', '/friends'].includes(pathname) && circles.length === 0 ? (
             <div style={{
               display: 'flex', gap: 8, marginTop: 10, alignItems: 'center',
             }}>
@@ -1174,14 +1167,6 @@ export default function AppShell({
             <div style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, padding: '0 16px' }}>
               {circleMembers.map((m, i) => {
                 const isMe = m.id === user.id
-                const hasLocation = m.live_area && m.live_updated_at
-                const locAge = hasLocation ? Math.floor((Date.now() - new Date(m.live_updated_at!).getTime()) / 60000) : null
-                const locLabel = locAge !== null ? (
-                  locAge < 1 ? 'now'
-                  : locAge < 60 ? `${locAge}m ago`
-                  : locAge < 1440 ? `${Math.floor(locAge/60)}h ago`
-                  : `${Math.floor(locAge/1440)}d ago`
-                ) : null
                 const isOnline = m.last_seen_at ? (Date.now() - new Date(m.last_seen_at).getTime()) < 5 * 60 * 1000 : false
                 return (
                   <div
@@ -1227,12 +1212,6 @@ export default function AppShell({
                           }}>online</span>
                         )}
                       </div>
-                      {hasLocation && locAge !== null && locAge < 10080 && (
-                        <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                          {m.live_area} · {locLabel}
-                        </p>
-                      )}
                     </div>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.4 }}>
                       <polyline points="9 18 15 12 9 6"/>
