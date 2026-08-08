@@ -29,6 +29,14 @@ type Pact = {
 
 type MemberInfo = { id: string; name: string; color: string }
 
+type PactComment = {
+  id: string
+  pact_id: string
+  user_id: string
+  text: string
+  created_at: string
+}
+
 export default function PlansPage() {
   const { user, activeCircle, circleMembers } = useCircle()
   const supabase = createClient()
@@ -36,6 +44,11 @@ export default function PlansPage() {
   const [pacts, setPacts] = useState<Pact[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
+
+  // Comments
+  const [comments, setComments] = useState<Record<string, PactComment[]>>({})
+  const [commentText, setCommentText] = useState('')
+  const [sendingComment, setSendingComment] = useState(false)
 
   // Edit form state
   const [editDate, setEditDate] = useState('')
@@ -182,8 +195,54 @@ export default function PlansPage() {
       .eq('circle_id', activeCircle!.id)
       .gte('date', today)
       .order('date', { ascending: true })
-    if (data) setPacts(data.map(p => ({ ...p, declines: p.declines || [] })))
+    if (data) {
+      setPacts(data.map(p => ({ ...p, declines: p.declines || [] })))
+      // Load comments for all pacts
+      const pactIds = data.map(p => p.id)
+      if (pactIds.length > 0) {
+        const { data: cmts } = await supabase
+          .from('pact_comments')
+          .select('*')
+          .in('pact_id', pactIds)
+          .order('created_at', { ascending: true })
+        if (cmts) {
+          const grouped: Record<string, PactComment[]> = {}
+          cmts.forEach((c: PactComment) => {
+            if (!grouped[c.pact_id]) grouped[c.pact_id] = []
+            grouped[c.pact_id].push(c)
+          })
+          setComments(grouped)
+        }
+      }
+    }
     setLoading(false)
+  }
+
+  async function addComment(pactId: string) {
+    const text = commentText.trim()
+    if (!text) return
+    setSendingComment(true)
+    const { data, error } = await supabase
+      .from('pact_comments')
+      .insert({ pact_id: pactId, user_id: user.id, text })
+      .select()
+      .single()
+    if (data) {
+      setComments(prev => ({
+        ...prev,
+        [pactId]: [...(prev[pactId] || []), data as PactComment],
+      }))
+      setCommentText('')
+    }
+    setSendingComment(false)
+  }
+
+  async function deleteComment(commentId: string, pactId: string) {
+    await supabase.from('pact_comments').delete().eq('id', commentId)
+    setComments(prev => ({
+      ...prev,
+      [pactId]: (prev[pactId] || []).filter(c => c.id !== commentId),
+    }))
   }
 
   function getMember(uid: string): MemberInfo | undefined {
@@ -724,6 +783,78 @@ export default function PlansPage() {
                           )
                         })}
                       </div>
+
+                      {/* Comment thread */}
+                      {(() => {
+                        const pactComments = comments[p.id] || []
+                        return (
+                          <div style={{ marginTop: 8 }}>
+                            {pactComments.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                                {pactComments.map(c => {
+                                  const author = getMember(c.user_id)
+                                  const isOwn = c.user_id === user.id
+                                  return (
+                                    <div key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                                      <div style={{
+                                        width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                                        background: author?.color || '#666',
+                                        color: txtOn(author?.color || '#666'),
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: 9, fontWeight: 800,
+                                      }}>
+                                        {author?.name?.[0] || '?'}
+                                      </div>
+                                      <div style={{
+                                        flex: 1, background: 'var(--surface2)', padding: '8px 12px',
+                                        borderRadius: 12, fontSize: 12.5, lineHeight: 1.4,
+                                      }}>
+                                        <div style={{ fontWeight: 700, fontSize: 11, marginBottom: 2 }}>
+                                          {author?.name || 'Unknown'}
+                                        </div>
+                                        {c.text}
+                                      </div>
+                                      {isOwn && (
+                                        <button
+                                          onClick={() => deleteComment(c.id, p.id)}
+                                          style={{
+                                            background: 'none', border: 'none', color: 'var(--text2)',
+                                            fontSize: 10, cursor: 'pointer', padding: '4px', flexShrink: 0,
+                                          }}
+                                        >✕</button>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <input
+                                type="text"
+                                placeholder="Add a comment…"
+                                value={expandedPactId === p.id ? commentText : ''}
+                                onChange={e => setCommentText(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') addComment(p.id) }}
+                                style={{
+                                  flex: 1, background: 'var(--surface)', border: '1px solid var(--border)',
+                                  borderRadius: 20, padding: '8px 14px', color: 'var(--text)',
+                                  fontSize: 12.5, outline: 'none',
+                                }}
+                              />
+                              <button
+                                onClick={() => addComment(p.id)}
+                                disabled={sendingComment || !commentText.trim()}
+                                style={{
+                                  width: 36, height: 36, borderRadius: '50%', border: 'none',
+                                  background: commentText.trim() ? 'var(--accent)' : 'var(--surface3)',
+                                  color: '#fff', fontSize: 14, cursor: 'pointer', flexShrink: 0,
+                                  opacity: sendingComment ? 0.5 : 1,
+                                }}
+                              >➤</button>
+                            </div>
+                          </div>
+                        )
+                      })()}
 
                       {/* Action buttons */}
                       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>

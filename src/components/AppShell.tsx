@@ -27,6 +27,7 @@ export type UserProfile = {
   avatar_url: string | null
   last_seen_at: string | null
   sparks_paused_until: string | null
+  visibility_window: number | null
 }
 
 export type Circle = {

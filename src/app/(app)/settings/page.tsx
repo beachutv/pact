@@ -41,8 +41,9 @@ export default function SettingsPage() {
   const [isStandalone, setIsStandalone] = useState(false)
   const [isiOS, setIsiOS] = useState(false)
 
-  // Visibility window
+  // Visibility window — use user profile value if available, localStorage fallback
   const [visWindow, setVisWindow] = useState(() => {
+    if (user.visibility_window === 7 || user.visibility_window === 14) return user.visibility_window
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('pact_vis_window')
       return saved ? parseInt(saved) : 7
@@ -636,7 +637,7 @@ export default function SettingsPage() {
                       .update({ sparks_enabled: next })
                       .eq('circle_id', c.id)
                       .eq('user_id', user.id)
-                    showToast(next ? `⚡ Sparks on for ${c.name}` : `⚡ Sparks off for ${c.name}`)
+                    showToast(next ? `✓ Available in ${c.name}` : `Unavailable in ${c.name}`)
                   }}
                   style={{
                     width: 42, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -753,9 +754,10 @@ export default function SettingsPage() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {[7, 14].map(days => (
-            <button key={days} onClick={() => {
+            <button key={days} onClick={async () => {
               setVisWindow(days)
               localStorage.setItem('pact_vis_window', String(days))
+              await supabase.from('users').update({ visibility_window: days }).eq('id', user.id)
               showToast(`Visibility: ${days} days`)
             }} style={{
               flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
@@ -900,9 +902,9 @@ export default function SettingsPage() {
             width: '100%', maxWidth: 440,
           }}>
             <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 16px' }} />
-            <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>⚡ Pause sparks</p>
+            <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>😴 Take a break</p>
             <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.5 }}>
-              You won&apos;t appear in anyone&apos;s sparks and won&apos;t see sparks yourself. You can resume anytime.
+              You won&apos;t appear as available to friends. Plans won&apos;t include you until you resume.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
@@ -919,7 +921,7 @@ export default function SettingsPage() {
                     await supabase.from('users').update({ sparks_paused_until: until }).eq('id', user.id)
                     updateUser({ sparks_paused_until: until })
                     setShowSparkPause(false)
-                    showToast(`⚡ Sparks paused — ${opt.label.toLowerCase()}`)
+                    showToast(`😴 Break active — ${opt.label.toLowerCase()}`)
                   }}
                   style={{
                     padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border)',
@@ -963,9 +965,9 @@ export default function SettingsPage() {
             width: '100%', maxWidth: 440, maxHeight: '70vh', display: 'flex', flexDirection: 'column',
           }}>
             <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 16px' }} />
-            <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>🔇 Silence from sparks</p>
+            <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>🔇 Silence someone</p>
             <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 14, lineHeight: 1.5 }}>
-              Pick someone — they won&apos;t trigger sparks for you regardless of circle settings. They won&apos;t know they&apos;re silenced.
+              Pick someone — they won&apos;t be suggested when making plans. They won&apos;t know they&apos;re silenced.
             </p>
             <div style={{ overflowY: 'auto', flex: 1 }}>
               {allCircleMates.length === 0 ? (
