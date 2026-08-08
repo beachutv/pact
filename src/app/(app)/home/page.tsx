@@ -190,35 +190,6 @@ export default function HomePage() {
         Plan something ✨
       </button>
 
-      {/* Your circles */}
-      <p style={{
-        fontSize: 11, fontWeight: 800, color: 'var(--text2)',
-        textTransform: 'uppercase', letterSpacing: '.5px', marginTop: 24, marginBottom: 10,
-      }}>
-        Your circles
-      </p>
-      <div style={{
-        display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4,
-      }}>
-        {circles.map(c => (
-          <div
-            key={c.id}
-            className={`chip ${activeCircle?.id === c.id ? 'active' : ''}`}
-            onClick={() => router.push('/circles/' + c.id + '/settings')}
-            style={{ flexShrink: 0 }}
-          >
-            {c.emoji} {c.name}
-          </div>
-        ))}
-        <div
-          className="chip"
-          onClick={() => router.push('/circles/new')}
-          style={{ flexShrink: 0, borderStyle: 'dashed', color: 'var(--text2)' }}
-        >
-          ＋ New circle
-        </div>
-      </div>
-
       {/* Active plans (pending/in-progress) */}
       {activePacts.length > 0 && (
         <>

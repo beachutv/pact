@@ -813,7 +813,7 @@ export default function AppShell({
           padding: '12px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
           overflowY: 'auto', overflowX: 'hidden',
         } : {
-          padding: '10px 18px 10px',
+          padding: '16px 18px 10px',
           borderBottom: '1px solid var(--border)',
           flexShrink: 0,
         }}>
