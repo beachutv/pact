@@ -518,7 +518,7 @@ export default function SettingsPage() {
           icon={<IconBell size={20} color="var(--accent)" />}
           title="Notifications"
           description={pushSubscribed
-            ? "You'll get notified for messages, new pacts, and sparks."
+            ? "You'll get notified for messages, new plans, and friend updates."
             : notifPerm === 'unsupported'
               ? "Your browser doesn't support notifications. Add Pact to your home screen first — notifications require Safari on iOS or Chrome on Android."
               : "Get alerted when friends message you or make plans. Without this, you'll only see updates when you open the app."}
@@ -550,8 +550,8 @@ export default function SettingsPage() {
           icon={<IconPin size={20} color="var(--accent)" />}
           title="Location"
           description={locPerm === 'granted'
-            ? "Sparks and spot travel times use your live location."
-            : "Lets Pact calculate real travel times and detect nearby friends (Sparks). Without this, travel times use your home area — still works, just less accurate."}
+            ? "Travel times and nearby detection use your live location."
+            : "Lets Pact calculate real travel times. Without this, travel times use your home area — still works, just less accurate."}
           on={locPerm === 'granted'}
           onToggle={handleLocationToggle}
           blocked={locPerm === 'denied'}

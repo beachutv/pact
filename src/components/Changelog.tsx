@@ -2,11 +2,26 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '8.0'
+export const CURRENT_VERSION = '8.1'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '8.1',
+    date: 'August 8, 2026',
+    title: 'Polish & cleanup',
+    subtitle: 'The details that make it feel right',
+    items: [
+      { icon: '✨', text: 'Pact. logo in the header — tap it to go home' },
+      { icon: '📅', text: 'Availability step in plan wizard — see who is free before confirming' },
+      { icon: '🎉', text: 'Celebration screen after creating a plan' },
+      { icon: '👥', text: 'Friends tab restored to navigation' },
+      { icon: '🌙', text: 'Quick theme toggle in the header' },
+      { icon: '📆', text: 'Visibility window setting — control how far ahead friends see your schedule' },
+      { icon: '🧹', text: 'Removed old calendar grid and chat features — leaner and faster' },
+    ],
+  },
   {
     version: '8.0',
     date: 'August 8, 2026',

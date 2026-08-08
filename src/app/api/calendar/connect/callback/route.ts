@@ -56,6 +56,6 @@ export async function GET(request: Request) {
   // This will be implemented in Phase 2
 
   // Redirect to the next URL (from state param) or default to calendar
-  const next = searchParams.get('state') || '/calendar'
+  const next = searchParams.get('state') || '/home'
   return NextResponse.redirect(`${origin}${next}`)
 }

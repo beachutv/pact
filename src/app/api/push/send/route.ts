@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const payload = JSON.stringify({
       title: title || 'Pact',
       body: msgBody || '',
-      url: url || '/calendar',
+      url: url || '/home',
       tag: tag || 'pact-default',
     })
 

@@ -176,17 +176,29 @@ export default function NotificationsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Actions bar */}
+      {/* Header bar */}
       <div style={{
-        padding: '10px 16px', display: 'flex', alignItems: 'center',
-        justifyContent: 'flex-end',
+        padding: '12px 16px', display: 'flex', alignItems: 'center',
+        justifyContent: 'space-between',
         flexShrink: 0,
       }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            onClick={() => router.back()}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--text2)', fontSize: 13, fontWeight: 600, padding: 0,
+            }}
+          >
+            ← Back
+          </button>
+          <span style={{ fontSize: 16, fontWeight: 800 }}>Notifications</span>
+        </div>
         {hasUnread && (
           <button
             onClick={markAllRead}
             style={{
-              background: 'none', border: 'none', fontSize: 13,
+              background: 'none', border: 'none', fontSize: 12,
               fontWeight: 600, color: 'var(--accent)', cursor: 'pointer',
             }}
           >
@@ -212,7 +224,7 @@ export default function NotificationsPage() {
             </svg>
             <p style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>No notifications yet</p>
             <p style={{ fontSize: 12, color: 'var(--text2)', textAlign: 'center', lineHeight: 1.5 }}>
-              You&apos;ll see friend requests, pact updates, and sparks here.
+              You&apos;ll see friend requests, plan updates, and birthday reminders here.
             </p>
           </div>
         ) : (

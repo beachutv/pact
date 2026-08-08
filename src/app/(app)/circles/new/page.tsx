@@ -142,7 +142,7 @@ export default function NewCirclePage() {
       supabase.rpc('add_circle_member', { p_circle_id: createdCircleId, p_user_id: userId })
     )
     await Promise.all(promises)
-    window.location.href = '/calendar'
+    window.location.href = '/home'
   }
 
   async function handleCreate() {
@@ -184,7 +184,7 @@ export default function NewCirclePage() {
     if (foundFriends.length > 0) {
       setMode('add-friends')
     } else {
-      window.location.href = '/calendar'
+      window.location.href = '/home'
     }
   }
 
@@ -250,7 +250,7 @@ export default function NewCirclePage() {
       .eq('status', 'pending')
 
     // Full page reload to refresh circle context (server component fetches circles)
-    window.location.href = '/calendar'
+    window.location.href = '/home'
   }
 
   async function browsePublic() {
@@ -304,7 +304,7 @@ export default function NewCirclePage() {
         user_id: user.id,
         role: 'member',
       })
-      window.location.href = '/calendar'
+      window.location.href = '/home'
     } else if (joinModeVal === 'approval') {
       await supabase.from('circle_join_requests').insert({
         circle_id: circleId,
@@ -475,7 +475,7 @@ export default function NewCirclePage() {
           )}
           <button
             className="btn-secondary"
-            onClick={() => { window.location.href = '/calendar' }}
+            onClick={() => { window.location.href = '/home' }}
             style={{ width: '100%' }}
           >
             {selectedFriends.size > 0 ? 'Skip for now' : 'Done'}

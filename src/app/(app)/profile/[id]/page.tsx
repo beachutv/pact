@@ -305,7 +305,7 @@ export default function ProfilePage() {
       alert('Failed to leave circle. Please try again.')
       return
     }
-    window.location.href = '/calendar'
+    window.location.href = '/home'
   }
 
   async function handleDeleteAccount() {
@@ -690,7 +690,7 @@ function SharedCircles({ userId, circles }: { userId: string; circles: { id: str
             key={c.id}
             onClick={() => {
               localStorage.setItem('pact_active_circle', c.id)
-              window.location.href = '/calendar'
+              window.location.href = '/home'
             }}
             style={{
               display: 'flex', alignItems: 'center', gap: 10,

@@ -48,7 +48,7 @@ export default function JoinPage() {
 
       if (existing) {
         setStatus('already')
-        setTimeout(() => { window.location.href = '/calendar' }, 1500)
+        setTimeout(() => { window.location.href = '/home' }, 1500)
         return
       }
 
@@ -124,7 +124,7 @@ export default function JoinPage() {
 
       setStatus('done')
       // Full page load to refresh circle context
-      setTimeout(() => { window.location.href = '/calendar' }, 800)
+      setTimeout(() => { window.location.href = '/home' }, 800)
     }
 
     joinCircle()

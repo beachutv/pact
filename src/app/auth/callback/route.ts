@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/calendar'
+  const next = searchParams.get('next') ?? '/home'
 
   if (code) {
     const supabase = await createClient()
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
         const { data: profile } = await supabase.from('users').select('home_area').eq('id', user.id).single()
         if (!profile?.home_area) {
           // Pass the next param through onboarding so invite links work for new users
-          const onboardingUrl = next !== '/calendar' ? `/onboarding?next=${encodeURIComponent(next)}` : '/onboarding'
+          const onboardingUrl = next !== '/home' ? `/onboarding?next=${encodeURIComponent(next)}` : '/onboarding'
           return NextResponse.redirect(`${origin}${onboardingUrl}`)
         }
       }

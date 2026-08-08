@@ -310,7 +310,7 @@ export default function CircleSettingsPage() {
       type: 'pact_change',
       title: `You're in! Welcome to ${circle?.name}`,
       body: 'Your request to join was approved',
-      link: '/calendar',
+      link: '/home',
     })
     setJoiningAction(null)
   }
@@ -344,7 +344,7 @@ export default function CircleSettingsPage() {
     await supabase.from('circles').delete().eq('id', id)
     const remaining = circles.filter(c => c.id !== id)
     if (remaining.length > 0) setActiveCircle(remaining[0])
-    window.location.href = '/calendar'
+    window.location.href = '/home'
   }
 
   async function handleLeave() {
@@ -354,7 +354,7 @@ export default function CircleSettingsPage() {
     const remaining = circles.filter(c => c.id !== id)
     if (remaining.length > 0) {
       setActiveCircle(remaining[0])
-      window.location.href = '/calendar'
+      window.location.href = '/home'
     } else {
       // No circles left — go to create/join
       localStorage.removeItem('pact_active_circle')

@@ -24,7 +24,7 @@ export async function sendPushNotification({
         user_ids: userIds,
         title,
         body,
-        url: url || '/calendar',
+        url: url || '/home',
         tag: tag || 'pact-default',
       }),
     })
