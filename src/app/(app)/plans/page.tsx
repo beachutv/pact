@@ -913,16 +913,21 @@ export default function PlansPage() {
                       color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
                     }}>Edit</button>
                   )}
-                  <button onClick={() => { setLongPressPactId(null); router.push('/chat') }} style={{
+                  <button onClick={() => {
+                    setLongPressPactId(null)
+                    if (navigator.share) {
+                      const pact = pacts.find(x => x.id === p.id)
+                      navigator.share({
+                        title: pact?.occasion || 'Pact plan',
+                        text: `${fmtDate(p.date)} · ${fmtHour(p.win_start)}-${fmtHour(p.win_end)}`,
+                        url: window.location.origin + '/plans',
+                      }).catch(() => {})
+                    }
+                  }} style={{
                     display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                     background: 'transparent', fontSize: 13, fontWeight: 600,
                     color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                  }}>Discuss</button>
-                  <button onClick={() => openShareModal(p.id)} style={{
-                    display: 'block', width: '100%', padding: '8px 12px', border: 'none',
-                    background: 'transparent', fontSize: 13, fontWeight: 600,
-                    color: 'var(--text)', cursor: 'pointer', textAlign: 'left', borderRadius: 10,
-                  }}>Send to chat</button>
+                  }}>Share</button>
                   <button onClick={() => { setLongPressPactId(null); deletePact(p.id) }} style={{
                     display: 'block', width: '100%', padding: '8px 12px', border: 'none',
                     background: 'transparent', fontSize: 13, fontWeight: 600,

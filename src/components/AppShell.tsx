@@ -972,10 +972,8 @@ export default function AppShell({
           <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1 }}>
             {(() => {
               const titles: Record<string, string> = {
-                '/calendar': 'Calendar',
-                '/chat': 'Chat',
+                '/home': 'Home',
                 '/plans': 'Plans',
-                '/spots': 'Spots',
                 '/friends': 'Friends',
                 '/notifications': 'Notifications',
                 '/settings': 'You',
@@ -988,7 +986,7 @@ export default function AppShell({
 
           {/* Row 3: Circle chips — horizontal scroll */}
           <div data-walkthrough="circle-area">
-          {circles.length > 0 && ['/calendar', '/chat', '/plans', '/spots', '/friends'].includes(pathname) ? (
+          {circles.length > 0 && ['/home', '/plans', '/friends'].includes(pathname) ? (
             <div data-walkthrough="circle-chips" style={{
               display: 'flex', gap: 6, marginTop: 10, overflowX: 'auto',
               WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
@@ -1039,7 +1037,7 @@ export default function AppShell({
                 +
               </button>
             </div>
-          ) : ['/calendar', '/chat', '/plans', '/spots', '/friends'].includes(pathname) ? (
+          ) : ['/home', '/plans', '/friends'].includes(pathname) ? (
             <div style={{
               display: 'flex', gap: 8, marginTop: 10, alignItems: 'center',
             }}>
