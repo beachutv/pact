@@ -2,11 +2,26 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '7.0'
+export const CURRENT_VERSION = '8.0'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '8.0',
+    date: 'August 8, 2026',
+    title: 'The big reimagine',
+    subtitle: 'Willingness first, logistics second',
+    items: [
+      { icon: '🏠', text: 'New home screen — greeting, rotating prompts, and a big "Plan something" button' },
+      { icon: '✨', text: 'Multi-step plan wizard — pick a date or find a time, invite friends, set details, slide to confirm' },
+      { icon: '📅', text: 'Built-in date picker — no more jumping between tabs to pick a day' },
+      { icon: '🔗', text: 'Share plan links — drop a link in your group chat, friends on Pact join instantly' },
+      { icon: '😴', text: 'Take a break — pause availability so friends know not to expect you' },
+      { icon: '🧭', text: 'Simplified navigation — 3 tabs (Home, Plans, You) instead of 5' },
+      { icon: '🧹', text: 'Calendar grid, built-in chat, spots, and sparks removed — the app is leaner and more focused' },
+    ],
+  },
   {
     version: '7.0',
     date: 'August 7, 2026',
