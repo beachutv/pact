@@ -468,30 +468,26 @@ function NewPlanContent() {
                 visibilityDays={visibilityDays()}
                 memberVisibility={visMap}
                 onGroupTap={(h, getGroupStatus) => {
-                  // First tap sets start, second tap sets end
-                  if (startHour === h && endHour === h + 1) {
-                    // Tapping same hour — deselect
+                  if (startHour && endHour && h >= startHour && h < endHour) {
+                    // Tapping any selected block — clear selection
                     setStartHour(0); setEndHour(0)
-                  } else if (startHour && endHour && h >= startHour && h < endHour) {
-                    // Tapping within range — shrink to just this hour
-                    setStartHour(h); setEndHour(h + 1)
                   } else if (!startHour && !endHour) {
                     // No selection — start fresh
                     setStartHour(h); setEndHour(h + 1)
                   } else if (h < startHour) {
-                    // Extend range left — but stop at any busy block between h and startHour
-                    let newStart = h
+                    // Extend range left — but stop at any busy block in between
+                    let canExtend = true
                     for (let i = h + 1; i < startHour; i++) {
-                      if (getGroupStatus(i) === 'busy') { newStart = 0; break }
+                      if (getGroupStatus(i) === 'busy') { canExtend = false; break }
                     }
-                    if (newStart) setStartHour(newStart)
+                    if (canExtend) setStartHour(h)
                   } else {
-                    // Extend range right — but stop at any busy block between endHour and h
-                    let newEnd = h + 1
+                    // Extend range right — but stop at any busy block in between
+                    let canExtend = true
                     for (let i = endHour; i < h; i++) {
-                      if (getGroupStatus(i) === 'busy') { newEnd = 0; break }
+                      if (getGroupStatus(i) === 'busy') { canExtend = false; break }
                     }
-                    if (newEnd) setEndHour(newEnd)
+                    if (canExtend) setEndHour(h + 1)
                   }
                 }}
                 selectedStart={startHour || undefined}
