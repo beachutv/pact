@@ -2,11 +2,24 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '9.2'
+export const CURRENT_VERSION = '9.3'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '9.3',
+    date: 'August 9, 2026',
+    title: 'Time votes & circle matching',
+    subtitle: 'Proposed times are now voteable, circles auto-detected',
+    items: [
+      { icon: '🗳️', text: 'Proposed time cards are now tappable — tap to vote for a time that works for you' },
+      { icon: '👥', text: 'People who propose the same time are grouped with a vote count (e.g. 3/5)' },
+      { icon: '🔄', text: 'Creator can freely adjust their proposed time — no more locked blocks' },
+      { icon: '🏷️', text: 'Circle auto-detect — if your invited friends match a circle, the app offers to tag it' },
+      { icon: '🔒', text: 'Tagged plans are circle-scoped: only members can see or access the event' },
+    ],
+  },
   {
     version: '9.2',
     date: 'August 9, 2026',

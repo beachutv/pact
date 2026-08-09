@@ -40,6 +40,29 @@ function NewPlanContent() {
   // Invite
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set())
 
+  // Circle matching — auto-detect when invited set matches a circle
+  const [matchedCircle, setMatchedCircle] = useState<{ id: string; name: string; emoji: string } | null>(null)
+  const [circleTagged, setCircleTagged] = useState(false)
+  const [circleMatchDismissed, setCircleMatchDismissed] = useState(false)
+
+  // Check if invited friends match a circle
+  useEffect(() => {
+    if (invitedIds.size === 0 || circleMatchDismissed) { setMatchedCircle(null); return }
+    const invitedPlusSelf = new Set([...invitedIds, user.id])
+    for (const c of circles) {
+      // Get members of this circle
+      const circleUserIds = new Set<string>()
+      friendCircles.forEach((cids, uid) => { if (cids.has(c.id)) circleUserIds.add(uid) })
+      circleUserIds.add(user.id) // current user is always in their circles
+      // Check if invited set matches circle members exactly
+      if (circleUserIds.size === invitedPlusSelf.size && [...invitedPlusSelf].every(id => circleUserIds.has(id))) {
+        setMatchedCircle({ id: c.id, name: c.name, emoji: c.emoji })
+        return
+      }
+    }
+    setMatchedCircle(null)
+  }, [invitedIds, circles, friendCircles, circleMatchDismissed]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Details
   const [title, setTitle] = useState('')
   const [spotName, setSpotName] = useState('')
@@ -179,8 +202,8 @@ function NewPlanContent() {
   async function createPlan() {
     const date = viewingDate || effectiveDate()
     if (!date) return
-    // Circle is optional — only assigned if user explicitly selected one
-    const circleId = selectedCircleId || null
+    // Circle is optional — only assigned if user explicitly selected one or tagged a matched circle
+    const circleId = (circleTagged && matchedCircle?.id) || selectedCircleId || null
     setSending(true); setError('')
 
     try {
@@ -362,6 +385,43 @@ function NewPlanContent() {
             })
           })()}
         </div>
+
+        {/* Circle match prompt */}
+        {matchedCircle && !circleMatchDismissed && (
+          <div style={{
+            padding: '12px 14px', borderRadius: 14,
+            background: circleTagged ? 'var(--accent-soft)' : 'var(--surface2)',
+            border: circleTagged ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <span style={{ fontSize: 20 }}>{matchedCircle.emoji}</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 13, fontWeight: 700 }}>
+                {circleTagged ? `Tagged to ${matchedCircle.name}` : `This looks like ${matchedCircle.name}`}
+              </p>
+              <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1, lineHeight: 1.4 }}>
+                {circleTagged ? 'Only circle members can see this plan' : 'Tag this circle? Only members will see the plan.'}
+              </p>
+            </div>
+            {circleTagged ? (
+              <button onClick={() => { setCircleTagged(false); setSelectedCircleId(null) }} style={{
+                padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)',
+                background: 'var(--surface)', color: 'var(--text2)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              }}>Remove</button>
+            ) : (
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => { setCircleTagged(true); setSelectedCircleId(matchedCircle.id) }} style={{
+                  padding: '5px 12px', borderRadius: 8, border: 'none',
+                  background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                }}>Tag</button>
+                <button onClick={() => setCircleMatchDismissed(true)} style={{
+                  padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border)',
+                  background: 'var(--surface)', color: 'var(--text2)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                }}>No</button>
+              </div>
+            )}
+          </div>
+        )}
 
         <button className="btn-primary" disabled={invitedIds.size === 0} onClick={() => setStep(3)}>
           Invite {invitedIds.size} friend{invitedIds.size === 1 ? '' : 's'} →

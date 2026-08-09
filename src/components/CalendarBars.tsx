@@ -159,9 +159,6 @@ export default function CalendarBars({
   // Toggle time proposal on group bar
   async function tapGroupSlot(h: number) {
     if (!pactId || !editable) return
-    // If this is within the pact's set time and user is the creator, don't allow toggling
-    // (the creator already proposed this time by creating the plan)
-    if (pactStart !== undefined && pactEnd !== undefined && h >= pactStart && h < pactEnd && createdBy === userId) return
 
     const existing = proposals.find(p => p.user_id === userId && p.hour === h)
     if (existing) {
@@ -178,6 +175,34 @@ export default function CalendarBars({
       }).select('id').single()
       if (data) {
         setProposals(prev => prev.map(p => p.id === tempId ? { ...p, id: data.id } : p))
+      }
+    }
+  }
+
+  // Vote for someone else's proposed range — adopt it as your own
+  async function voteForRange(hours: number[]) {
+    if (!pactId || !editable) return
+    // Remove all existing proposals by this user
+    const mine = proposals.filter(p => p.user_id === userId)
+    setProposals(prev => prev.filter(p => p.user_id !== userId))
+    for (const p of mine) {
+      await supabase.from('time_proposals').delete().eq('id', p.id)
+    }
+    // Add proposals for the voted range
+    const newProposals: TimeProposal[] = []
+    for (const h of hours) {
+      const tempId = crypto.randomUUID()
+      const newP: TimeProposal = { id: tempId, pact_id: pactId, user_id: userId, hour: h }
+      newProposals.push(newP)
+    }
+    setProposals(prev => [...prev, ...newProposals])
+    // Insert all at once
+    for (const np of newProposals) {
+      const { data } = await supabase.from('time_proposals').insert({
+        pact_id: pactId, user_id: userId, hour: np.hour,
+      }).select('id').single()
+      if (data) {
+        setProposals(prev => prev.map(p => p.id === np.id ? { ...p, id: data.id } : p))
       }
     }
   }
@@ -464,77 +489,84 @@ export default function CalendarBars({
         ))}
       </div>
 
-      {/* Proposal summaries per user */}
+      {/* Proposed times — voteable cards */}
       {pactId && (() => {
-        // Group proposals by user and find their contiguous time ranges
         const byUser = new Map<string, number[]>()
         proposals.forEach(p => {
           if (!byUser.has(p.user_id)) byUser.set(p.user_id, [])
           byUser.get(p.user_id)!.push(p.hour)
         })
-
-        // Include creator's set time (win_start–win_end) as their "proposal"
-        // even if they haven't added explicit time_proposals
+        // Include creator's set time as their initial proposal
         if (createdBy && pactStart !== undefined && pactEnd !== undefined) {
           if (!byUser.has(createdBy)) byUser.set(createdBy, [])
-          const creatorHours = byUser.get(createdBy)!
-          for (let h = pactStart; h < pactEnd; h++) {
-            if (!creatorHours.includes(h)) creatorHours.push(h)
-          }
+          const ch = byUser.get(createdBy)!
+          for (let h = pactStart; h < pactEnd; h++) { if (!ch.includes(h)) ch.push(h) }
         }
 
-        const summaries: { uid: string; name: string; color: string; avatar_url?: string | null; ranges: string; isCreator: boolean }[] = []
-        byUser.forEach((hours, uid) => {
-          const m = getMemberInfo(uid)
-          if (!m) return
-          const sorted = [...hours].sort((a, b) => a - b)
-          // Build contiguous ranges
-          const ranges: [number, number][] = []
-          let rStart = sorted[0], rEnd = sorted[0]
-          for (let i = 1; i < sorted.length; i++) {
-            if (sorted[i] === rEnd + 1) {
-              rEnd = sorted[i]
-            } else {
-              ranges.push([rStart, rEnd + 1])
-              rStart = sorted[i]; rEnd = sorted[i]
-            }
-          }
-          ranges.push([rStart, rEnd + 1])
-          const rangeStr = ranges.map(([s, e]) => `${fmtTiny(s)}–${fmtTiny(e)}`).join(', ')
-          summaries.push({ uid, name: m.name.split(' ')[0], color: m.color, avatar_url: m.avatar_url, ranges: rangeStr, isCreator: uid === createdBy })
+        type UR = { uid: string; name: string; color: string; avatar_url?: string | null; hours: number[]; rangeStr: string }
+        const userRanges: UR[] = []
+        byUser.forEach((hrs, uid) => {
+          const m = getMemberInfo(uid); if (!m) return
+          const sorted = [...new Set(hrs)].sort((a, b) => a - b)
+          const ranges: [number, number][] = []; let rs = sorted[0], re = sorted[0]
+          for (let i = 1; i < sorted.length; i++) { if (sorted[i] === re + 1) re = sorted[i]; else { ranges.push([rs, re + 1]); rs = sorted[i]; re = sorted[i] } }
+          ranges.push([rs, re + 1])
+          userRanges.push({ uid, name: m.name.split(' ')[0], color: m.color, avatar_url: m.avatar_url, hours: sorted, rangeStr: ranges.map(([s, e]) => `${fmtTiny(s)}–${fmtTiny(e)}`).join(', ') })
         })
+        if (userRanges.length === 0) return null
 
-        // Sort: creator first
-        summaries.sort((a, b) => (a.isCreator ? -1 : 0) - (b.isCreator ? -1 : 0))
-
-        if (summaries.length === 0) return null
+        // Group by identical hour sets for consensus
+        const groups = new Map<string, UR[]>()
+        userRanges.forEach(ur => { const k = ur.hours.join(','); if (!groups.has(k)) groups.set(k, []); groups.get(k)!.push(ur) })
+        const sorted = [...groups.entries()].sort((a, b) => b[1].length - a[1].length)
+        const myHours = byUser.get(userId) || []
+        const myKey = [...new Set(myHours)].sort((a, b) => a - b).join(',')
+        const total = memberIds.length
 
         return (
-          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.4px' }}>
-              Proposed times
+              Proposed times {sorted.length > 1 ? '— tap to vote' : ''}
             </p>
-            {summaries.map(s => (
-              <div key={s.uid} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                <div style={{
-                  width: 18, height: 18, borderRadius: '50%', background: s.color,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 7, fontWeight: 800, color: '#fff', flexShrink: 0,
-                  position: 'relative', overflow: 'hidden',
+            {sorted.map(([key, voters]) => {
+              const mine = key === myKey && myKey !== ''
+              const top = voters.find(v => v.uid === createdBy) || voters[0]
+              return (
+                <button key={key} onClick={() => { if (!mine && editable) voteForRange(top.hours) }} style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+                  borderRadius: 12, border: mine ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                  background: mine ? 'var(--accent-soft)' : 'var(--surface2)',
+                  cursor: mine || !editable ? 'default' : 'pointer', width: '100%', textAlign: 'left',
                 }}>
-                  {s.name[0]}
-                  {s.avatar_url && (
-                    <img src={s.avatar_url} alt="" style={{
-                      position: 'absolute', inset: 0, width: '100%', height: '100%',
-                      objectFit: 'cover', borderRadius: '50%',
-                    }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                  )}
-                </div>
-                <span style={{ fontWeight: 700, color: 'var(--text)' }}>{s.name}</span>
-                {s.isCreator && <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 600 }}>(proposed)</span>}
-                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{s.ranges}</span>
-              </div>
-            ))}
+                  <div style={{ display: 'flex', flexShrink: 0 }}>
+                    {voters.slice(0, 4).map((v, i) => (
+                      <div key={v.uid} style={{
+                        width: 22, height: 22, borderRadius: '50%', background: v.color,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 8, fontWeight: 800, color: '#fff',
+                        marginLeft: i > 0 ? -6 : 0, border: '1.5px solid var(--surface)',
+                        position: 'relative', overflow: 'hidden', flexShrink: 0,
+                      }}>
+                        {v.name[0]}
+                        {v.avatar_url && <img src={v.avatar_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />}
+                      </div>
+                    ))}
+                    {voters.length > 4 && <span style={{ fontSize: 9, color: 'var(--text2)', marginLeft: 4, alignSelf: 'center' }}>+{voters.length - 4}</span>}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{top.rangeStr}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 6 }}>
+                      {voters.length === total ? '✓ everyone' : `${voters.length}/${total}`}
+                    </span>
+                  </div>
+                  {mine ? (
+                    <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, flexShrink: 0 }}>your pick</span>
+                  ) : editable ? (
+                    <span style={{ fontSize: 10, color: 'var(--text2)', fontWeight: 600, flexShrink: 0 }}>tap to agree</span>
+                  ) : null}
+                </button>
+              )
+            })}
           </div>
         )
       })()}
