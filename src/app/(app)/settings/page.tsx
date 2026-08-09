@@ -588,21 +588,21 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Take a break */}
+        {/* Global break — applies to everything */}
         <div style={{ padding: '10px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
             <span style={{ flexShrink: 0, display: 'flex' }}>
-              <IconZap size={20} color="var(--amber)" />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
             </span>
             <div style={{ flex: 1 }}>
               <p style={{ fontSize: 14, fontWeight: 700 }}>Take a break</p>
               <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2, lineHeight: 1.5 }}>
-                When on, you will not appear as available to friends. Use when you need time off from planning.
+                Hides you from all circles and plans. No one will see you as available.
               </p>
             </div>
           </div>
 
-          {/* Global pause */}
+          {/* Global pause card */}
           {(() => {
             const paused = user.sparks_paused_until && new Date(user.sparks_paused_until) > new Date()
             const pausedUntil = paused ? new Date(user.sparks_paused_until!) : null
@@ -613,86 +613,112 @@ export default function SettingsPage() {
               : null
             return (
               <div style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                borderRadius: 12, background: paused ? 'var(--red-soft)' : 'var(--surface2)',
+                padding: '12px 14px',
+                borderRadius: 14, background: paused ? 'var(--red-soft)' : 'var(--surface2)',
                 border: paused ? '1px solid rgba(248,113,113,0.3)' : '1px solid var(--border)',
-                marginBottom: 10,
               }}>
-                <span style={{ fontSize: 14, display: 'flex', alignItems: 'center' }}>{paused ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                )}</span>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 12, fontWeight: 700 }}>{paused ? `On a break` : 'Start a break'}</p>
-                  {paused && <p style={{ fontSize: 11, color: 'var(--text2)' }}>{pauseLabel}</p>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 20 }}>{paused ? '😴' : '👋'}</span>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700 }}>{paused ? 'You\'re on a break' : 'Active'}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
+                      {paused ? pauseLabel : 'Friends can see your availability'}
+                    </p>
+                  </div>
+                  {paused ? (
+                    <button onClick={async () => {
+                      await supabase.from('users').update({ sparks_paused_until: null }).eq('id', user.id)
+                      updateUser({ sparks_paused_until: null })
+                      showToast('Welcome back!')
+                    }} style={{
+                      padding: '6px 14px', borderRadius: 10, border: 'none',
+                      background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    }}>End break</button>
+                  ) : (
+                    <button onClick={() => setShowSparkPause(true)} style={{
+                      padding: '6px 14px', borderRadius: 10, border: '1px solid var(--border)',
+                      background: 'var(--surface)', color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    }}>Start break</button>
+                  )}
                 </div>
-                {paused ? (
-                  <button onClick={async () => {
-                    await supabase.from('users').update({ sparks_paused_until: null }).eq('id', user.id)
-                    updateUser({ sparks_paused_until: null })
-                    showToast('Welcome back!')
-                  }} style={{
-                    padding: '5px 12px', borderRadius: 8, border: 'none',
-                    background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  }}>Resume</button>
-                ) : (
-                  <button onClick={() => setShowSparkPause(true)} style={{
-                    padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)',
-                    background: 'var(--surface)', color: 'var(--text2)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  }}>Pause all</button>
-                )}
               </div>
             )
           })()}
+        </div>
 
-          {/* Per-circle availability toggles */}
-          <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6, marginTop: 4 }}>
-            Per circle
-          </p>
+        {/* Per-circle availability — separate from global break */}
+        <div style={{ padding: '10px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+            <span style={{ flexShrink: 0, display: 'flex' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 14, fontWeight: 700 }}>Circle availability</p>
+              <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2, lineHeight: 1.5 }}>
+                Toggle availability per circle. Off means that circle won&apos;t see you as free.
+              </p>
+            </div>
+          </div>
+
           {(() => {
             const globalBreakOn = user.sparks_paused_until && new Date(user.sparks_paused_until) > new Date()
-            return circles.map(c => {
-              const enabled = !globalBreakOn && sparkCircleStates[c.id] !== false
-              return (
-                <div key={c.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0',
-                  borderBottom: '1px solid var(--border)',
-                  opacity: globalBreakOn ? 0.45 : 1,
-                }}>
-                  <span style={{ fontSize: 16 }}>{c.emoji}</span>
-                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{c.name}</span>
-                  <button
-                    disabled={!!globalBreakOn}
-                    onClick={async () => {
-                      if (globalBreakOn) return
-                      const next = !enabled
-                      setSparkCircleStates(prev => ({ ...prev, [c.id]: next }))
-                      if (activeCircle && c.id === activeCircle.id) {
-                        setContextSparkMap(prev => ({ ...prev, [user.id]: next }))
-                      }
-                      await supabase.from('circle_members')
-                        .update({ sparks_enabled: next })
-                        .eq('circle_id', c.id)
-                        .eq('user_id', user.id)
-                      showToast(next ? `Available in ${c.name}` : `Unavailable in ${c.name}`)
-                    }}
-                    style={{
-                      width: 42, height: 24, borderRadius: 12, border: 'none',
-                      cursor: globalBreakOn ? 'not-allowed' : 'pointer',
-                      background: enabled ? 'var(--accent)' : 'var(--surface3)',
-                      position: 'relative', flexShrink: 0, transition: 'background 0.2s',
-                    }}
-                  >
-                    <div style={{
-                      width: 18, height: 18, borderRadius: '50%', background: '#fff',
-                      position: 'absolute', top: 3, left: enabled ? 21 : 3,
-                      transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                    }} />
-                  </button>
-                </div>
-              )
-            })
+            return (
+              <>
+                {globalBreakOn && (
+                  <div style={{
+                    padding: '8px 12px', borderRadius: 10, background: 'var(--surface2)',
+                    border: '1px solid var(--border)', marginBottom: 8,
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}>
+                    <span style={{ fontSize: 12 }}>😴</span>
+                    <p style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>
+                      Global break is on — all circles are paused
+                    </p>
+                  </div>
+                )}
+                {circles.map(c => {
+                  const enabled = !globalBreakOn && sparkCircleStates[c.id] !== false
+                  return (
+                    <div key={c.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0',
+                      borderBottom: '1px solid var(--border)',
+                      opacity: globalBreakOn ? 0.4 : 1,
+                    }}>
+                      <span style={{ fontSize: 16 }}>{c.emoji}</span>
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{c.name}</span>
+                      <button
+                        disabled={!!globalBreakOn}
+                        onClick={async () => {
+                          if (globalBreakOn) return
+                          const next = !enabled
+                          setSparkCircleStates(prev => ({ ...prev, [c.id]: next }))
+                          if (activeCircle && c.id === activeCircle.id) {
+                            setContextSparkMap(prev => ({ ...prev, [user.id]: next }))
+                          }
+                          await supabase.from('circle_members')
+                            .update({ sparks_enabled: next })
+                            .eq('circle_id', c.id)
+                            .eq('user_id', user.id)
+                          showToast(next ? `Available in ${c.name}` : `Unavailable in ${c.name}`)
+                        }}
+                        style={{
+                          width: 42, height: 24, borderRadius: 12, border: 'none',
+                          cursor: globalBreakOn ? 'not-allowed' : 'pointer',
+                          background: enabled ? 'var(--accent)' : 'var(--surface3)',
+                          position: 'relative', flexShrink: 0, transition: 'background 0.2s',
+                        }}
+                      >
+                        <div style={{
+                          width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                          position: 'absolute', top: 3, left: enabled ? 21 : 3,
+                          transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                        }} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </>
+            )
           })()}
 
           {/* Silence list */}

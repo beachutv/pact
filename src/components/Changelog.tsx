@@ -2,11 +2,22 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '9.0'
+export const CURRENT_VERSION = '9.1'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '9.1',
+    date: 'August 9, 2026',
+    title: 'Share & Break',
+    subtitle: 'Invite links work for everyone, break mode redesigned',
+    items: [
+      { icon: '🔗', text: 'Shareable plan invite links now work for people not yet in the circle — they see the plan preview and can join' },
+      { icon: '😴', text: 'Global break is now its own section — clearly separate from per-circle availability toggles' },
+      { icon: '👥', text: 'Circle availability — toggle which circles see you as free, independent of global break' },
+    ],
+  },
   {
     version: '9.0',
     date: 'August 8, 2026',

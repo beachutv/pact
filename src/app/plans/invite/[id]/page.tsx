@@ -44,48 +44,36 @@ export default function PlanInvitePage() {
       // 1) Check if user is logged in
       const { data: { session } } = await supabase.auth.getSession()
 
-      // 2) Load plan details
-      const { data: pact, error: pactErr } = await supabase
-        .from('pacts')
-        .select('id, occasion, date, win_start, win_end, spot_name, spot_area, status, circle_id, created_by')
-        .eq('id', id)
-        .single()
+      // 2) Load plan details via SECURITY DEFINER function (bypasses RLS)
+      const { data: preview, error: previewErr } = await supabase
+        .rpc('get_plan_invite_preview', { plan_id: id })
 
-      if (pactErr || !pact) {
+      if (previewErr || !preview || !preview.id) {
         setError('Plan not found or has been deleted.')
         setFlowState('error')
         return
       }
 
-      // Get member count
-      const { count } = await supabase
-        .from('pact_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('pact_id', id)
-
-      // Get creator name
-      let creatorName = 'someone'
-      if (pact.created_by) {
-        const { data: creator } = await supabase
-          .from('users')
-          .select('name')
-          .eq('id', pact.created_by)
-          .single()
-        if (creator) creatorName = creator.name?.split(' ')[0] || 'someone'
-      }
-
-      // Get circle info
-      const { data: circleData } = await supabase
-        .from('circles')
-        .select('id, name, emoji, invite_code')
-        .eq('id', pact.circle_id)
-        .single()
-      if (circleData) setCircle(circleData)
+      setCircle({
+        id: preview.circle_id,
+        name: preview.circle_name,
+        emoji: preview.circle_emoji,
+        invite_code: preview.circle_invite_code,
+      })
 
       setPlan({
-        ...pact,
-        memberCount: count || 0,
-        creatorName,
+        id: preview.id,
+        occasion: preview.occasion,
+        date: preview.date,
+        win_start: preview.win_start,
+        win_end: preview.win_end,
+        spot_name: preview.spot_name,
+        spot_area: preview.spot_area,
+        status: preview.status,
+        circle_id: preview.circle_id,
+        created_by: preview.created_by,
+        memberCount: preview.member_count || 0,
+        creatorName: preview.creator_name || 'someone',
       })
 
       // Not logged in → show sign-up prompt
@@ -100,7 +88,7 @@ export default function PlanInvitePage() {
       const { data: membership } = await supabase
         .from('circle_members')
         .select('user_id')
-        .eq('circle_id', pact.circle_id)
+        .eq('circle_id', preview.circle_id)
         .eq('user_id', session.user.id)
         .maybeSingle()
 
