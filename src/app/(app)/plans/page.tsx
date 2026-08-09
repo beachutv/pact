@@ -642,37 +642,11 @@ export default function PlansPage() {
     setSaving(false)
   }
 
-  if (circles.length === 0) {
+  if (loading) {
     return <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
-      <div style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 16, padding: '24px 16px', textAlign: 'center',
-      }}>
-        <p style={{ fontSize: 36, marginBottom: 8 }}>📌</p>
-        <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Plans</p>
-        <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 16 }}>
-          Once everyone taps &quot;I&apos;m in&quot; on a proposal, it lands here — date, time, spot, and who&apos;s coming. No more &quot;so tuloy ba?&quot;
-        </p>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-          <button
-            onClick={() => router.push('/circles/new')}
-            style={{
-              padding: '9px 16px', borderRadius: 12, border: 'none',
-              background: 'var(--accent)', color: '#fff',
-              fontSize: 13, fontWeight: 700, cursor: 'pointer',
-            }}
-          >+ Create circle</button>
-          <button
-            onClick={() => router.push('/circles/new')}
-            style={{
-              padding: '9px 16px', borderRadius: 12,
-              border: '1px solid var(--border)', background: 'var(--surface2)',
-              color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-            }}
-          >+ Circle</button>
-        </div>
-      </div>
+      <div style={{ textAlign: 'center', padding: 30 }}><div className="spinner" /></div>
     </div>
+  }
   }
 
   if (loading) return <div style={{ padding: 20 }}><div className="spinner" /></div>

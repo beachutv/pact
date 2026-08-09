@@ -726,7 +726,7 @@ export default function SettingsPage() {
             Silence list
           </p>
           <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8, lineHeight: 1.5 }}>
-            People on this list won&apos;t appear as available to you, regardless of circle settings.
+            People on this list won&apos;t see your availability, regardless of circle settings.
           </p>
           {silencedUsers.length === 0 ? (
             <p style={{ fontSize: 12, color: 'var(--text2)', fontStyle: 'italic', padding: '4px 0' }}>Nobody silenced</p>

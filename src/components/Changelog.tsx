@@ -2,11 +2,26 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '9.3'
+export const CURRENT_VERSION = '9.4'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '9.4',
+    date: 'August 9, 2026',
+    title: 'Polish & guardrails',
+    subtitle: 'Smarter scheduling, required fields, bug fixes',
+    items: [
+      { icon: '🟢', text: 'Date chips now show availability dots — green (mostly free), amber (some busy), red (mostly busy)' },
+      { icon: '📅', text: 'Always shows 7+ days to browse when planning, not just the selected range' },
+      { icon: '🚫', text: 'Hard busy hour blocks can no longer be proposed — only free or flexible slots are selectable' },
+      { icon: '📝', text: 'Plan name is now required — no more empty plans' },
+      { icon: '⏰', text: 'Time window is now required — must tap the group bar to set a time before proposing' },
+      { icon: '📋', text: 'Plans list fixed — pacts now load correctly regardless of circle membership' },
+      { icon: '🔇', text: 'Silence list corrected — silenced people can\'t see YOUR availability, not the other way around' },
+    ],
+  },
   {
     version: '9.3',
     date: 'August 9, 2026',

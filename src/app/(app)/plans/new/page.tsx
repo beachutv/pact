@@ -193,15 +193,17 @@ function NewPlanContent() {
   }
 
   function visibilityDays(): number {
-    if (planType === 'date') return 1
-    if (selectedRange === 'weekend') return 3
-    if (selectedRange === 'next-week') return 7
+    if (planType === 'date') return 7
+    if (selectedRange === 'weekend') return 7
+    if (selectedRange === 'next-week') return 14
     return 14
   }
 
   async function createPlan() {
     const date = viewingDate || effectiveDate()
     if (!date) return
+    if (!title.trim()) { setError('Give your plan a name'); return }
+    if (!startHour || !endHour || startHour >= endHour) { setError('Set a time window on the group bar'); return }
     // Circle is optional — only assigned if user explicitly selected one or tagged a matched circle
     const circleId = (circleTagged && matchedCircle?.id) || selectedCircleId || null
     setSending(true); setError('')
@@ -442,7 +444,7 @@ function NewPlanContent() {
           const memberInfos = [user, ...allFriends.filter(m => invitedIds.has(m.id))].map(m => ({
             id: m.id, name: m.name, color: m.color, avatar_url: m.avatar_url,
           }))
-          const showDatePicker = planType === 'find' || !selectedDate
+          const showDatePicker = true // always show date tabs so user can browse
           return date ? (
             <>
               <CalendarBars
@@ -487,7 +489,7 @@ function NewPlanContent() {
 
         {/* Title */}
         <div>
-          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>What is the occasion? (optional)</label>
+          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>What&apos;s the plan? <span style={{ color: 'var(--red)', fontSize: 10 }}>required</span></label>
           <input className="input" type="text" placeholder="Dinner, catch up, birthday..." value={title} onChange={e => setTitle(e.target.value)} style={{ marginTop: 6 }} />
           {!title && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
@@ -538,7 +540,7 @@ function NewPlanContent() {
 
         {error && <p style={{ fontSize: 13, color: 'var(--red)', textAlign: 'center' }}>{error}</p>}
 
-        <button className="btn-primary" disabled={sending} onClick={createPlan} style={{ marginTop: 8 }}>
+        <button className="btn-primary" disabled={sending || !title.trim() || !startHour || !endHour || startHour >= endHour} onClick={createPlan} style={{ marginTop: 8 }}>
           {sending ? 'Creating...' : 'Propose plan'}
         </button>
       </>)}

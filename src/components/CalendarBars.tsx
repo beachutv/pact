@@ -59,6 +59,8 @@ export default function CalendarBars({
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [localOverrides, setLocalOverrides] = useState<Map<number, number>>(new Map())
   const [proposals, setProposals] = useState<TimeProposal[]>([])
+  // Per-date busy block counts for availability dots on date chips
+  const [dateBusyCounts, setDateBusyCounts] = useState<Map<string, number>>(new Map())
 
   // Load busy blocks
   useEffect(() => {
@@ -112,6 +114,33 @@ export default function CalendarBars({
     return () => { supabase.removeChannel(channel) }
   }, [pactId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load per-date busy counts for availability dots on date picker
+  useEffect(() => {
+    if (!onDateChange || !memberIds.length) return
+    const dates: string[] = []
+    for (let i = 0; i < visibilityDays; i++) {
+      const d = new Date(); d.setDate(d.getDate() + i)
+      dates.push(d.toISOString().slice(0, 10))
+    }
+    if (dates.length <= 1) return
+    const startDate = dates[0], endDate = dates[dates.length - 1]
+    supabase.from('busy_blocks')
+      .select('date, start_hour, end_hour')
+      .in('user_id', memberIds)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .eq('flexibility', 'hard')
+      .then(({ data }) => {
+        if (!data) return
+        const counts = new Map<string, number>()
+        data.forEach((b: any) => {
+          const busyHours = b.end_hour - b.start_hour
+          counts.set(b.date, (counts.get(b.date) || 0) + busyHours)
+        })
+        setDateBusyCounts(counts)
+      })
+  }, [memberIds.join(','), visibilityDays, onDateChange ? 'y' : 'n']) // eslint-disable-line react-hooks/exhaustive-deps
+
   function userStatusAt(uid: string, h: number): number {
     if (uid === userId && localOverrides.has(h)) return localOverrides.get(h)!
     const hit = blocks.find(b =>
@@ -159,6 +188,10 @@ export default function CalendarBars({
   // Toggle time proposal on group bar
   async function tapGroupSlot(h: number) {
     if (!pactId || !editable) return
+    // Don't allow proposing on hours where user is hard busy (status 2)
+    // unless it's from this pact itself
+    const myStatus = userStatusAt(userId, h)
+    if (myStatus === 2 && !isThisPactBlockAt(userId, h)) return
 
     const existing = proposals.find(p => p.user_id === userId && p.hour === h)
     if (existing) {
@@ -268,6 +301,12 @@ export default function CalendarBars({
             const ds = d.toISOString().slice(0, 10)
             const isActive = ds === dateStr
             const dayName = i === 0 ? 'Today' : i === 1 ? 'Tmrw' : d.toLocaleDateString('en-US', { weekday: 'short' })
+            // Availability indicator: count busy hours across all members
+            // 15 hours visible (8a-11p), multiply by member count for max
+            const maxBusyHours = (VIS_END - VIS_START) * memberIds.length
+            const busyCount = dateBusyCounts.get(ds) || 0
+            const busyPct = maxBusyHours > 0 ? busyCount / maxBusyHours : 0
+            const dotColor = busyPct < 0.2 ? 'var(--green)' : busyPct < 0.5 ? 'var(--amber)' : 'var(--red)'
             return (
               <button key={ds} onClick={() => onDateChange(ds)} style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
@@ -279,6 +318,10 @@ export default function CalendarBars({
               }}>
                 <span>{dayName}</span>
                 <span style={{ fontSize: 13, fontWeight: 800 }}>{d.getDate()}</span>
+                <span style={{
+                  width: 5, height: 5, borderRadius: '50%',
+                  background: dotColor, marginTop: 1,
+                }} />
               </button>
             )
           })}
@@ -368,7 +411,12 @@ export default function CalendarBars({
 
               {/* The slot itself */}
               <div
-                onClick={() => pactId ? tapGroupSlot(h) : onGroupTap ? onGroupTap(h) : undefined}
+                onClick={() => {
+                  // Don't allow selecting hard busy hours (except this pact's own blocks)
+                  if (userStatusAt(userId, h) === 2 && !isThisPactBlockAt(userId, h)) return
+                  if (pactId) tapGroupSlot(h)
+                  else if (onGroupTap) onGroupTap(h)
+                }}
                 style={{
                   width: '100%', height: barHeight, borderRadius: 4,
                   background: userBusy && (hasProposals || hourProposals.length > 0) ? 'var(--red-soft)'
