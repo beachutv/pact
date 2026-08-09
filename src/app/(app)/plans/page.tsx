@@ -217,13 +217,13 @@ export default function PlansPage() {
     // Build queries
     let upcomingQuery = supabase
       .from('pacts')
-      .select('*, members:pact_members(user_id), declines:pact_declines(user_id)')
+      .select('*, members:pact_members(user_id)')
       .gte('date', today)
       .order('date', { ascending: true })
 
     let pastQuery = supabase
       .from('pacts')
-      .select('*, members:pact_members(user_id), declines:pact_declines(user_id)')
+      .select('*, members:pact_members(user_id)')
       .lt('date', today)
       .order('date', { ascending: false })
       .limit(20)
@@ -237,19 +237,20 @@ export default function PlansPage() {
     // Fetch upcoming + past in parallel
     const [{ data: upcoming }, { data: past }] = await Promise.all([upcomingQuery, pastQuery])
     const all = [...(upcoming || []), ...(past || [])]
-    setPacts(all.map(p => ({ ...p, declines: p.declines || [] })))
 
-    // Build member cache + load comments + responses in parallel
+    // Show plans immediately — don't block on secondary data
+    setPacts(all.map(p => ({ ...p, declines: p.declines || [] })))
+    setLoading(false)
+
+    // Secondary data: loaded in parallel, each failure-safe (tables may not exist)
     const pactIds = all.map(p => p.id)
     const mIds = new Set<string>()
     all.forEach(p => {
       p.members?.forEach((m: any) => mIds.add(m.user_id))
-      p.declines?.forEach((d: any) => mIds.add(d.user_id))
       if (p.created_by) mIds.add(p.created_by)
     })
     const unknownIds = [...mIds].filter(id => !circleMembers.find(m => m.id === id) && id !== user.id)
 
-    // Run all secondary queries in parallel
     const promises: Promise<void>[] = []
     if (unknownIds.length > 0) {
       promises.push(Promise.resolve(
@@ -265,6 +266,20 @@ export default function PlansPage() {
       }))
     }
     if (pactIds.length > 0) {
+      // Declines — table may not exist yet (migration-v20)
+      promises.push(Promise.resolve(
+        supabase.from('pact_declines').select('pact_id, user_id').in('pact_id', pactIds)
+      ).then(({ data: decls }) => {
+        if (decls && decls.length > 0) {
+          const declineMap: Record<string, { user_id: string }[]> = {}
+          decls.forEach((d: any) => {
+            if (!declineMap[d.pact_id]) declineMap[d.pact_id] = []
+            declineMap[d.pact_id].push({ user_id: d.user_id })
+          })
+          setPacts(prev => prev.map(p => ({ ...p, declines: declineMap[p.id] || p.declines || [] })))
+        }
+      }).catch(() => {}))
+      // Comments — table may not exist yet (migration-v8.1)
       promises.push(Promise.resolve(
         supabase.from('pact_comments').select('*').in('pact_id', pactIds)
           .order('created_at', { ascending: true })
@@ -277,7 +292,8 @@ export default function PlansPage() {
           })
           setComments(grouped)
         }
-      }))
+      }).catch(() => {}))
+      // Responses — table may not exist yet (migration-v8.2)
       promises.push(Promise.resolve(
         supabase.from('pact_responses').select('*').in('pact_id', pactIds)
       ).then(({ data: resps }) => {
@@ -289,10 +305,9 @@ export default function PlansPage() {
           })
           setResponses(groupedR)
         }
-      }))
+      }).catch(() => {}))
     }
     await Promise.all(promises)
-    setLoading(false)
   }
 
   // Auto-expand a specific plan if linked via ?pact=<id>
