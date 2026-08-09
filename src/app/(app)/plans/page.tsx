@@ -210,7 +210,11 @@ export default function PlansPage() {
 
   async function loadPacts() {
     const today = new Date().toISOString().slice(0, 10)
-    // Build query - filter by specific circle or all user circles
+    const pastDate = new Date()
+    pastDate.setDate(pastDate.getDate() - 30)
+    const pastDateStr = pastDate.toISOString().slice(0, 10)
+
+    // Build queries
     let upcomingQuery = supabase
       .from('pacts')
       .select('*, members:pact_members(user_id), declines:pact_declines(user_id)')
@@ -223,23 +227,20 @@ export default function PlansPage() {
       .lt('date', today)
       .order('date', { ascending: false })
       .limit(20)
+      .gte('date', pastDateStr)
 
     if (circleFilter) {
       upcomingQuery = upcomingQuery.eq('circle_id', circleFilter)
       pastQuery = pastQuery.eq('circle_id', circleFilter)
     }
-    // No else — RLS already restricts to plans in user's circles OR plans they're a member of
 
-    // Fetch upcoming + today
-    const { data: upcoming } = await upcomingQuery
-    // Fetch past (last 30 days)
-    const pastDate = new Date()
-    pastDate.setDate(pastDate.getDate() - 30)
-    const { data: past } = await pastQuery.gte('date', pastDate.toISOString().slice(0, 10))
+    // Fetch upcoming + past in parallel
+    const [{ data: upcoming }, { data: past }] = await Promise.all([upcomingQuery, pastQuery])
     const all = [...(upcoming || []), ...(past || [])]
     setPacts(all.map(p => ({ ...p, declines: p.declines || [] })))
 
-    // Build member cache from all pact members for cross-circle lookup
+    // Build member cache + load comments + responses in parallel
+    const pactIds = all.map(p => p.id)
     const mIds = new Set<string>()
     all.forEach(p => {
       p.members?.forEach((m: any) => mIds.add(m.user_id))
@@ -247,46 +248,50 @@ export default function PlansPage() {
       if (p.created_by) mIds.add(p.created_by)
     })
     const unknownIds = [...mIds].filter(id => !circleMembers.find(m => m.id === id) && id !== user.id)
+
+    // Run all secondary queries in parallel
+    const promises: Promise<void>[] = []
     if (unknownIds.length > 0) {
-      const { data: profiles } = await supabase.from('users').select('id, name, color, avatar_url').in('id', unknownIds)
-      if (profiles) {
-        setAllMembersCache(prev => {
-          const next = new Map(prev)
-          profiles.forEach((p: any) => next.set(p.id, { id: p.id, name: p.name, color: p.color }))
-          return next
-        })
-      }
+      promises.push(Promise.resolve(
+        supabase.from('users').select('id, name, color, avatar_url').in('id', unknownIds)
+      ).then(({ data: profiles }) => {
+        if (profiles) {
+          setAllMembersCache(prev => {
+            const next = new Map(prev)
+            profiles.forEach((p: any) => next.set(p.id, { id: p.id, name: p.name, color: p.color }))
+            return next
+          })
+        }
+      }))
     }
-    // Load comments for all pacts
-    const pactIds = all.map(p => p.id)
     if (pactIds.length > 0) {
-      const { data: cmts } = await supabase
-        .from('pact_comments')
-        .select('*')
-        .in('pact_id', pactIds)
-        .order('created_at', { ascending: true })
-      if (cmts) {
-        const grouped: Record<string, PactComment[]> = {}
-        cmts.forEach((c: PactComment) => {
-          if (!grouped[c.pact_id]) grouped[c.pact_id] = []
-          grouped[c.pact_id].push(c)
-        })
-        setComments(grouped)
-      }
-      // Load responses/votes
-      const { data: resps } = await supabase
-        .from('pact_responses')
-        .select('*')
-        .in('pact_id', pactIds)
-      if (resps) {
-        const groupedR: Record<string, PactResponse[]> = {}
-        resps.forEach((r: PactResponse) => {
-          if (!groupedR[r.pact_id]) groupedR[r.pact_id] = []
-          groupedR[r.pact_id].push(r)
-        })
-        setResponses(groupedR)
-      }
+      promises.push(Promise.resolve(
+        supabase.from('pact_comments').select('*').in('pact_id', pactIds)
+          .order('created_at', { ascending: true })
+      ).then(({ data: cmts }) => {
+        if (cmts) {
+          const grouped: Record<string, PactComment[]> = {}
+          cmts.forEach((c: PactComment) => {
+            if (!grouped[c.pact_id]) grouped[c.pact_id] = []
+            grouped[c.pact_id].push(c)
+          })
+          setComments(grouped)
+        }
+      }))
+      promises.push(Promise.resolve(
+        supabase.from('pact_responses').select('*').in('pact_id', pactIds)
+      ).then(({ data: resps }) => {
+        if (resps) {
+          const groupedR: Record<string, PactResponse[]> = {}
+          resps.forEach((r: PactResponse) => {
+            if (!groupedR[r.pact_id]) groupedR[r.pact_id] = []
+            groupedR[r.pact_id].push(r)
+          })
+          setResponses(groupedR)
+        }
+      }))
     }
+    await Promise.all(promises)
     setLoading(false)
   }
 

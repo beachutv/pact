@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fmtTiny } from '@/lib/utils'
 
@@ -142,11 +142,20 @@ export default function CalendarBars({
       })
   }, [memberIds.join(','), visibilityDays, onDateChange ? 'y' : 'n']) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Pre-compute a lookup map: "userId:hour" -> block for O(1) access instead of .find() per call
+  const blockLookup = useMemo(() => {
+    const map = new Map<string, BusyBlock>()
+    blocks.forEach(b => {
+      for (let h = b.start_hour; h < b.end_hour; h++) {
+        map.set(`${b.user_id}:${h}`, b)
+      }
+    })
+    return map
+  }, [blocks])
+
   function userStatusAt(uid: string, h: number): number {
     if (uid === userId && localOverrides.has(h)) return localOverrides.get(h)!
-    const hit = blocks.find(b =>
-      b.user_id === uid && b.start_hour <= h && b.end_hour > h
-    )
+    const hit = blockLookup.get(`${uid}:${h}`)
     if (!hit) return 0
     return hit.flexibility === 'soft' ? 1 : 2
   }
@@ -154,18 +163,14 @@ export default function CalendarBars({
   // Check if a user's busy block at hour h is from a pact
   function isPactBlockAt(uid: string, h: number): boolean {
     if (uid === userId && localOverrides.has(h)) return false
-    const hit = blocks.find(b =>
-      b.user_id === uid && b.start_hour <= h && b.end_hour > h
-    )
+    const hit = blockLookup.get(`${uid}:${h}`)
     return hit?.source === 'pact'
   }
 
   // Check if a specific pact owns the busy block at this hour
   function isThisPactBlockAt(uid: string, h: number): boolean {
     if (!pactId) return false
-    const hit = blocks.find(b =>
-      b.user_id === uid && b.start_hour <= h && b.end_hour > h
-    )
+    const hit = blockLookup.get(`${uid}:${h}`)
     return hit?.pact_id === pactId
   }
 

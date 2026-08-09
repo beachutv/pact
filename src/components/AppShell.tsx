@@ -486,18 +486,16 @@ export default function AppShell({
   // Notifications
   useEffect(() => {
     async function fetchNotifs() {
-      const { data } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(20)
+      const [{ data }, { count: unread }] = await Promise.all([
+        supabase.from('notifications').select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase.from('notifications').select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('read', false),
+      ])
       if (data) setNotifications(data)
-      const { count: unread } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('read', false)
       setUnreadNotifCount(unread || 0)
     }
     fetchNotifs()

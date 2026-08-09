@@ -95,51 +95,57 @@ function NewPlanContent() {
       const friends: UserProfile[] = []
       const circleMembership = new Map<string, Set<string>>()
       const cIds = circles.map(c => c.id)
-      if (cIds.length > 0) {
-        const { data: cms } = await supabase
-          .from('circle_members').select('user_id, circle_id, users!user_id(*)').in('circle_id', cIds)
-        if (cms) cms.forEach((cm: any) => {
-          if (cm.users && cm.users.id !== user.id) {
-            // Track circle membership
-            if (!circleMembership.has(cm.users.id)) circleMembership.set(cm.users.id, new Set())
-            circleMembership.get(cm.users.id)!.add(cm.circle_id)
-            if (!seen.has(cm.users.id)) {
-              seen.add(cm.users.id); friends.push(cm.users)
-            }
+
+      // Run circle members + friendships queries in parallel
+      const [cmResult, fshipResult] = await Promise.all([
+        cIds.length > 0
+          ? supabase.from('circle_members').select('user_id, circle_id, users!user_id(*)').in('circle_id', cIds)
+          : Promise.resolve({ data: null }),
+        supabase.from('friendships').select('requester_id, addressee_id')
+          .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`).eq('status', 'accepted'),
+      ])
+
+      if (cmResult.data) cmResult.data.forEach((cm: any) => {
+        if (cm.users && cm.users.id !== user.id) {
+          if (!circleMembership.has(cm.users.id)) circleMembership.set(cm.users.id, new Set())
+          circleMembership.get(cm.users.id)!.add(cm.circle_id)
+          if (!seen.has(cm.users.id)) {
+            seen.add(cm.users.id); friends.push(cm.users)
           }
-        })
-      }
-      const { data: fships } = await supabase
-        .from('friendships').select('requester_id, addressee_id')
-        .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`).eq('status', 'accepted')
-      if (fships) {
-        const fIds = fships.map(f => f.requester_id === user.id ? f.addressee_id : f.requester_id).filter(id => !seen.has(id))
+        }
+      })
+
+      if (fshipResult.data) {
+        const fIds = fshipResult.data.map(f => f.requester_id === user.id ? f.addressee_id : f.requester_id).filter(id => !seen.has(id))
         if (fIds.length > 0) {
           const { data: profiles } = await supabase.from('users').select('*').in('id', fIds)
           if (profiles) profiles.forEach((p: any) => { if (!seen.has(p.id)) { seen.add(p.id); friends.push(p) } })
         }
       }
+
       setFriendCircles(circleMembership)
       const sorted = friends.sort((a, b) => a.name.localeCompare(b.name))
       setAllFriends(sorted)
       setLoadingFriends(false)
 
-      // Load busy blocks for availability signals (next 7 days)
+      // Load busy blocks for availability signals (next 7 days) — fire and forget
       const friendIds = sorted.map(f => f.id)
       if (friendIds.length > 0) {
         const todayStr = new Date().toISOString().slice(0, 10)
         const weekEnd = new Date(); weekEnd.setDate(weekEnd.getDate() + 7)
         const weekEndStr = weekEnd.toISOString().slice(0, 10)
-        const { data: blocks } = await supabase.from('busy_blocks')
+        supabase.from('busy_blocks')
           .select('user_id')
           .in('user_id', friendIds)
           .gte('date', todayStr)
           .lte('date', weekEndStr)
-        if (blocks) {
-          const counts = new Map<string, number>()
-          blocks.forEach((b: any) => counts.set(b.user_id, (counts.get(b.user_id) || 0) + 1))
-          setFriendBusy(counts)
-        }
+          .then(({ data: blocks }) => {
+            if (blocks) {
+              const counts = new Map<string, number>()
+              blocks.forEach((b: any) => counts.set(b.user_id, (counts.get(b.user_id) || 0) + 1))
+              setFriendBusy(counts)
+            }
+          })
       }
     }
     load()
