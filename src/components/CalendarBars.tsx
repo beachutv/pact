@@ -38,6 +38,9 @@ type Props = {
   onDateChange?: (date: string) => void
   visibilityDays?: number
   createdBy?: string  // user ID of plan creator — shows avatar on set time blocks
+  onGroupTap?: (hour: number) => void  // for new plan flow — tap to set time range
+  selectedStart?: number  // highlight selected range on group bar
+  selectedEnd?: number
 }
 
 const VIS_START = 8
@@ -46,6 +49,7 @@ const VIS_END = 23
 export default function CalendarBars({
   memberIds, dateStr, userId, editable = true, pactStart, pactEnd, compact = false,
   pactId, members = [], onDateChange, visibilityDays = 7, createdBy,
+  onGroupTap, selectedStart, selectedEnd,
 }: Props) {
   const supabase = createClient()
   const [blocks, setBlocks] = useState<BusyBlock[]>([])
@@ -229,7 +233,8 @@ export default function CalendarBars({
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <b style={{ color: 'var(--text)' }}>Group</b>
         {pactId && <span style={{ fontSize: 10 }}> — tap to propose a time</span>}
-        {!pactId && pactStart !== undefined && <span style={{ fontSize: 10 }}> — set time highlighted</span>}
+        {onGroupTap && <span style={{ fontSize: 10 }}> — tap to set time</span>}
+        {!pactId && !onGroupTap && pactStart !== undefined && <span style={{ fontSize: 10 }}> — set time highlighted</span>}
       </div>
 
       {/* Group bar with proposal avatars */}
@@ -237,10 +242,13 @@ export default function CalendarBars({
         {hours.map(h => {
           const st = groupAt(h)
           const inPact = pactStart !== undefined && pactEnd !== undefined && h >= pactStart && h < pactEnd
-          const blocked = st === 'busy' && !inPact
+          const inSelected = selectedStart !== undefined && selectedEnd !== undefined && h >= selectedStart && h < selectedEnd
+          const blocked = st === 'busy' && !inPact && !inSelected
           const hourProposals = proposalsAt(h)
-          const iProposed = hourProposals.some(p => p.user_id === userId)
-          const hasProposals = hourProposals.length > 0
+          // If user is busy at a proposed hour, show busy instead of proposed
+          const userBusy = userStatusAt(userId, h) === 2
+          const iProposed = hourProposals.some(p => p.user_id === userId) && !userBusy
+          const hasProposals = hourProposals.length > 0 && !userBusy
 
           return (
             <div key={h} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
@@ -303,32 +311,37 @@ export default function CalendarBars({
 
               {/* The slot itself */}
               <div
-                onClick={() => pactId ? tapGroupSlot(h) : undefined}
+                onClick={() => pactId ? tapGroupSlot(h) : onGroupTap ? onGroupTap(h) : undefined}
                 style={{
                   width: '100%', height: barHeight, borderRadius: 4,
-                  background: iProposed ? 'var(--accent-soft)'
+                  background: userBusy && (hasProposals || hourProposals.length > 0) ? 'var(--red-soft)'
+                    : iProposed ? 'var(--accent-soft)'
+                    : inSelected ? 'var(--accent-soft)'
                     : inPact ? 'var(--accent-soft)'
                     : st === 'free' ? 'var(--green-soft)'
                     : st === 'soft' ? 'var(--amber-soft)'
                     : 'var(--red-soft)',
-                  border: iProposed ? '2px solid var(--accent)'
+                  border: userBusy && (hasProposals || hourProposals.length > 0) ? '1.5px solid rgba(231,118,93,0.5)'
+                    : iProposed ? '2px solid var(--accent)'
+                    : inSelected ? '2px solid var(--accent)'
                     : inPact ? '1.5px solid var(--accent)'
                     : st === 'free' ? '1px solid rgba(139,176,126,0.3)'
                     : st === 'soft' ? '1px solid rgba(255,184,84,0.35)'
                     : '1px solid rgba(231,118,93,0.3)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 7, fontWeight: 800,
-                  color: iProposed ? 'var(--accent)' : inPact ? 'var(--accent)' : blocked ? 'var(--red)' : st === 'soft' ? 'var(--amber)' : 'transparent',
-                  opacity: blocked && !pactId ? 0.5 : 1,
-                  cursor: pactId && editable ? 'pointer' : blocked ? 'not-allowed' : 'default',
+                  color: userBusy && hourProposals.length > 0 ? 'var(--red)'
+                    : iProposed ? 'var(--accent)' : inSelected ? 'var(--accent)' : inPact ? 'var(--accent)' : blocked ? 'var(--red)' : st === 'soft' ? 'var(--amber)' : 'transparent',
+                  opacity: blocked && !pactId && !onGroupTap ? 0.5 : 1,
+                  cursor: (pactId || onGroupTap) && editable ? 'pointer' : blocked ? 'not-allowed' : 'default',
                   userSelect: 'none',
                   transition: 'transform 0.1s',
                 }}
-                onPointerDown={e => { if (pactId && editable) (e.target as HTMLElement).style.transform = 'scale(0.88)' }}
+                onPointerDown={e => { if ((pactId || onGroupTap) && editable) (e.target as HTMLElement).style.transform = 'scale(0.88)' }}
                 onPointerUp={e => { (e.target as HTMLElement).style.transform = '' }}
                 onPointerLeave={e => { (e.target as HTMLElement).style.transform = '' }}
               >
-                {hasProposals ? '▼' : inPact ? '▼' : blocked ? '✕' : st === 'soft' ? '~' : ''}
+                {userBusy && hourProposals.length > 0 ? '✕' : hasProposals ? '▼' : inSelected ? '▼' : inPact ? '▼' : blocked ? '✕' : st === 'soft' ? '~' : ''}
               </div>
             </div>
           )
@@ -398,7 +411,8 @@ export default function CalendarBars({
           { bg: 'var(--amber-soft)', border: 'rgba(255,184,84,0.35)', label: 'flexible' },
           { bg: 'var(--red-soft)', border: 'rgba(231,118,93,0.3)', label: 'busy' },
           ...(pactId ? [{ bg: 'var(--accent-soft)', border: 'var(--accent)', label: 'proposed' }] : []),
-          ...(pactStart !== undefined && !pactId ? [{ bg: 'var(--accent-soft)', border: 'var(--accent)', label: 'locked' }] : []),
+          ...(onGroupTap && selectedStart !== undefined ? [{ bg: 'var(--accent-soft)', border: 'var(--accent)', label: 'selected' }] : []),
+          ...(pactStart !== undefined && !pactId && !onGroupTap ? [{ bg: 'var(--accent-soft)', border: 'var(--accent)', label: 'locked' }] : []),
         ].map(l => (
           <span key={l.label} style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{

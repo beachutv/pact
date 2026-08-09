@@ -217,7 +217,7 @@ export default function HomePage() {
               >
                 {/* Row 1: Title + circle tag + status */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  <p style={{ fontSize: 14, fontWeight: 700, flex: 1, minWidth: 0 }} onClick={() => router.push('/plans')}>
+                  <p style={{ fontSize: 14, fontWeight: 700, flex: 1, minWidth: 0 }} onClick={() => router.push(`/plans?pact=${p.id}`)}>
                     {p.occasion || when}
                   </p>
                   {circle && (
@@ -237,7 +237,7 @@ export default function HomePage() {
                 </div>
                 {/* Row 2: Time + member count + expand toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-                  <p style={{ fontSize: 12, color: 'var(--text2)' }} onClick={() => router.push('/plans')}>
+                  <p style={{ fontSize: 12, color: 'var(--text2)' }} onClick={() => router.push(`/plans?pact=${p.id}`)}>
                     {when} · {fmtHour(p.win_start)}–{fmtHour(p.win_end)} · {(p.members || []).length} going
                   </p>
                   <button
@@ -254,7 +254,7 @@ export default function HomePage() {
                 </div>
                 {/* Expanded details */}
                 {isExpanded && (
-                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }} onClick={() => router.push('/plans')}>
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }} onClick={() => router.push(`/plans?pact=${p.id}`)}>
                     {p.spot_name && (
                       <p style={{ fontSize: 12, marginBottom: 4 }}>
                         {p.spot_emoji} {p.spot_name} · {p.spot_area}
@@ -317,7 +317,7 @@ export default function HomePage() {
           >
             {/* Row 1: Title + circle tag + countdown */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <p style={{ fontSize: 14, fontWeight: 700, flex: 1, minWidth: 0 }} onClick={() => router.push('/plans')}>
+              <p style={{ fontSize: 14, fontWeight: 700, flex: 1, minWidth: 0 }} onClick={() => router.push(`/plans?pact=${p.id}`)}>
                 {p.occasion || fmtDate(p.date)}
               </p>
               {circle && (
@@ -337,7 +337,7 @@ export default function HomePage() {
             </div>
             {/* Row 2: Time + expand */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-              <p style={{ fontSize: 12, color: 'var(--green)', fontWeight: 700 }} onClick={() => router.push('/plans')}>
+              <p style={{ fontSize: 12, color: 'var(--green)', fontWeight: 700 }} onClick={() => router.push(`/plans?pact=${p.id}`)}>
                 {fmtHour(p.win_start)}–{fmtHour(p.win_end)}
               </p>
               <button
@@ -354,7 +354,7 @@ export default function HomePage() {
             </div>
             {/* Expanded */}
             {isExpanded && (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }} onClick={() => router.push('/plans')}>
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }} onClick={() => router.push(`/plans?pact=${p.id}`)}>
                 {p.spot_name && (
                   <p style={{ fontSize: 12, marginBottom: 4 }}>
                     {p.spot_emoji} {p.spot_name} · {p.spot_area}

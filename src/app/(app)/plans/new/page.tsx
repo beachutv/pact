@@ -384,16 +384,44 @@ function NewPlanContent() {
           }))
           const showDatePicker = planType === 'find' || !selectedDate
           return date ? (
-            <CalendarBars
-              memberIds={memberIds}
-              dateStr={date}
-              userId={user.id}
-              editable={true}
-              compact={false}
-              members={memberInfos}
-              onDateChange={showDatePicker ? (d) => setViewingDate(d) : undefined}
-              visibilityDays={visibilityDays()}
-            />
+            <>
+              <CalendarBars
+                memberIds={memberIds}
+                dateStr={date}
+                userId={user.id}
+                editable={true}
+                compact={false}
+                members={memberInfos}
+                onDateChange={showDatePicker ? (d) => setViewingDate(d) : undefined}
+                visibilityDays={visibilityDays()}
+                onGroupTap={(h) => {
+                  // First tap sets start, second tap sets end
+                  if (startHour === h && endHour === h + 1) {
+                    // Tapping same hour — deselect
+                    setStartHour(0); setEndHour(0)
+                  } else if (startHour && endHour && h >= startHour && h < endHour) {
+                    // Tapping within range — shrink to just this hour
+                    setStartHour(h); setEndHour(h + 1)
+                  } else if (!startHour && !endHour) {
+                    // No selection — start fresh
+                    setStartHour(h); setEndHour(h + 1)
+                  } else if (h < startHour) {
+                    // Extend range left
+                    setStartHour(h)
+                  } else {
+                    // Extend range right
+                    setEndHour(h + 1)
+                  }
+                }}
+                selectedStart={startHour || undefined}
+                selectedEnd={endHour || undefined}
+              />
+              {startHour > 0 && endHour > 0 && (
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', textAlign: 'center', marginTop: 4 }}>
+                  {fmtHour(startHour)} – {fmtHour(endHour)}
+                </p>
+              )}
+            </>
           ) : null
         })()}
 

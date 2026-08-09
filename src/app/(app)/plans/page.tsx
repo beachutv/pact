@@ -1042,8 +1042,7 @@ export default function PlansPage() {
                 )}
                 <button onClick={() => {
                   const pactTitle = p.occasion || fmtDate(p.date)
-                  const inviteCode = circles.find(c => c.id === p.circle_id)?.invite_code || ''
-                  const shareUrl = inviteCode ? `${window.location.origin}/join/${inviteCode}` : window.location.origin
+                  const shareUrl = `${window.location.origin}/plans/invite/${p.id}`
                   const shareText = `${pactTitle} — ${fmtDate(p.date)}, ${fmtWin(p.win_start, p.win_end)}`
                   if (navigator.share) {
                     navigator.share({ title: pactTitle, text: shareText, url: shareUrl }).catch(() => {})
