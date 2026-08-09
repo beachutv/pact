@@ -187,17 +187,14 @@ function NewPlanContent() {
 
   function effectiveDate(): string {
     if (planType === 'date' && selectedDate) return selectedDate
-    const today = new Date()
-    if (selectedRange === 'weekend') { const d = new Date(today); d.setDate(d.getDate() + (6 - d.getDay())); return toStr(d) }
-    if (selectedRange === 'next-week') { const d = new Date(today); d.setDate(d.getDate() + (8 - d.getDay())); return toStr(d) }
-    return toStr(today)
+    return toStr(new Date())
   }
 
   function visibilityDays(): number {
     if (planType === 'date') return 7
-    if (selectedRange === 'weekend') return 7
-    if (selectedRange === 'next-week') return 14
-    return 14
+    if (selectedRange === 'this-week') return 7
+    if (selectedRange === '2-weeks') return 14
+    return 7
   }
 
   async function createPlan() {
@@ -323,7 +320,7 @@ function NewPlanContent() {
         <h2 style={{ fontSize: 20, fontWeight: 800 }}>When are you thinking?</h2>
         <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>Pick a window and we will help find the best time.</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-          {[{ key: 'weekend', label: 'This weekend' }, { key: 'next-week', label: 'Next week' }, { key: '2-weeks', label: 'Next 2 weeks' }].map(r => (
+          {[{ key: 'this-week', label: 'This week' }, { key: '2-weeks', label: 'Next 2 weeks' }].map(r => (
             <button key={r.key} onClick={() => setSelectedRange(r.key)} className="chip" style={{
               padding: '12px 18px', fontSize: 13,
               borderColor: selectedRange === r.key ? 'var(--accent)' : 'var(--border)',
@@ -445,6 +442,12 @@ function NewPlanContent() {
           const memberInfos = [user, ...allFriends.filter(m => invitedIds.has(m.id))].map(m => ({
             id: m.id, name: m.name, color: m.color, avatar_url: m.avatar_url,
           }))
+          // Build per-member visibility windows so CalendarBars can exclude
+          // members on days beyond their personal setting
+          const visMap = new Map<string, number>()
+          ;[user, ...allFriends.filter(m => invitedIds.has(m.id))].forEach(m => {
+            visMap.set(m.id, m.visibility_window || 7)
+          })
           const showDatePicker = true // always show date tabs so user can browse
           return date ? (
             <>
@@ -457,6 +460,7 @@ function NewPlanContent() {
                 members={memberInfos}
                 onDateChange={showDatePicker ? (d) => setViewingDate(d) : undefined}
                 visibilityDays={visibilityDays()}
+                memberVisibility={visMap}
                 onGroupTap={(h) => {
                   // First tap sets start, second tap sets end
                   if (startHour === h && endHour === h + 1) {

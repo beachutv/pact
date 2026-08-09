@@ -43,6 +43,7 @@ type Props = {
   onGroupTap?: (hour: number) => void  // for new plan flow — tap to set time range
   selectedStart?: number  // highlight selected range on group bar
   selectedEnd?: number
+  memberVisibility?: Map<string, number>  // per-member visibility window (days) — members beyond their window are excluded from group bar
 }
 
 const VIS_START = 8
@@ -51,7 +52,7 @@ const VIS_END = 23
 export default function CalendarBars({
   memberIds, dateStr, userId, editable = true, pactStart, pactEnd, compact = false,
   pactId, members = [], onDateChange, visibilityDays = 7, createdBy,
-  onGroupTap, selectedStart, selectedEnd,
+  onGroupTap, selectedStart, selectedEnd, memberVisibility,
 }: Props) {
   const supabase = createClient()
   const [blocks, setBlocks] = useState<BusyBlock[]>([])
@@ -168,8 +169,20 @@ export default function CalendarBars({
     return hit?.pact_id === pactId
   }
 
+  // Check if a member is within their visibility window for the current date
+  function isMemberVisible(uid: string): boolean {
+    if (!memberVisibility || !memberVisibility.has(uid)) return true
+    const window = memberVisibility.get(uid)!
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const viewDate = new Date(dateStr + 'T00:00:00'); viewDate.setHours(0, 0, 0, 0)
+    const daysDiff = Math.round((viewDate.getTime() - today.getTime()) / 86400000)
+    return daysDiff < window
+  }
+
   function groupAt(h: number): 'free' | 'soft' | 'busy' {
-    const states = memberIds.map(id => {
+    const visibleMembers = memberIds.filter(id => isMemberVisible(id))
+    if (visibleMembers.length === 0) return 'free'
+    const states = visibleMembers.map(id => {
       // If a member's busy block at this hour is from THIS pact, treat as free
       // (pact's own time shouldn't show as busy on the group bar)
       if (isThisPactBlockAt(id, h)) return 0
