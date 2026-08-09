@@ -467,7 +467,7 @@ function NewPlanContent() {
                 onDateChange={showDatePicker ? (d) => setViewingDate(d) : undefined}
                 visibilityDays={visibilityDays()}
                 memberVisibility={visMap}
-                onGroupTap={(h) => {
+                onGroupTap={(h, getGroupStatus) => {
                   // First tap sets start, second tap sets end
                   if (startHour === h && endHour === h + 1) {
                     // Tapping same hour — deselect
@@ -479,11 +479,19 @@ function NewPlanContent() {
                     // No selection — start fresh
                     setStartHour(h); setEndHour(h + 1)
                   } else if (h < startHour) {
-                    // Extend range left
-                    setStartHour(h)
+                    // Extend range left — but stop at any busy block between h and startHour
+                    let newStart = h
+                    for (let i = h + 1; i < startHour; i++) {
+                      if (getGroupStatus(i) === 'busy') { newStart = 0; break }
+                    }
+                    if (newStart) setStartHour(newStart)
                   } else {
-                    // Extend range right
-                    setEndHour(h + 1)
+                    // Extend range right — but stop at any busy block between endHour and h
+                    let newEnd = h + 1
+                    for (let i = endHour; i < h; i++) {
+                      if (getGroupStatus(i) === 'busy') { newEnd = 0; break }
+                    }
+                    if (newEnd) setEndHour(newEnd)
                   }
                 }}
                 selectedStart={startHour || undefined}

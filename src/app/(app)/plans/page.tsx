@@ -235,8 +235,10 @@ export default function PlansPage() {
     }
 
     // Fetch upcoming + past in parallel
-    const [{ data: upcoming }, { data: past }] = await Promise.all([upcomingQuery, pastQuery])
-    const all = [...(upcoming || []), ...(past || [])]
+    const [upRes, pastRes] = await Promise.all([upcomingQuery, pastQuery])
+    if (upRes.error) console.error('[Plans] upcoming query error:', upRes.error)
+    if (pastRes.error) console.error('[Plans] past query error:', pastRes.error)
+    const all = [...(upRes.data || []), ...(pastRes.data || [])]
 
     // Show plans immediately — don't block on secondary data
     setPacts(all.map(p => ({ ...p, declines: p.declines || [] })))

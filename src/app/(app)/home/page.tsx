@@ -53,12 +53,13 @@ export default function HomePage() {
   useEffect(() => {
     async function fetchPacts() {
       setLoading(true)
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('pacts')
         .select('*, members:pact_members(user_id)')
         .gte('date', toStr(new Date()))
         .order('date', { ascending: true })
         .limit(10)
+      if (error) console.error('[Home] pacts query error:', error)
       if (data) setPacts(data as Pact[])
       setLoading(false)
     }

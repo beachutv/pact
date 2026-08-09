@@ -79,14 +79,15 @@ export default function CircleSettingsPage() {
         })))
       }
 
-      // Load pending join requests
-      // Note: must disambiguate users FK — table has both user_id and resolved_by referencing users
-      const { data: reqs } = await supabase
-        .from('circle_join_requests')
-        .select('id, user_id, status, created_at, users!user_id(id, name, color, avatar_url)')
-        .eq('circle_id', id)
-        .eq('status', 'pending')
-      if (reqs) setJoinRequests(reqs)
+      // Load pending join requests (table may not exist if migration-v5 wasn't run)
+      try {
+        const { data: reqs } = await supabase
+          .from('circle_join_requests')
+          .select('id, user_id, status, created_at, users!user_id(id, name, color, avatar_url)')
+          .eq('circle_id', id)
+          .eq('status', 'pending')
+        if (reqs) setJoinRequests(reqs)
+      } catch {}
 
       setLoading(false)
     }
@@ -348,9 +349,14 @@ export default function CircleSettingsPage() {
   }
 
   async function handleLeave() {
-    await supabase.from('circle_members').delete()
+    const { error } = await supabase.from('circle_members').delete()
       .eq('circle_id', id)
       .eq('user_id', user.id)
+    if (error) {
+      console.error('Leave circle error:', error)
+      alert('Failed to leave circle. Please try again.')
+      return
+    }
     const remaining = circles.filter(c => c.id !== id)
     if (remaining.length > 0) {
       setActiveCircle(remaining[0])

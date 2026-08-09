@@ -40,7 +40,7 @@ type Props = {
   onDateChange?: (date: string) => void
   visibilityDays?: number
   createdBy?: string  // user ID of plan creator — shows avatar on set time blocks
-  onGroupTap?: (hour: number) => void  // for new plan flow — tap to set time range
+  onGroupTap?: (hour: number, getGroupStatus: (h: number) => 'free' | 'soft' | 'busy') => void  // for new plan flow
   selectedStart?: number  // highlight selected range on group bar
   selectedEnd?: number
   memberVisibility?: Map<string, number>  // per-member visibility window (days) — members beyond their window are excluded from group bar
@@ -445,7 +445,7 @@ export default function CalendarBars({
                   // Also block when any group member is hard busy (group status = 'busy')
                   if (st === 'busy' && !inPact && !inSelected) return
                   if (pactId) tapGroupSlot(h)
-                  else if (onGroupTap) onGroupTap(h)
+                  else if (onGroupTap) onGroupTap(h, groupAt)
                 }}
                 style={{
                   width: '100%', height: barHeight, borderRadius: 4,
