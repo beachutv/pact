@@ -33,10 +33,11 @@ type Props = {
   pactStart?: number
   pactEnd?: number
   compact?: boolean
-  pactId?: string          // required for time proposals
-  members?: MemberInfo[]   // member profiles for avatar display
+  pactId?: string
+  members?: MemberInfo[]
   onDateChange?: (date: string) => void
   visibilityDays?: number
+  createdBy?: string  // user ID of plan creator — shows avatar on set time blocks
 }
 
 const VIS_START = 8
@@ -44,7 +45,7 @@ const VIS_END = 23
 
 export default function CalendarBars({
   memberIds, dateStr, userId, editable = true, pactStart, pactEnd, compact = false,
-  pactId, members = [], onDateChange, visibilityDays = 7,
+  pactId, members = [], onDateChange, visibilityDays = 7, createdBy,
 }: Props) {
   const supabase = createClient()
   const [blocks, setBlocks] = useState<BusyBlock[]>([])
@@ -275,7 +276,30 @@ export default function CalendarBars({
                   )}
                 </div>
               )}
-              {!hasProposals && pactId && <div style={{ minHeight: 14 }} />}
+              {/* Creator avatar on set time blocks (when no proposals yet) */}
+              {!hasProposals && inPact && createdBy && (() => {
+                const creator = getMemberInfo(createdBy)
+                if (!creator) return <div style={{ minHeight: 14 }} />
+                return (
+                  <div style={{ display: 'flex', justifyContent: 'center', minHeight: 14 }}>
+                    <div style={{
+                      width: 14, height: 14, borderRadius: '50%', background: creator.color,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 6, fontWeight: 800, color: '#fff',
+                      border: '1.5px solid var(--accent)', position: 'relative', overflow: 'hidden',
+                    }}>
+                      {creator.name[0]}
+                      {creator.avatar_url && (
+                        <img src={creator.avatar_url} alt="" style={{
+                          position: 'absolute', inset: 0, width: '100%', height: '100%',
+                          objectFit: 'cover', borderRadius: '50%',
+                        }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+              {!hasProposals && !inPact && pactId && <div style={{ minHeight: 14 }} />}
 
               {/* The slot itself */}
               <div

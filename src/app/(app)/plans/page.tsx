@@ -872,6 +872,7 @@ export default function PlansPage() {
                         pactEnd={p.win_end}
                         compact={true}
                         pactId={p.id}
+                        createdBy={p.created_by || undefined}
                         members={[
                           ...p.members.map(m => m.user_id),
                           ...(p.declines || []).map(d => d.user_id),
