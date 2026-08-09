@@ -54,13 +54,15 @@ export default function CalendarBars({
   const supabase = createClient()
   const [blocks, setBlocks] = useState<BusyBlock[]>([])
   const [loading, setLoading] = useState(true)
+  const [initialLoaded, setInitialLoaded] = useState(false)
   const [localOverrides, setLocalOverrides] = useState<Map<number, number>>(new Map())
   const [proposals, setProposals] = useState<TimeProposal[]>([])
 
   // Load busy blocks
   useEffect(() => {
     if (!memberIds.length || !dateStr) return
-    setLoading(true)
+    // Only show loading spinner on first load — subsequent date switches keep old data visible
+    if (!initialLoaded) setLoading(true)
     setLocalOverrides(new Map())
     supabase
       .from('busy_blocks')
@@ -70,6 +72,7 @@ export default function CalendarBars({
       .then(({ data }) => {
         setBlocks((data || []) as BusyBlock[])
         setLoading(false)
+        setInitialLoaded(true)
       })
   }, [memberIds.join(','), dateStr]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -423,6 +426,67 @@ export default function CalendarBars({
           </span>
         ))}
       </div>
+
+      {/* Proposal summaries per user */}
+      {pactId && proposals.length > 0 && (() => {
+        // Group proposals by user and find their contiguous time ranges
+        const byUser = new Map<string, number[]>()
+        proposals.forEach(p => {
+          if (!byUser.has(p.user_id)) byUser.set(p.user_id, [])
+          byUser.get(p.user_id)!.push(p.hour)
+        })
+
+        const summaries: { uid: string; name: string; color: string; avatar_url?: string | null; ranges: string }[] = []
+        byUser.forEach((hours, uid) => {
+          const m = getMemberInfo(uid)
+          if (!m) return
+          const sorted = [...hours].sort((a, b) => a - b)
+          // Build contiguous ranges
+          const ranges: [number, number][] = []
+          let rStart = sorted[0], rEnd = sorted[0]
+          for (let i = 1; i < sorted.length; i++) {
+            if (sorted[i] === rEnd + 1) {
+              rEnd = sorted[i]
+            } else {
+              ranges.push([rStart, rEnd + 1])
+              rStart = sorted[i]; rEnd = sorted[i]
+            }
+          }
+          ranges.push([rStart, rEnd + 1])
+          const rangeStr = ranges.map(([s, e]) => `${fmtTiny(s)}–${fmtTiny(e)}`).join(', ')
+          summaries.push({ uid, name: m.name.split(' ')[0], color: m.color, avatar_url: m.avatar_url, ranges: rangeStr })
+        })
+
+        if (summaries.length === 0) return null
+
+        return (
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.4px' }}>
+              Proposed times
+            </p>
+            {summaries.map(s => (
+              <div key={s.uid} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                <div style={{
+                  width: 18, height: 18, borderRadius: '50%', background: s.color,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 7, fontWeight: 800, color: '#fff', flexShrink: 0,
+                  position: 'relative', overflow: 'hidden',
+                }}>
+                  {s.name[0]}
+                  {s.avatar_url && (
+                    <img src={s.avatar_url} alt="" style={{
+                      position: 'absolute', inset: 0, width: '100%', height: '100%',
+                      objectFit: 'cover', borderRadius: '50%',
+                    }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  )}
+                </div>
+                <span style={{ fontWeight: 700, color: 'var(--text)' }}>{s.name}</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{s.ranges}</span>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
     </div>
   )
 }
