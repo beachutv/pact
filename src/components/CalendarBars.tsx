@@ -328,7 +328,7 @@ export default function CalendarBars({
                 onPointerUp={e => { (e.target as HTMLElement).style.transform = '' }}
                 onPointerLeave={e => { (e.target as HTMLElement).style.transform = '' }}
               >
-                {iProposed ? '✓' : inPact ? '▼' : blocked ? '✕' : st === 'soft' ? '~' : ''}
+                {hasProposals ? '▼' : inPact ? '▼' : blocked ? '✕' : st === 'soft' ? '~' : ''}
               </div>
             </div>
           )

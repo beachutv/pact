@@ -8,7 +8,6 @@ import { fmtDate, fmtHour, fmtWin, txtOn } from '@/lib/utils'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { sendPushNotification } from '@/lib/push'
 import LocationPicker from '@/components/LocationPicker'
-import SlideToConfirm from '@/components/SlideToConfirm'
 import CalendarBars from '@/components/CalendarBars'
 
 type Pact = {
@@ -764,10 +763,10 @@ export default function PlansPage() {
                   </div>
                 </>
               ) : (
-                /* ─── View mode ─── */
+                /* ─── View mode — compact card, tap to open detail modal ─── */
                 <>
                   <div
-                    onClick={() => setExpandedPactId(expandedPactId === p.id ? null : p.id)}
+                    onClick={() => setExpandedPactId(p.id)}
                     style={{ cursor: 'pointer' }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -782,48 +781,28 @@ export default function PlansPage() {
                           })()}
                         </p>
                         <p style={{ fontSize: 12, color: 'var(--text2)' }}>
-                          {fmtDate(p.date)} · {fmtWin(p.win_start, p.win_end)}
+                          📅 {fmtDate(p.date)} · {fmtWin(p.win_start, p.win_end)}
                         </p>
-                        <p style={{ fontSize: 12, color: 'var(--text2)' }}>
-                          {p.spot_name !== 'TBD'
-                            ? `${p.spot_emoji || '📍'} ${p.spot_name}${p.spot_area ? ` — ${p.spot_area}` : ''}`
-                            : 'To be set'}
-                        </p>
-                        {p.created_by && (
-                          <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
-                            Created by {getMember(p.created_by)?.name?.split(' ')[0] || 'someone'}
+                        {p.spot_name !== 'TBD' && (
+                          <p style={{ fontSize: 12, color: 'var(--text2)' }}>
+                            📍 {p.spot_name}{p.spot_area ? ` — ${p.spot_area}` : ''}
                           </p>
                         )}
+                        <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
+                          Created by {getMember(p.created_by || '')?.name?.split(' ')[0] || 'someone'}
+                        </p>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                        <span style={{
-                          fontSize: 10, fontWeight: 800, padding: '4px 10px', borderRadius: 12,
-                          textTransform: 'uppercase', letterSpacing: '.4px',
-                          background: p.status === 'confirmed' ? 'var(--green-soft)' : 'var(--amber-soft)',
-                          color: p.status === 'confirmed' ? 'var(--green)' : 'var(--amber)',
-                        }}>
-                          {p.status === 'confirmed' ? 'locked' : 'open'}
-                        </span>
-                      </div>
+                      <span style={{
+                        fontSize: 10, fontWeight: 800, padding: '4px 10px', borderRadius: 12,
+                        textTransform: 'uppercase', letterSpacing: '.4px',
+                        background: p.status === 'confirmed' ? 'var(--green-soft)' : 'var(--amber-soft)',
+                        color: p.status === 'confirmed' ? 'var(--green)' : 'var(--amber)',
+                      }}>
+                        {p.status === 'confirmed' ? 'locked' : 'open'}
+                      </span>
                     </div>
 
-                    {/* Edit button — separate from status */}
-                    {editable && (
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                        <button onClick={(e) => { e.stopPropagation(); startEditing(p) }}
-                          style={{
-                            background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10,
-                            padding: '5px 14px', fontSize: 11, fontWeight: 700,
-                            color: 'var(--text2)', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: 5,
-                          }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                          Edit
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Who's in + who's out — always visible */}
+                    {/* Who's in — always visible */}
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
                       {p.members.map(pm => {
                         const m = getMember(pm.user_id)
@@ -838,7 +817,6 @@ export default function PlansPage() {
                           </div>
                         )
                       })}
-                      {/* Show declined members with red X */}
                       {(p.declines || []).map(d => {
                         const m = getMember(d.user_id)
                         if (!m) return null
@@ -864,392 +842,11 @@ export default function PlansPage() {
                       <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 4 }}>
                         {p.members.length} in
                         {(p.declines || []).length > 0 && (
-                          <span style={{ color: 'var(--red)', marginLeft: 4 }}>
-                            · {p.declines.length} out
-                          </span>
+                          <span style={{ color: 'var(--red)', marginLeft: 4 }}>· {p.declines.length} out</span>
                         )}
-                      </span>
-                      <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 'auto' }}>
-                        {expandedPactId === p.id ? '▲' : '▼'}
                       </span>
                     </div>
                   </div>
-
-                  {/* Expanded details */}
-                  {expandedPactId === p.id && (
-                    <div style={{
-                      marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
-                      display: 'flex', flexDirection: 'column', gap: 8,
-                    }}>
-                      {/* Calendar bars — group + your availability */}
-                      <CalendarBars
-                        memberIds={[
-                          ...p.members.map(m => m.user_id),
-                          ...(p.declines || []).filter(d => !p.members.some(m => m.user_id === d.user_id)).map(d => d.user_id),
-                        ].filter((v, i, a) => a.indexOf(v) === i)}
-                        dateStr={p.date}
-                        userId={user.id}
-                        editable={true}
-                        pactStart={p.win_start}
-                        pactEnd={p.win_end}
-                        compact={true}
-                        pactId={p.id}
-                        createdBy={p.created_by || undefined}
-                        members={[
-                          ...p.members.map(m => m.user_id),
-                          ...(p.declines || []).map(d => d.user_id),
-                        ].filter((v, i, a) => a.indexOf(v) === i).map(uid => {
-                          const m = getMember(uid)
-                          return m ? { id: m.id, name: m.name, color: m.color, avatar_url: (m as any).avatar_url } : { id: uid, name: '?', color: '#999' }
-                        })}
-                      />
-
-                      {/* Member list with voting */}
-                      {(() => {
-                        const pactResponses = responses[p.id] || []
-                        const getVote = (uid: string) => pactResponses.find(r => r.user_id === uid)?.response || null
-                        const isPending = p.status === 'pending'
-                        const yesCount = pactResponses.filter(r => r.response === 'yes').length + p.members.length
-                        const maybeCount = pactResponses.filter(r => r.response === 'maybe').length
-
-                        return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            {/* Vote tally for pending plans */}
-                            {isPending && pactResponses.length > 0 && (
-                              <p style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>
-                                {yesCount} in{maybeCount > 0 ? ` · ${maybeCount} maybe` : ''}
-                                {(p.declines || []).length > 0 ? ` · ${p.declines.length} out` : ''}
-                              </p>
-                            )}
-
-                            {/* Committed members */}
-                            {p.members.map(pm => {
-                              const m = getMember(pm.user_id)
-                              if (!m) return null
-                              return (
-                                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                                  <div style={{
-                                    width: 20, height: 20, borderRadius: '50%', background: m.color,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: 8, fontWeight: 800, color: txtOn(m.color), flexShrink: 0,
-                                  }}>
-                                    {m.name[0]}
-                                  </div>
-                                  <span style={{ flex: 1, fontWeight: 600 }}>{m.name}{m.id === user.id ? ' (you)' : ''}</span>
-                                  <span style={{ color: 'var(--green)', fontSize: 11, fontWeight: 700 }}>✓ In</span>
-                                </div>
-                              )
-                            })}
-
-                            {/* Members who voted but haven't committed */}
-                            {isPending && pactResponses
-                              .filter(r => !p.members.some(m => m.user_id === r.user_id) && !p.declines?.some(d => d.user_id === r.user_id))
-                              .map(r => {
-                                const m = getMember(r.user_id)
-                                if (!m) return null
-                                const voteStyle = r.response === 'yes'
-                                  ? { bg: 'var(--green-soft)', color: 'var(--green)', label: '✓ works' }
-                                  : r.response === 'maybe'
-                                  ? { bg: 'var(--amber-soft)', color: 'var(--amber)', label: '~ maybe' }
-                                  : { bg: 'var(--red-soft)', color: 'var(--red)', label: "✕ can't" }
-                                return (
-                                  <div key={`vote-${m.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                                    <div style={{
-                                      width: 20, height: 20, borderRadius: '50%', background: m.color,
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                      fontSize: 8, fontWeight: 800, color: txtOn(m.color), flexShrink: 0,
-                                    }}>
-                                      {m.name[0]}
-                                    </div>
-                                    <span style={{ flex: 1, fontWeight: 600 }}>{m.name}{m.id === user.id ? ' (you)' : ''}</span>
-                                    <span style={{
-                                      fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 8,
-                                      background: voteStyle.bg, color: voteStyle.color,
-                                    }}>{voteStyle.label}</span>
-                                  </div>
-                                )
-                              })
-                            }
-
-                            {/* Declined */}
-                            {(p.declines || []).map(d => {
-                              const m = getMember(d.user_id)
-                              if (!m) return null
-                              return (
-                                <div key={`out-${m.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, opacity: 0.6 }}>
-                                  <div style={{
-                                    width: 20, height: 20, borderRadius: '50%', background: m.color,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: 8, fontWeight: 800, color: txtOn(m.color), flexShrink: 0,
-                                  }}>
-                                    {m.name[0]}
-                                  </div>
-                                  <span style={{ fontWeight: 600 }}>{m.name}{m.id === user.id ? ' (you)' : ''}</span>
-                                  <span style={{ color: 'var(--red)', marginLeft: 'auto', fontSize: 11, fontWeight: 700 }}>✕ Out</span>
-                                </div>
-                              )
-                            })}
-
-                            {/* Your vote buttons — show for pending plans where you haven't committed */}
-                            {isPending && !isIn && !declinedPacts.has(p.id) && !p.declines?.some(d => d.user_id === user.id) && (
-                              <div style={{
-                                display: 'flex', gap: 6, marginTop: 6, padding: '8px 0',
-                                borderTop: '1px solid var(--border)',
-                              }}>
-                                {([
-                                  { key: 'yes' as const, label: '✓ works', border: 'var(--green)', bg: 'var(--green-soft)', color: 'var(--green)' },
-                                  { key: 'maybe' as const, label: '~ maybe', border: 'var(--amber)', bg: 'var(--amber-soft)', color: 'var(--amber)' },
-                                  { key: 'no' as const, label: "✕ can't", border: 'var(--red)', bg: 'var(--red-soft)', color: 'var(--red)' },
-                                ] as const).map(opt => {
-                                  const myVote = getVote(user.id)
-                                  const isSelected = myVote === opt.key
-                                  return (
-                                    <button
-                                      key={opt.key}
-                                      onClick={() => votePact(p.id, opt.key)}
-                                      style={{
-                                        flex: 1, padding: '6px 0', borderRadius: 10,
-                                        border: isSelected ? `1.5px solid ${opt.border}` : '1.5px solid var(--border)',
-                                        background: isSelected ? opt.bg : 'var(--surface2)',
-                                        color: isSelected ? opt.color : 'var(--text2)',
-                                        fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                                      }}
-                                    >
-                                      {opt.label}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })()}
-
-                      {/* Comment thread */}
-                      {(() => {
-                        const pactComments = comments[p.id] || []
-                        return (
-                          <div style={{ marginTop: 8 }}>
-                            {pactComments.length > 0 && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-                                {pactComments.map(c => {
-                                  const author = getMember(c.user_id)
-                                  const isOwn = c.user_id === user.id
-                                  return (
-                                    <div key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                                      <div style={{
-                                        width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-                                        background: author?.color || '#666',
-                                        color: txtOn(author?.color || '#666'),
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        fontSize: 9, fontWeight: 800,
-                                      }}>
-                                        {author?.name?.[0] || '?'}
-                                      </div>
-                                      <div style={{
-                                        flex: 1, background: 'var(--surface2)', padding: '8px 12px',
-                                        borderRadius: 12, fontSize: 12.5, lineHeight: 1.4,
-                                      }}>
-                                        <div style={{ fontWeight: 700, fontSize: 11, marginBottom: 2 }}>
-                                          {author?.name || 'Unknown'}
-                                        </div>
-                                        {c.text}
-                                      </div>
-                                      {isOwn && (
-                                        <button
-                                          onClick={() => deleteComment(c.id, p.id)}
-                                          style={{
-                                            background: 'none', border: 'none', color: 'var(--text2)',
-                                            fontSize: 10, cursor: 'pointer', padding: '4px', flexShrink: 0,
-                                          }}
-                                        >✕</button>
-                                      )}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            )}
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              <input
-                                type="text"
-                                placeholder="Add a comment…"
-                                value={expandedPactId === p.id ? commentText : ''}
-                                onChange={e => setCommentText(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') addComment(p.id) }}
-                                style={{
-                                  flex: 1, background: 'var(--surface)', border: '1px solid var(--border)',
-                                  borderRadius: 20, padding: '8px 14px', color: 'var(--text)',
-                                  fontSize: 12.5, outline: 'none',
-                                }}
-                              />
-                              <button
-                                onClick={() => addComment(p.id)}
-                                disabled={sendingComment || !commentText.trim()}
-                                style={{
-                                  width: 36, height: 36, borderRadius: '50%', border: 'none',
-                                  background: commentText.trim() ? 'var(--accent)' : 'var(--surface3)',
-                                  color: '#fff', fontSize: 14, cursor: 'pointer', flexShrink: 0,
-                                  opacity: sendingComment ? 0.5 : 1,
-                                }}
-                              >➤</button>
-                            </div>
-                          </div>
-                        )
-                      })()}
-
-                      {/* Action buttons */}
-                      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                        <button
-                          onClick={() => {
-                            const pactTitle = p.occasion || fmtDate(p.date)
-                            const shareText = `${pactTitle} — ${fmtDate(p.date)}, ${fmtWin(p.win_start, p.win_end)}`
-                            if (navigator.share) {
-                              navigator.share({
-                                title: pactTitle,
-                                text: shareText,
-                                url: window.location.origin + '/join/' + (activeCircle?.invite_code || ''),
-                              }).catch(() => {})
-                            } else {
-                              navigator.clipboard.writeText(shareText)
-                              showToast('Copied to clipboard')
-                            }
-                          }}
-                          style={{
-                            flex: 1, padding: '8px 0', borderRadius: 10,
-                            border: '1px solid var(--border)', background: 'var(--surface2)',
-                            color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                          }}
-                        >
-                          Share
-                        </button>
-                        {isIn && (
-                          <button
-                            onClick={() => addToCalendar(p)}
-                            disabled={addingToCalendar === p.id}
-                            style={{
-                              flex: 1, padding: '8px 0', borderRadius: 10,
-                              border: '1px solid var(--border)', background: 'var(--surface2)',
-                              color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                              opacity: addingToCalendar === p.id ? 0.5 : 1,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                            }}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                            {addingToCalendar === p.id ? 'Adding...' : 'Calendar'}
-                          </button>
-                        )}
-                        {isIn && (
-                          <button
-                            onClick={() => startHoldBreak(p.id)}
-                            style={{
-                              flex: 1, padding: '8px 0', borderRadius: 10,
-                              border: '1px solid var(--border)', background: 'var(--red-soft)',
-                              color: 'var(--red)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                            }}
-                          >
-                            Can&apos;t make it
-                          </button>
-                        )}
-                      </div>
-                      {/* Delete for plan creator */}
-                      {editable && (
-                        <button onClick={() => deletePact(p.id)} style={{
-                          width: '100%', padding: '8px 0', borderRadius: 10, border: 'none',
-                          background: 'none', color: 'var(--red)', fontSize: 11, fontWeight: 600,
-                          cursor: 'pointer', marginTop: 2,
-                        }}>
-                          {p.status === 'confirmed' ? 'Cancel this plan' : 'Delete this plan'}
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Slide to commit / Decline — only if not already in */}
-                  {!isIn && (declinedPacts.has(p.id) || p.declines?.some(d => d.user_id === user.id)) && (
-                    <div style={{
-                      marginTop: 8, padding: '10px 14px', borderRadius: 10,
-                      background: 'var(--surface2)', textAlign: 'center',
-                    }}>
-                      <p style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600 }}>
-                        You declined this pact
-                      </p>
-                      <button
-                        onClick={async () => {
-                          setDeclinedPacts(prev => { const n = new Set(prev); n.delete(p.id); return n })
-                          await supabase.from('pact_declines').delete()
-                            .eq('pact_id', p.id).eq('user_id', user.id)
-                          await loadPacts()
-                        }}
-                        style={{
-                          marginTop: 6, padding: '6px 16px', borderRadius: 8, border: '1px solid var(--border)',
-                          background: 'transparent', color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                        }}
-                      >
-                        Changed my mind
-                      </button>
-                    </div>
-                  )}
-                  {!isIn && !declinedPacts.has(p.id) && !p.declines?.some(d => d.user_id === user.id) && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                      <SlideToConfirm
-                        label="Slide to lock in"
-                        onConfirm={() => joinPact(p.id)}
-                        height={44}
-                      />
-                      <button
-                        onClick={async () => {
-                          const pactTitle = p.occasion || fmtDate(p.date)
-                          const allOtherIds = p.members.map(m => m.user_id).filter(id => id !== user.id)
-                          if (p.created_by && !allOtherIds.includes(p.created_by) && p.created_by !== user.id) {
-                            allOtherIds.push(p.created_by)
-                          }
-                          // Persist decline in DB
-                          await supabase.from('pact_declines').upsert({
-                            pact_id: p.id,
-                            user_id: user.id,
-                          }, { onConflict: 'pact_id,user_id' })
-                          // Remove from own Google Calendar
-                          fetch('/api/calendar/delete-event', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ pactId: p.id }),
-                          }).catch(() => {})
-                          // Also remove pact busy block
-                          await supabase.from('busy_blocks').delete()
-                            .eq('pact_id', p.id).eq('user_id', user.id)
-                          // Mark as declined locally
-                          setDeclinedPacts(prev => new Set([...prev, p.id]))
-                          for (const uid of allOtherIds) {
-                            await supabase.from('notifications').insert({
-                              user_id: uid,
-                              type: 'pact_change',
-                              title: `${user.name?.split(' ')[0] || 'Someone'} can't make it`,
-                              body: `Declined ${pactTitle}`,
-                              link: `/plans?pact=${p.id}`,
-                            })
-                          }
-                          if (allOtherIds.length > 0) {
-                            sendPushNotification({
-                              userIds: allOtherIds,
-                              title: `${user.name?.split(' ')[0] || 'Someone'} can't make it`,
-                              body: `Declined ${pactTitle}`,
-                              url: `/plans?pact=${p.id}`,
-                              tag: `decline-${p.id}`,
-                            })
-                          }
-                          await loadPacts()
-                          showToast('The group has been informed')
-                        }}
-                        style={{
-                          padding: '10px 0', borderRadius: 10, width: '100%',
-                          border: '1px solid var(--border)', background: 'transparent',
-                          color: 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                        }}
-                      >
-                        Can&apos;t make it
-                      </button>
-                    </div>
-                  )}
                 </>
               )}
 
@@ -1259,6 +856,258 @@ export default function PlansPage() {
         })
       })()}
 
+      {/* ─── Plan Detail Modal ─── */}
+      {expandedPactId && (() => {
+        const p = pacts.find(x => x.id === expandedPactId)
+        if (!p) return null
+        const isIn = p.members.some(m => m.user_id === user.id)
+        const editable = canEdit(p)
+        const pactComments = comments[p.id] || []
+        const pactResponses = responses[p.id] || []
+        const getVote = (uid: string) => pactResponses.find(r => r.user_id === uid)?.response || null
+        const isPending = p.status === 'pending'
+
+        return (
+          <div
+            onClick={e => { if (e.target === e.currentTarget) setExpandedPactId(null) }}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+              zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 24,
+            }}
+          >
+            <div style={{
+              background: 'var(--surface2)', borderRadius: 20, padding: 22,
+              width: '100%', maxWidth: 360, maxHeight: '80vh', overflowY: 'auto',
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>
+                  {p.occasion || (() => {
+                    const others = p.members
+                      .filter(m => m.user_id !== user.id)
+                      .map(m => getMember(m.user_id)?.name.split(' ')[0])
+                      .filter(Boolean)
+                    return others.length > 0 ? `Pact with ${others.join(', ')}` : 'Pact'
+                  })()}
+                </h3>
+                <span style={{
+                  fontSize: 10, fontWeight: 800, padding: '4px 10px', borderRadius: 12,
+                  textTransform: 'uppercase', letterSpacing: '.4px',
+                  background: p.status === 'confirmed' ? 'var(--green-soft)' : 'var(--amber-soft)',
+                  color: p.status === 'confirmed' ? 'var(--green)' : 'var(--amber)',
+                }}>
+                  {p.status === 'confirmed' ? 'locked' : p.status === 'cancelled' ? 'cancelled' : 'scheduling'}
+                </span>
+              </div>
+
+              {/* When + where */}
+              <div style={{ marginTop: 10 }}>
+                <p style={{ fontSize: 13, color: 'var(--text2)' }}>📅 {fmtDate(p.date)} · {fmtWin(p.win_start, p.win_end)}</p>
+                {p.spot_name !== 'TBD' && (
+                  <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4 }}>
+                    📍 {p.spot_name}{p.spot_area ? ` — ${p.spot_area}` : ''}
+                  </p>
+                )}
+                <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
+                  Created by {getMember(p.created_by || '')?.name?.split(' ')[0] || 'someone'}
+                </p>
+              </div>
+
+              {/* Who's in */}
+              <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginTop: 16, marginBottom: 8 }}>
+                Who&apos;s in ({p.members.length})
+              </p>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                {p.members.map(pm => {
+                  const m = getMember(pm.user_id)
+                  if (!m) return null
+                  return (
+                    <div key={m.id} style={{
+                      width: 28, height: 28, borderRadius: '50%', background: m.color,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 10, fontWeight: 800, color: txtOn(m.color),
+                    }}>{m.name[0]}</div>
+                  )
+                })}
+                <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 8 }}>
+                  {p.members.map(pm => getMember(pm.user_id)?.name.split(' ')[0]).filter(Boolean).join(', ')}
+                </span>
+              </div>
+
+              {/* Availability */}
+              <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginTop: 16, marginBottom: 8 }}>
+                Availability
+              </p>
+              <CalendarBars
+                memberIds={[
+                  ...p.members.map(m => m.user_id),
+                  ...(p.declines || []).filter(d => !p.members.some(m => m.user_id === d.user_id)).map(d => d.user_id),
+                ].filter((v, i, a) => a.indexOf(v) === i)}
+                dateStr={p.date}
+                userId={user.id}
+                editable={true}
+                pactStart={p.win_start}
+                pactEnd={p.win_end}
+                compact={true}
+                pactId={p.id}
+                createdBy={p.created_by || undefined}
+                members={[
+                  ...p.members.map(m => m.user_id),
+                  ...(p.declines || []).map(d => d.user_id),
+                ].filter((v, i, a) => a.indexOf(v) === i).map(uid => {
+                  const m = getMember(uid)
+                  return m ? { id: m.id, name: m.name, color: m.color, avatar_url: (m as any).avatar_url } : { id: uid, name: '?', color: '#999' }
+                })}
+              />
+
+              {/* Voting buttons — for pending plans where user hasn't committed */}
+              {isPending && !isIn && !declinedPacts.has(p.id) && !p.declines?.some(d => d.user_id === user.id) && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 8, padding: '8px 0', borderTop: '1px solid var(--border)' }}>
+                  {([
+                    { key: 'yes' as const, label: '✓ works', border: 'var(--green)', bg: 'var(--green-soft)', color: 'var(--green)' },
+                    { key: 'maybe' as const, label: '~ maybe', border: 'var(--amber)', bg: 'var(--amber-soft)', color: 'var(--amber)' },
+                    { key: 'no' as const, label: "✕ can't", border: 'var(--red)', bg: 'var(--red-soft)', color: 'var(--red)' },
+                  ] as const).map(opt => {
+                    const myVote = getVote(user.id)
+                    const isSelected = myVote === opt.key
+                    return (
+                      <button key={opt.key} onClick={() => votePact(p.id, opt.key)} style={{
+                        flex: 1, padding: '6px 0', borderRadius: 10,
+                        border: isSelected ? `1.5px solid ${opt.border}` : '1.5px solid var(--border)',
+                        background: isSelected ? opt.bg : 'var(--surface)',
+                        color: isSelected ? opt.color : 'var(--text2)',
+                        fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      }}>{opt.label}</button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Comments */}
+              {pactComments.length > 0 && (
+                <>
+                  <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px', marginTop: 16, marginBottom: 8 }}>
+                    Comments
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {pactComments.map(c => {
+                      const m = getMember(c.user_id)
+                      return (
+                        <div key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                          <div style={{
+                            width: 24, height: 24, borderRadius: '50%', background: m?.color || '#999',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 9, fontWeight: 800, color: '#fff', flexShrink: 0,
+                          }}>{m?.name?.[0] || '?'}</div>
+                          <div style={{ background: 'var(--surface)', borderRadius: 12, padding: '8px 12px', flex: 1 }}>
+                            <p style={{ fontSize: 11, fontWeight: 700 }}>{m?.name || 'Unknown'}</p>
+                            <p style={{ fontSize: 12, color: 'var(--text)', marginTop: 2 }}>{c.text}</p>
+                          </div>
+                          {c.user_id === user.id && (
+                            <button onClick={() => deleteComment(c.id, p.id)} style={{
+                              background: 'none', border: 'none', color: 'var(--text2)',
+                              fontSize: 12, cursor: 'pointer', opacity: 0.4, padding: '4px',
+                            }}>✕</button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* Comment input */}
+              <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
+                <input type="text" placeholder="Add a comment…" value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addComment(p.id) }}
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12.5, outline: 'none' }}
+                />
+                <button onClick={() => addComment(p.id)} disabled={sendingComment || !commentText.trim()} style={{
+                  width: 36, height: 36, borderRadius: '50%', border: 'none',
+                  background: commentText.trim() ? 'var(--accent)' : 'var(--surface3)',
+                  color: '#fff', fontSize: 14, cursor: 'pointer', flexShrink: 0, opacity: sendingComment ? 0.5 : 1,
+                }}>➤</button>
+              </div>
+
+              {/* ─── Stacked action buttons (prototype style) ─── */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+                {isIn && (
+                  <button onClick={() => addToCalendar(p)} disabled={addingToCalendar === p.id} style={{
+                    width: '100%', padding: 12, borderRadius: 12, border: 'none',
+                    background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    opacity: addingToCalendar === p.id ? 0.6 : 1,
+                  }}>{addingToCalendar === p.id ? 'Adding...' : 'Add to calendar'}</button>
+                )}
+                <button onClick={() => {
+                  const pactTitle = p.occasion || fmtDate(p.date)
+                  const shareText = `${pactTitle} — ${fmtDate(p.date)}, ${fmtWin(p.win_start, p.win_end)}`
+                  if (navigator.share) {
+                    navigator.share({ title: pactTitle, text: shareText, url: window.location.origin + '/join/' + (circles.find(c => c.id === p.circle_id)?.invite_code || '') }).catch(() => {})
+                  } else { navigator.clipboard.writeText(shareText); showToast('Copied to clipboard') }
+                }} style={{
+                  width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
+                  background: 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}>Share with more people</button>
+                {editable && (
+                  <button onClick={() => { setExpandedPactId(null); startEditing(p) }} style={{
+                    width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
+                    background: 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  }}>Edit plan</button>
+                )}
+                {isIn ? (
+                  <button onClick={() => { setExpandedPactId(null); startHoldBreak(p.id) }} style={{
+                    width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
+                    background: 'var(--surface)', color: 'var(--red)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  }}>Opt out</button>
+                ) : !declinedPacts.has(p.id) && !p.declines?.some(d => d.user_id === user.id) ? (
+                  <>
+                    <button onClick={async () => { await joinPact(p.id); showToast("You're in!") }} style={{
+                      width: '100%', padding: 12, borderRadius: 12, border: 'none',
+                      background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    }}>I&apos;m in</button>
+                    <button onClick={async () => {
+                      const pactTitle = p.occasion || fmtDate(p.date)
+                      const allOtherIds = p.members.map(m => m.user_id).filter(id => id !== user.id)
+                      if (p.created_by && !allOtherIds.includes(p.created_by) && p.created_by !== user.id) allOtherIds.push(p.created_by)
+                      await supabase.from('pact_declines').upsert({ pact_id: p.id, user_id: user.id }, { onConflict: 'pact_id,user_id' })
+                      fetch('/api/calendar/delete-event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pactId: p.id }) }).catch(() => {})
+                      await supabase.from('busy_blocks').delete().eq('pact_id', p.id).eq('user_id', user.id)
+                      setDeclinedPacts(prev => new Set([...prev, p.id]))
+                      for (const uid of allOtherIds) { await supabase.from('notifications').insert({ user_id: uid, type: 'pact_change', title: `${user.name?.split(' ')[0] || 'Someone'} can't make it`, body: `Declined ${pactTitle}`, link: `/plans?pact=${p.id}` }) }
+                      if (allOtherIds.length > 0) { sendPushNotification({ userIds: allOtherIds, title: `${user.name?.split(' ')[0] || 'Someone'} can't make it`, body: `Declined ${pactTitle}`, url: `/plans?pact=${p.id}`, tag: `decline-${p.id}` }) }
+                      await loadPacts(); showToast('The group has been informed'); setExpandedPactId(null)
+                    }} style={{
+                      width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
+                      background: 'var(--surface)', color: 'var(--red)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    }}>Opt out</button>
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '8px 0' }}>
+                    <p style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600 }}>You declined this pact</p>
+                    <button onClick={async () => {
+                      setDeclinedPacts(prev => { const n = new Set(prev); n.delete(p.id); return n })
+                      await supabase.from('pact_declines').delete().eq('pact_id', p.id).eq('user_id', user.id)
+                      await loadPacts()
+                    }} style={{
+                      marginTop: 6, padding: '6px 16px', borderRadius: 8, border: '1px solid var(--border)',
+                      background: 'transparent', color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    }}>Changed my mind</button>
+                  </div>
+                )}
+              </div>
+
+              {/* Close button */}
+              <button onClick={() => setExpandedPactId(null)} style={{
+                marginTop: 16, width: '100%', padding: 12, borderRadius: 12,
+                border: '1px solid var(--border)', background: 'none',
+                color: 'var(--text2)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}>Close</button>
+            </div>
+          </div>
+        )
+      })()}
       {/* Hold-to-break pact modal */}
       {breakPactId && (
         <div
