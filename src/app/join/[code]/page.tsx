@@ -182,7 +182,7 @@ export default function JoinPage() {
             <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
               An admin will review your request. You&apos;ll get a notification when you&apos;re approved.
             </p>
-            <a href="/calendar" style={{
+            <a href="/home" style={{
               display: 'inline-block', padding: '10px 24px', borderRadius: 12,
               background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700,
               textDecoration: 'none',
@@ -199,7 +199,7 @@ export default function JoinPage() {
             <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
               Hang tight — an admin will review your request.
             </p>
-            <a href="/calendar" style={{
+            <a href="/home" style={{
               display: 'inline-block', padding: '10px 24px', borderRadius: 12,
               background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700,
               textDecoration: 'none',
@@ -216,7 +216,7 @@ export default function JoinPage() {
             <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
               Ask the person who shared it for a new link, or join with a code from the app.
             </p>
-            <a href="/calendar" style={{
+            <a href="/home" style={{
               display: 'inline-block', padding: '10px 24px', borderRadius: 12,
               background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700,
               textDecoration: 'none',

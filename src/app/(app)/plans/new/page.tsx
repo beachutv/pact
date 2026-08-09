@@ -6,7 +6,6 @@ import { useCircle, type UserProfile } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { fmtDate, fmtHour, toStr, txtOn } from '@/lib/utils'
 import LocationPicker from '@/components/LocationPicker'
-import SlideToConfirm from '@/components/SlideToConfirm'
 import CalendarBars from '@/components/CalendarBars'
 import { sendPushNotification } from '@/lib/push'
 
@@ -59,19 +58,30 @@ function NewPlanContent() {
 
   const titleSuggestions = ['Dinner', 'Lunch', 'Coffee', 'Drinks', 'Catch up', 'Movie night', 'Brunch', 'Study session']
 
+  // Circle membership map: userId -> set of circleIds
+  const [friendCircles, setFriendCircles] = useState<Map<string, Set<string>>>(new Map())
+  // Busy block counts for availability signals
+  const [friendBusy, setFriendBusy] = useState<Map<string, number>>(new Map())
+
   // Load friends
   useEffect(() => {
     async function load() {
       setLoadingFriends(true)
       const seen = new Set<string>()
       const friends: UserProfile[] = []
+      const circleMembership = new Map<string, Set<string>>()
       const cIds = circles.map(c => c.id)
       if (cIds.length > 0) {
         const { data: cms } = await supabase
-          .from('circle_members').select('user_id, users!user_id(*)').in('circle_id', cIds)
+          .from('circle_members').select('user_id, circle_id, users!user_id(*)').in('circle_id', cIds)
         if (cms) cms.forEach((cm: any) => {
-          if (cm.users && cm.users.id !== user.id && !seen.has(cm.users.id)) {
-            seen.add(cm.users.id); friends.push(cm.users)
+          if (cm.users && cm.users.id !== user.id) {
+            // Track circle membership
+            if (!circleMembership.has(cm.users.id)) circleMembership.set(cm.users.id, new Set())
+            circleMembership.get(cm.users.id)!.add(cm.circle_id)
+            if (!seen.has(cm.users.id)) {
+              seen.add(cm.users.id); friends.push(cm.users)
+            }
           }
         })
       }
@@ -85,8 +95,28 @@ function NewPlanContent() {
           if (profiles) profiles.forEach((p: any) => { if (!seen.has(p.id)) { seen.add(p.id); friends.push(p) } })
         }
       }
-      setAllFriends(friends.sort((a, b) => a.name.localeCompare(b.name)))
+      setFriendCircles(circleMembership)
+      const sorted = friends.sort((a, b) => a.name.localeCompare(b.name))
+      setAllFriends(sorted)
       setLoadingFriends(false)
+
+      // Load busy blocks for availability signals (next 7 days)
+      const friendIds = sorted.map(f => f.id)
+      if (friendIds.length > 0) {
+        const todayStr = new Date().toISOString().slice(0, 10)
+        const weekEnd = new Date(); weekEnd.setDate(weekEnd.getDate() + 7)
+        const weekEndStr = weekEnd.toISOString().slice(0, 10)
+        const { data: blocks } = await supabase.from('busy_blocks')
+          .select('user_id')
+          .in('user_id', friendIds)
+          .gte('date', todayStr)
+          .lte('date', weekEndStr)
+        if (blocks) {
+          const counts = new Map<string, number>()
+          blocks.forEach((b: any) => counts.set(b.user_id, (counts.get(b.user_id) || 0) + 1))
+          setFriendBusy(counts)
+        }
+      }
     }
     load()
   }, [user.id, circles.length]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -118,10 +148,16 @@ function NewPlanContent() {
   }
 
   async function inviteCircle(cid: string) {
-    setSelectedCircleId(cid)
-    const { data: cms } = await supabase.from('circle_members').select('user_id').eq('circle_id', cid)
-    if (cms) setInvitedIds(new Set(cms.map(cm => cm.user_id).filter(id => id !== user.id)))
+    // Toggle circle filter — just filter the list, don't auto-select
+    setSelectedCircleId(prev => prev === cid ? null : cid)
   }
+
+  // Filtered friends based on selected circle
+  const displayedFriends = (() => {
+    if (!selectedCircleId) return allFriends
+    // Show only friends from the selected circle
+    return allFriends // We filter by circle membership below
+  })()
 
   function handleLocationSelect(name: string, area: string) { setSpotName(name); setSpotArea(area) }
 
@@ -159,30 +195,17 @@ function NewPlanContent() {
 
       await supabase.from('pact_members').insert({ pact_id: pactId, user_id: user.id })
 
-      const otherMembers = allFriends.filter(m => m.id !== user.id && invitedIds.has(m.id)).map(m => m.name.split(' ')[0])
-      fetch('/api/calendar/push-event', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pactId, occasion: title || null, spotName: spotName || null,
-          otherNames: otherMembers, circleName: circles.find(c => c.id === circleId)?.name || '',
-          date, startHour, endHour,
-          location: spotName && spotArea ? `${spotName}, ${spotArea}` : spotName || undefined,
-          calendarId: targetCalId, confirmed: false,
-          totalCircleMembers: allFriends.length + 1, pactMemberCount: invitedIds.size + 1,
-        }),
-      }).catch(() => {})
-
       const pushTargets = allFriends.filter(m => m.id !== user.id && invitedIds.has(m.id)).map(m => m.id)
       const pactTitle = title.trim() || `Pact on ${fmtDate(date)}`
       for (const uid of pushTargets) {
         await supabase.from('notifications').insert({
           user_id: uid, type: 'pact_new', title: 'New pact proposed',
-          body: `${user.name?.split(' ')[0] || 'Someone'} proposed: ${pactTitle}`, link: '/plans',
+          body: `${user.name?.split(' ')[0] || 'Someone'} proposed: ${pactTitle}`, link: `/plans?pact=${pactId}`,
         })
       }
       if (pushTargets.length) {
         sendPushNotification({ userIds: pushTargets, title: 'New pact proposed',
-          body: `${user.name?.split(' ')[0] || 'Someone'} proposed: ${pactTitle}`, url: '/plans',
+          body: `${user.name?.split(' ')[0] || 'Someone'} proposed: ${pactTitle}`, url: `/plans?pact=${pactId}`,
         }).catch(() => {})
       }
       setStep(4)
@@ -288,13 +311,13 @@ function NewPlanContent() {
 
       {/* STEP 2: Invite */}
       {step === 2 && (<>
-        <h2 style={{ fontSize: 20, fontWeight: 800 }}>Who is joining?</h2>
-        <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>Invite friends from your circles or share a link.</p>
+        <h2 style={{ fontSize: 20, fontWeight: 800 }}>Who&apos;s joining?</h2>
+        <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>Invite friends or share a link. Availability is based on their calendar.</p>
 
         {circles.length > 0 && (
           <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
             <button className="chip" style={{ flexShrink: 0, fontSize: 12, borderColor: !selectedCircleId ? 'var(--accent)' : 'var(--border)', background: !selectedCircleId ? 'var(--accent-soft)' : 'var(--surface)', fontWeight: !selectedCircleId ? 700 : 600 }}
-              onClick={() => { setSelectedCircleId(null); setInvitedIds(new Set()) }}>All friends</button>
+              onClick={() => setSelectedCircleId(null)}>All friends</button>
             {circles.map(c => (
               <button key={c.id} className="chip" style={{ flexShrink: 0, fontSize: 12, borderColor: selectedCircleId === c.id ? 'var(--accent)' : 'var(--border)', background: selectedCircleId === c.id ? 'var(--accent-soft)' : 'var(--surface)', fontWeight: selectedCircleId === c.id ? 700 : 600 }}
                 onClick={() => inviteCircle(c.id)}>{c.emoji} {c.name}</button>
@@ -305,23 +328,39 @@ function NewPlanContent() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginTop: 8 }}>
           {loadingFriends ? <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}><div className="spinner" /></div>
            : allFriends.length === 0 ? <p style={{ fontSize: 13, color: 'var(--text2)', textAlign: 'center', padding: 20 }}>No friends found. Add friends or join a circle first.</p>
-           : allFriends.map(m => {
-            const isInvited = invitedIds.has(m.id)
-            return (
-              <button key={m.id} onClick={() => toggleInvite(m.id)} style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
-                background: 'none', border: 'none', borderBottom: '1px solid var(--border)',
-                cursor: 'pointer', width: '100%', textAlign: 'left',
-              }}>
-                <div className="avatar" style={{ background: m.color, color: txtOn(m.color), position: 'relative', overflow: 'hidden' }}>
-                  {m.name[0]}
-                  {m.avatar_url && <img src={m.avatar_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />}
-                </div>
-                <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>{m.name}</span>
-                <div style={{ width: 22, height: 22, borderRadius: 7, border: isInvited ? '2px solid var(--accent)' : '2px solid var(--border)', background: isInvited ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isInvited ? '#fff' : 'transparent', fontSize: 12 }}>✓</div>
-              </button>
-            )
-          })}
+           : (() => {
+            // Filter by circle if selected
+            const filtered = selectedCircleId
+              ? allFriends.filter(m => friendCircles.get(m.id)?.has(selectedCircleId))
+              : allFriends
+            return filtered.length === 0
+              ? <p style={{ fontSize: 13, color: 'var(--text2)', textAlign: 'center', padding: 20 }}>No friends in this circle.</p>
+              : filtered.map(m => {
+              const isInvited = invitedIds.has(m.id)
+              // Availability signal based on busy blocks
+              const busyCount = friendBusy.get(m.id) || 0
+              const signal = busyCount <= 3
+                ? { label: 'looks free', color: 'var(--green)', dot: '🟢' }
+                : busyCount <= 8
+                ? { label: 'might be free', color: 'var(--amber)', dot: '🟡' }
+                : { label: 'busy', color: 'var(--text2)', dot: '⚪' }
+              return (
+                <button key={m.id} onClick={() => toggleInvite(m.id)} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
+                  background: 'none', border: 'none', borderBottom: '1px solid var(--border)',
+                  cursor: 'pointer', width: '100%', textAlign: 'left',
+                }}>
+                  <div className="avatar" style={{ background: m.color, color: txtOn(m.color), position: 'relative', overflow: 'hidden' }}>
+                    {m.name[0]}
+                    {m.avatar_url && <img src={m.avatar_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />}
+                  </div>
+                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>{m.name}</span>
+                  <span style={{ color: signal.color, fontSize: 10, fontWeight: 700 }}>{signal.dot} {signal.label}</span>
+                  <div style={{ width: 22, height: 22, borderRadius: 7, border: isInvited ? '2px solid var(--accent)' : '2px solid var(--border)', background: isInvited ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isInvited ? '#fff' : 'transparent', fontSize: 12 }}>✓</div>
+                </button>
+              )
+            })
+          })()}
         </div>
 
         <button className="btn-primary" disabled={invitedIds.size === 0} onClick={() => setStep(3)}>
@@ -411,7 +450,9 @@ function NewPlanContent() {
 
         {error && <p style={{ fontSize: 13, color: 'var(--red)', textAlign: 'center' }}>{error}</p>}
 
-        <SlideToConfirm disabled={sending} label={sending ? 'Creating...' : 'Slide to propose'} onConfirm={createPlan} />
+        <button className="btn-primary" disabled={sending} onClick={createPlan} style={{ marginTop: 8 }}>
+          {sending ? 'Creating...' : 'Propose plan'}
+        </button>
       </>)}
 
       {/* STEP 4: Confirmed */}

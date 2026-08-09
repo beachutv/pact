@@ -1042,10 +1042,12 @@ export default function PlansPage() {
                 )}
                 <button onClick={() => {
                   const pactTitle = p.occasion || fmtDate(p.date)
+                  const inviteCode = circles.find(c => c.id === p.circle_id)?.invite_code || ''
+                  const shareUrl = inviteCode ? `${window.location.origin}/join/${inviteCode}` : window.location.origin
                   const shareText = `${pactTitle} — ${fmtDate(p.date)}, ${fmtWin(p.win_start, p.win_end)}`
                   if (navigator.share) {
-                    navigator.share({ title: pactTitle, text: shareText, url: window.location.origin + '/join/' + (circles.find(c => c.id === p.circle_id)?.invite_code || '') }).catch(() => {})
-                  } else { navigator.clipboard.writeText(shareText); showToast('Copied to clipboard') }
+                    navigator.share({ title: pactTitle, text: shareText, url: shareUrl }).catch(() => {})
+                  } else { navigator.clipboard.writeText(`${shareText}\n${shareUrl}`); showToast('Copied to clipboard') }
                 }} style={{
                   width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
                   background: 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
