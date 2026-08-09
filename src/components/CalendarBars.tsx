@@ -301,6 +301,14 @@ export default function CalendarBars({
 
   const barHeight = compact ? 24 : 32
 
+  // Detect past hours on today's date
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const currentHour = new Date().getHours()
+  const isToday = dateStr === todayStr
+  function isPastHour(h: number): boolean {
+    return isToday && h < currentHour
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       {/* Date picker */}
@@ -425,6 +433,8 @@ export default function CalendarBars({
               {/* The slot itself */}
               <div
                 onClick={() => {
+                  // Don't allow selecting past hours
+                  if (isPastHour(h)) return
                   // Don't allow selecting hard busy hours (except this pact's own blocks)
                   if (userStatusAt(userId, h) === 2 && !isThisPactBlockAt(userId, h)) return
                   // Also block when any group member is hard busy (group status = 'busy')
@@ -434,14 +444,16 @@ export default function CalendarBars({
                 }}
                 style={{
                   width: '100%', height: barHeight, borderRadius: 4,
-                  background: userBusy && (hasProposals || hourProposals.length > 0) ? 'var(--red-soft)'
+                  background: isPastHour(h) ? 'var(--surface2)'
+                    : userBusy && (hasProposals || hourProposals.length > 0) ? 'var(--red-soft)'
                     : iProposed ? 'var(--accent-soft)'
                     : inSelected ? 'var(--accent-soft)'
                     : inPact ? 'var(--accent-soft)'
                     : st === 'free' ? 'var(--green-soft)'
                     : st === 'soft' ? 'var(--amber-soft)'
                     : 'var(--red-soft)',
-                  border: userBusy && (hasProposals || hourProposals.length > 0) ? '1.5px solid rgba(231,118,93,0.5)'
+                  border: isPastHour(h) ? '1px solid var(--border)'
+                    : userBusy && (hasProposals || hourProposals.length > 0) ? '1.5px solid rgba(231,118,93,0.5)'
                     : iProposed ? '2px solid var(--accent)'
                     : inSelected ? '2px solid var(--accent)'
                     : inPact ? '1.5px solid var(--accent)'
@@ -450,10 +462,11 @@ export default function CalendarBars({
                     : '1px solid rgba(231,118,93,0.3)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 7, fontWeight: 800,
-                  color: userBusy && hourProposals.length > 0 ? 'var(--red)'
+                  color: isPastHour(h) ? 'var(--text2)'
+                    : userBusy && hourProposals.length > 0 ? 'var(--red)'
                     : iProposed ? 'var(--accent)' : inSelected ? 'var(--accent)' : inPact ? 'var(--accent)' : blocked ? 'var(--red)' : st === 'soft' ? 'var(--amber)' : 'transparent',
-                  opacity: blocked ? 0.5 : 1,
-                  cursor: blocked ? 'not-allowed' : (pactId || onGroupTap) && editable ? 'pointer' : 'default',
+                  opacity: isPastHour(h) ? 0.35 : blocked ? 0.5 : 1,
+                  cursor: isPastHour(h) || blocked ? 'not-allowed' : (pactId || onGroupTap) && editable ? 'pointer' : 'default',
                   userSelect: 'none',
                   transition: 'transform 0.1s',
                 }}
@@ -490,26 +503,31 @@ export default function CalendarBars({
           const st = userStatusAt(userId, h)
           const isPact = isPactBlockAt(userId, h)
           const isThisPact = isThisPactBlockAt(userId, h)
+          const past = isPastHour(h)
           return (
             <div
               key={h}
-              onClick={() => editable && !isThisPact && tapMySlot(h)}
+              onClick={() => !past && editable && !isThisPact && tapMySlot(h)}
               style={{
                 flex: 1, height: barHeight, borderRadius: 4,
-                background: isThisPact ? 'var(--accent-soft)'
+                background: past ? 'var(--surface2)'
+                  : isThisPact ? 'var(--accent-soft)'
                   : isPact ? 'var(--accent-soft)'
                   : st === 0 ? 'var(--green-soft)' : st === 1 ? 'var(--amber-soft)' : 'var(--red-soft)',
-                border: isThisPact ? '1.5px solid var(--accent)'
+                border: past ? '1px solid var(--border)'
+                  : isThisPact ? '1.5px solid var(--accent)'
                   : isPact ? '1px solid rgba(118,172,179,0.4)'
                   : st === 0 ? '1px solid rgba(139,176,126,0.3)'
                   : st === 1 ? '1px solid rgba(255,184,84,0.35)'
                   : '1px solid rgba(231,118,93,0.3)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 7, fontWeight: 800,
-                color: isThisPact ? 'var(--accent)'
+                color: past ? 'var(--text2)'
+                  : isThisPact ? 'var(--accent)'
                   : isPact ? 'var(--accent)'
                   : st === 1 ? 'var(--amber)' : st === 2 ? 'var(--red)' : 'transparent',
-                cursor: isThisPact ? 'default' : editable ? 'pointer' : 'default',
+                opacity: past ? 0.35 : 1,
+                cursor: past ? 'not-allowed' : isThisPact ? 'default' : editable ? 'pointer' : 'default',
                 userSelect: 'none',
                 transition: 'transform 0.1s',
               }}
