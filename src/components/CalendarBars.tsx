@@ -414,6 +414,8 @@ export default function CalendarBars({
                 onClick={() => {
                   // Don't allow selecting hard busy hours (except this pact's own blocks)
                   if (userStatusAt(userId, h) === 2 && !isThisPactBlockAt(userId, h)) return
+                  // Also block when any group member is hard busy (group status = 'busy')
+                  if (st === 'busy' && !inPact && !inSelected) return
                   if (pactId) tapGroupSlot(h)
                   else if (onGroupTap) onGroupTap(h)
                 }}
@@ -437,8 +439,8 @@ export default function CalendarBars({
                   fontSize: 7, fontWeight: 800,
                   color: userBusy && hourProposals.length > 0 ? 'var(--red)'
                     : iProposed ? 'var(--accent)' : inSelected ? 'var(--accent)' : inPact ? 'var(--accent)' : blocked ? 'var(--red)' : st === 'soft' ? 'var(--amber)' : 'transparent',
-                  opacity: blocked && !pactId && !onGroupTap ? 0.5 : 1,
-                  cursor: (pactId || onGroupTap) && editable ? 'pointer' : blocked ? 'not-allowed' : 'default',
+                  opacity: blocked ? 0.5 : 1,
+                  cursor: blocked ? 'not-allowed' : (pactId || onGroupTap) && editable ? 'pointer' : 'default',
                   userSelect: 'none',
                   transition: 'transform 0.1s',
                 }}
