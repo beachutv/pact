@@ -868,8 +868,8 @@ export default function PlansPage() {
                         dateStr={p.date}
                         userId={user.id}
                         editable={true}
-                        pactStart={p.status === 'confirmed' ? p.win_start : undefined}
-                        pactEnd={p.status === 'confirmed' ? p.win_end : undefined}
+                        pactStart={p.win_start}
+                        pactEnd={p.win_end}
                         compact={true}
                         pactId={p.id}
                         members={[
