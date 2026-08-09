@@ -13,10 +13,17 @@ type Step = {
 
 const STEPS: Step[] = [
   {
-    emoji: '📅',
-    title: 'Your calendar',
-    body: 'This is your availability view. Green means free. Tap any day to see the full hour-by-hour breakdown and propose a plan.',
-    target: 'nav-calendar',
+    emoji: '🏠',
+    title: 'Home',
+    body: 'Your at-a-glance view. See upcoming plans, who\'s around, and what\'s happening across all your circles.',
+    target: 'nav-home',
+    position: 'above',
+  },
+  {
+    emoji: '📋',
+    title: 'Plans',
+    body: 'Create plans, vote on times, and lock in pacts with your circles. Slide to commit when you\'re in!',
+    target: 'nav-plans',
     position: 'above',
   },
   {
@@ -24,13 +31,6 @@ const STEPS: Step[] = [
     title: 'Friends',
     body: 'Add friends by their @username. Once connected, you can add each other to circles and start planning together.',
     target: 'nav-friends',
-    position: 'above',
-  },
-  {
-    emoji: '📍',
-    title: 'Spots',
-    body: 'Shows the best upcoming hangout windows with smart location picks based on where everyone\'s coming from.',
-    target: 'nav-spots',
     position: 'above',
   },
   {
@@ -43,14 +43,14 @@ const STEPS: Step[] = [
   {
     emoji: '🔔',
     title: 'Notifications',
-    body: 'Friend requests, pact updates, and reminders show up here. Tap the bell anytime to check what\'s new.',
+    body: 'Friend requests, plan updates, and reminders show up here. Tap the bell anytime to check what\'s new.',
     target: 'header-notif',
     position: 'below',
   },
   {
     emoji: '🔵',
     title: 'Circles',
-    body: 'Circles are your friend groups. Create one, join one, or add a friend to get started — the calendar, chat, and plans all follow your active circle.',
+    body: 'Circles are your friend groups. Create one or join one to get started — plans and friends all follow your active circle.',
     target: 'circle-area',
     position: 'below',
   },

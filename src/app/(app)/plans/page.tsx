@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { fmtDate, fmtHour, fmtWin, txtOn } from '@/lib/utils'
@@ -47,9 +47,11 @@ export default function PlansPage() {
   const { user, activeCircle, circleMembers, circleFilter, circles } = useCircle()
   const supabase = createClient()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [pacts, setPacts] = useState<Pact[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [addingToCalendar, setAddingToCalendar] = useState<string | null>(null)
 
   // Comments
   const [comments, setComments] = useState<Record<string, PactComment[]>>({})
@@ -153,7 +155,7 @@ export default function PlansPage() {
         type: 'pact_change',
         title: `${user.name?.split(' ')[0] || 'Someone'} broke their pact`,
         body: `They left the pact for ${pactTitle}`,
-        link: '/plans',
+        link: `/plans?pact=${breakPactId}`,
       })
     }
 
@@ -162,7 +164,7 @@ export default function PlansPage() {
       userIds: otherMembers.map(m => m.user_id),
       title: `${user.name?.split(' ')[0] || 'Someone'} broke their pact`,
       body: `They left the pact for ${pactTitle}`,
-      url: '/plans',
+      url: `/plans?pact=${breakPactId}`,
       tag: `break-${breakPactId}`,
     })
 
@@ -174,7 +176,7 @@ export default function PlansPage() {
           type: 'pact_change',
           title: 'Pact cancelled',
           body: `The pact for ${pactTitle} was auto-cancelled — not enough people left`,
-          link: '/plans',
+          link: `/plans?pact=${breakPactId}`,
         })
       }
       await supabase.from('busy_blocks').delete().eq('pact_id', breakPactId)
@@ -287,6 +289,66 @@ export default function PlansPage() {
     setLoading(false)
   }
 
+  // Auto-expand a specific plan if linked via ?pact=<id>
+  const deepLinkHandled = useRef(false)
+  useEffect(() => {
+    if (loading || deepLinkHandled.current) return
+    const targetPact = searchParams.get('pact')
+    if (targetPact && pacts.some(p => p.id === targetPact)) {
+      setExpandedPactId(targetPact)
+      deepLinkHandled.current = true
+      // Clean up the URL without re-rendering
+      window.history.replaceState({}, '', '/plans')
+      // Scroll to the card after a tick
+      setTimeout(() => {
+        document.getElementById(`pact-${targetPact}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 100)
+    }
+  }, [loading, pacts, searchParams])
+
+  async function addToCalendar(p: Pact) {
+    setAddingToCalendar(p.id)
+    try {
+      const confirmedOthers = p.members
+        .filter(m => m.user_id !== user.id)
+        .map(m => getMember(m.user_id)?.name.split(' ')[0])
+        .filter(Boolean) as string[]
+      const res = await fetch('/api/calendar/push-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pactId: p.id,
+          occasion: p.occasion || null,
+          spotName: p.spot_name !== 'TBD' ? p.spot_name : null,
+          otherNames: confirmedOthers,
+          circleName: circles.find(c => c.id === p.circle_id)?.name || '',
+          date: p.date,
+          startHour: p.win_start,
+          endHour: p.win_end,
+          location: p.spot_name !== 'TBD' && p.spot_area
+            ? `${p.spot_name}, ${p.spot_area}`
+            : p.spot_name !== 'TBD' ? p.spot_name : undefined,
+          confirmed: p.status === 'confirmed',
+          totalCircleMembers: circleMembers.length,
+          pactMemberCount: p.members.length,
+        }),
+      })
+      const data = await res.json()
+      if (data.needsReconnect) {
+        showToast('Calendar session expired — reconnect in Settings')
+      } else if (data.ok) {
+        showToast('Added to your calendar')
+      } else if (data.error === 'No calendar connected') {
+        showToast('Connect your calendar in Settings first')
+      } else {
+        showToast('Could not add to calendar')
+      }
+    } catch {
+      showToast('Could not add to calendar')
+    }
+    setAddingToCalendar(null)
+  }
+
   async function votePact(pactId: string, vote: 'yes' | 'maybe' | 'no') {
     // Optimistic update
     setResponses(prev => {
@@ -352,46 +414,6 @@ export default function PlansPage() {
         await supabase.from('pacts').update({ status: 'confirmed' }).eq('id', pactId)
       }
 
-      // Push/update event on THIS user's Google Calendar
-      // otherNames = people confirmed OTHER than me
-      fetch('/api/calendar/push-event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pactId,
-          occasion: pact.occasion || null,
-          spotName: pact.spot_name !== 'TBD' ? pact.spot_name : null,
-          otherNames: confirmedOthers,
-          circleName: activeCircle?.name,
-          date: pact.date,
-          startHour: pact.win_start,
-          endHour: pact.win_end,
-          location: pact.spot_name !== 'TBD' && pact.spot_area
-            ? `${pact.spot_name}, ${pact.spot_area}`
-            : pact.spot_name !== 'TBD' ? pact.spot_name : undefined,
-          confirmed: isNowConfirmed,
-          totalCircleMembers: circleMembers.length,
-          pactMemberCount: newMemberCount,
-        }),
-      }).catch(() => {})
-
-      // If pact is now confirmed, update ALL other members' calendar events too
-      if (isNowConfirmed) {
-        for (const pm of pact.members) {
-          if (pm.user_id === user.id) continue
-          // Each member's "otherNames" = everyone confirmed EXCEPT themselves
-          const theirOthers = [
-            ...confirmedOthers.filter(n => n !== getMember(pm.user_id)?.name.split(' ')[0]),
-            user.name?.split(' ')[0],
-          ].filter(Boolean) as string[]
-          // We can't push to their calendar from our session — but the API
-          // uses auth.getUser() which is the CURRENT user. So we rely on
-          // the notification to tell them it's confirmed, and their calendar
-          // will update next time they open plans or sync.
-          // For now, skip cross-user calendar updates.
-        }
-      }
-
       // Notify ALL existing pact members
       const pactTitle = pact.occasion || fmtDate(pact.date)
       const allOtherIds = pact.members.filter(m => m.user_id !== user.id).map(m => m.user_id)
@@ -408,14 +430,14 @@ export default function PlansPage() {
             type: 'pact_change',
             title: notifTitle,
             body: notifBody,
-            link: '/plans',
+            link: `/plans?pact=${pactId}`,
           })
         }
         sendPushNotification({
           userIds: allOtherIds,
           title: notifTitle,
           body: notifBody,
-          url: '/plans',
+          url: `/plans?pact=${pactId}`,
           tag: `join-${pactId}`,
         })
       }
@@ -461,7 +483,7 @@ export default function PlansPage() {
           type: 'pact_change',
           title: `${cancelTitle} cancelled`,
           body: `${user.name?.split(' ')[0] || 'Someone'} cancelled the pact on ${fmtDate(pact.date)}`,
-          link: '/plans',
+          link: `/plans?pact=${pactId}`,
         })
       }
       // Update status to 'cancelled' instead of deleting
@@ -472,7 +494,7 @@ export default function PlansPage() {
         userIds: otherMembers.map(m => m.user_id),
         title: `${cancelTitle} cancelled`,
         body: `${user.name?.split(' ')[0] || 'Someone'} cancelled the pact on ${fmtDate(pact.date)}`,
-        url: '/plans',
+        url: `/plans?pact=${pactId}`,
         tag: `pact-cancel-${pactId}`,
       })
     }
@@ -661,7 +683,7 @@ export default function PlansPage() {
           const editable = canEdit(p)
 
           return (
-            <div key={p.id} style={{ position: 'relative' }}>
+            <div key={p.id} id={`pact-${p.id}`} style={{ position: 'relative' }}>
               <div
                 className="card" style={{
                   display: 'flex', flexDirection: 'column', gap: 8,
@@ -1102,6 +1124,22 @@ export default function PlansPage() {
                         </button>
                         {isIn && (
                           <button
+                            onClick={() => addToCalendar(p)}
+                            disabled={addingToCalendar === p.id}
+                            style={{
+                              flex: 1, padding: '8px 0', borderRadius: 10,
+                              border: '1px solid var(--border)', background: 'var(--surface2)',
+                              color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                              opacity: addingToCalendar === p.id ? 0.5 : 1,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                            }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            {addingToCalendar === p.id ? 'Adding...' : 'Calendar'}
+                          </button>
+                        )}
+                        {isIn && (
+                          <button
                             onClick={() => startHoldBreak(p.id)}
                             style={{
                               flex: 1, padding: '8px 0', borderRadius: 10,
@@ -1187,7 +1225,7 @@ export default function PlansPage() {
                               type: 'pact_change',
                               title: `${user.name?.split(' ')[0] || 'Someone'} can't make it`,
                               body: `Declined ${pactTitle}`,
-                              link: '/plans',
+                              link: `/plans?pact=${p.id}`,
                             })
                           }
                           if (allOtherIds.length > 0) {
@@ -1195,7 +1233,7 @@ export default function PlansPage() {
                               userIds: allOtherIds,
                               title: `${user.name?.split(' ')[0] || 'Someone'} can't make it`,
                               body: `Declined ${pactTitle}`,
-                              url: '/plans',
+                              url: `/plans?pact=${p.id}`,
                               tag: `decline-${p.id}`,
                             })
                           }

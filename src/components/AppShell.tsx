@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { usePathname, useRouter } from 'next/navigation'
 import { txtOn, bdaySoon, birthdayMMDD } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { useLocationUpdate } from '@/lib/useLocationUpdate'
+
 
 // ---- Types ----
 export type UserProfile = {
@@ -166,7 +166,7 @@ export default function AppShell({
   }
 
   // Persistent location tracking across all tabs
-  useLocationUpdate(user.id, 'app-shell')
+
 
   // Landscape detection
   const [isLandscape, setIsLandscape] = useState(false)
@@ -176,26 +176,6 @@ export default function AppShell({
     const handler = (e: MediaQueryListEvent) => setIsLandscape(e.matches)
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
-  }, [])
-
-  // Request location permission if not yet granted
-  useEffect(() => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) return
-    if (!navigator.permissions) {
-      // Fallback: try once if we haven't asked before
-      const asked = localStorage.getItem('pact_loc_asked')
-      if (!asked) {
-        localStorage.setItem('pact_loc_asked', '1')
-        navigator.geolocation.getCurrentPosition(() => {}, () => {}, { timeout: 5000 })
-      }
-      return
-    }
-    navigator.permissions.query({ name: 'geolocation' }).then(result => {
-      if (result.state === 'prompt') {
-        // Trigger the browser permission dialog
-        navigator.geolocation.getCurrentPosition(() => {}, () => {}, { timeout: 5000 })
-      }
-    }).catch(() => {})
   }, [])
 
   // Heartbeat: update last_seen_at every 2 min while tab is visible (no permissions needed)
@@ -1268,6 +1248,7 @@ export default function AppShell({
                 data-walkthrough={
                   tab.key === '/home' ? 'nav-home'
                   : tab.key === '/plans' ? 'nav-plans'
+                  : tab.key === '/friends' ? 'nav-friends'
                   : tab.key === '/settings' ? 'nav-you'
                   : undefined
                 }

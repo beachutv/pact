@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
 import { txtOn } from '@/lib/utils'
-import { IconBell, IconPin, IconCalendar, IconRefresh, IconSmartphone, IconZap, IconSun, IconMoon } from '@/components/Icons'
+import { IconBell, IconCalendar, IconRefresh, IconSmartphone, IconZap, IconSun, IconMoon } from '@/components/Icons'
 import { CURRENT_VERSION } from '@/components/Changelog'
 
 type PermState = 'granted' | 'denied' | 'prompt' | 'unsupported'
@@ -26,7 +26,7 @@ export default function SettingsPage() {
 
   // Permissions
   const [notifPerm, setNotifPerm] = useState<PermState>('prompt')
-  const [locPerm, setLocPerm] = useState<PermState>('prompt')
+
   const [pushSubscribed, setPushSubscribed] = useState(false)
 
   // Theme
@@ -142,14 +142,6 @@ export default function SettingsPage() {
       }).catch(e => console.error('SW/Push check error:', e))
     }
 
-    // Check location permission
-    if (typeof navigator !== 'undefined' && navigator.permissions) {
-      navigator.permissions.query({ name: 'geolocation' }).then(result => {
-        setLocPerm(result.state as PermState)
-        result.addEventListener('change', () => setLocPerm(result.state as PermState))
-      }).catch(() => {})
-    }
-
     // Check standalone mode
     if (typeof window !== 'undefined') {
       const standalone = window.matchMedia('(display-mode: standalone)').matches
@@ -253,21 +245,6 @@ export default function SettingsPage() {
     } catch {
       showToast('Failed to send test')
     }
-  }
-
-  function handleLocationToggle() {
-    if (locPerm === 'denied') {
-      showToast('Open browser settings → Site settings → Location → Allow')
-      return
-    }
-    navigator.geolocation.getCurrentPosition(
-      () => { setLocPerm('granted'); showToast('Location enabled ✓') },
-      (err) => {
-        if (err.code === 1) { setLocPerm('denied'); showToast('Permission denied') }
-        else showToast('Location unavailable')
-      },
-      { timeout: 10000 }
-    )
   }
 
   function handleTheme(t: string) {
@@ -579,18 +556,6 @@ export default function SettingsPage() {
             <b>To enable:</b> Add Pact to your home screen first. Notifications require <b>Safari on iOS</b> or <b>Chrome on Android</b>.
           </div>
         )}
-        <div style={{ height: 4 }} />
-        <PermRow
-          icon={<IconPin size={20} color="var(--accent)" />}
-          title="Location"
-          description={locPerm === 'granted'
-            ? "Travel times and nearby detection use your live location."
-            : "Lets Pact calculate real travel times. Without this, travel times use your home area — still works, just less accurate."}
-          on={locPerm === 'granted'}
-          onToggle={handleLocationToggle}
-          blocked={locPerm === 'denied'}
-        />
-
         {/* Availability window */}
         <div style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
