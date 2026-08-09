@@ -354,7 +354,7 @@ export default function CircleSettingsPage() {
       .eq('user_id', user.id)
     if (error) {
       console.error('Leave circle error:', error)
-      alert('Failed to leave circle. Please try again.')
+      alert(`Failed to leave circle: ${error.message || error.code || 'Unknown error'}`)
       return
     }
     const remaining = circles.filter(c => c.id !== id)

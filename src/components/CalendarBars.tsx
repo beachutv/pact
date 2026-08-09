@@ -211,7 +211,30 @@ export default function CalendarBars({
     const myStatus = userStatusAt(userId, h)
     if (myStatus === 2 && !isThisPactBlockAt(userId, h)) return
 
-    const existing = proposals.find(p => p.user_id === userId && p.hour === h)
+    const myProposals = proposals.filter(p => p.user_id === userId)
+    const existing = myProposals.find(p => p.hour === h)
+
+    // Creator's first interaction: they have no explicit proposals but have a set time.
+    // Materialize the set time as proposal records, then toggle the tapped hour off.
+    if (createdBy === userId && myProposals.length === 0 && pactStart !== undefined && pactEnd !== undefined && h >= pactStart && h < pactEnd) {
+      const newProposals: TimeProposal[] = []
+      for (let hr = pactStart; hr < pactEnd; hr++) {
+        if (hr === h) continue // skip the tapped hour (deselecting it)
+        const tempId = crypto.randomUUID()
+        newProposals.push({ id: tempId, pact_id: pactId, user_id: userId, hour: hr })
+      }
+      setProposals(prev => [...prev, ...newProposals])
+      for (const np of newProposals) {
+        const { data } = await supabase.from('time_proposals').insert({
+          pact_id: pactId, user_id: userId, hour: np.hour,
+        }).select('id').single()
+        if (data) {
+          setProposals(prev => prev.map(p => p.id === np.id ? { ...p, id: data.id } : p))
+        }
+      }
+      return
+    }
+
     if (existing) {
       // Remove proposal
       setProposals(prev => prev.filter(p => p.id !== existing.id))
@@ -364,10 +387,19 @@ export default function CalendarBars({
       </div>
 
       {/* Group bar with proposal avatars */}
+      {(() => {
+        // Check if creator has explicit proposal records (vs just relying on set time)
+        const creatorHasExplicitProposals = createdBy ? proposals.some(p => p.user_id === createdBy) : false
+        return null
+      })()}
       <div style={{ display: 'flex', gap: 2, borderRadius: 8, overflow: 'visible', position: 'relative' }}>
         {hours.map(h => {
           const st = groupAt(h)
-          const inPact = pactStart !== undefined && pactEnd !== undefined && h >= pactStart && h < pactEnd
+          // inPact = within the original set time. But once creator has explicit proposals,
+          // only show as "pact highlighted" if this hour is still proposed
+          const inOriginalPact = pactStart !== undefined && pactEnd !== undefined && h >= pactStart && h < pactEnd
+          const creatorHasExplicitProposals = createdBy ? proposals.some(p => p.user_id === createdBy) : false
+          const inPact = inOriginalPact && (!creatorHasExplicitProposals || proposals.some(p => p.user_id === createdBy && p.hour === h))
           const inSelected = selectedStart !== undefined && selectedEnd !== undefined && h >= selectedStart && h < selectedEnd
           const blocked = st === 'busy' && !inPact && !inSelected
           const hourProposals = proposalsAt(h)
@@ -411,7 +443,7 @@ export default function CalendarBars({
                 </div>
               )}
               {/* Creator avatar on set time blocks (when no proposals yet) */}
-              {!hasProposals && inPact && createdBy && (() => {
+              {!hasProposals && inPact && createdBy && !creatorHasExplicitProposals && (() => {
                 const creator = getMemberInfo(createdBy)
                 if (!creator) return <div style={{ minHeight: 14 }} />
                 return (
@@ -582,11 +614,11 @@ export default function CalendarBars({
           if (!byUser.has(p.user_id)) byUser.set(p.user_id, [])
           byUser.get(p.user_id)!.push(p.hour)
         })
-        // Include creator's set time as their initial proposal
-        if (createdBy && pactStart !== undefined && pactEnd !== undefined) {
-          if (!byUser.has(createdBy)) byUser.set(createdBy, [])
+        // Include creator's set time as their initial proposal ONLY if they have no explicit proposals
+        if (createdBy && pactStart !== undefined && pactEnd !== undefined && !byUser.has(createdBy)) {
+          byUser.set(createdBy, [])
           const ch = byUser.get(createdBy)!
-          for (let h = pactStart; h < pactEnd; h++) { if (!ch.includes(h)) ch.push(h) }
+          for (let h = pactStart; h < pactEnd; h++) { ch.push(h) }
         }
 
         type UR = { uid: string; name: string; color: string; avatar_url?: string | null; hours: number[]; rangeStr: string }
