@@ -19,7 +19,7 @@ type Pact = {
   spot_emoji: string
   spot_area: string
   occasion: string | null
-  circle_id: string
+  circle_id: string | null
   created_by: string | null
   status: string
   members: { user_id: string }[]
@@ -94,6 +94,12 @@ export default function PlansPage() {
 
   // Cache of all member profiles seen across all loaded pacts
   const [allMembersCache, setAllMembersCache] = useState<Map<string, MemberInfo>>(new Map())
+
+  // Invite more friends to a pact
+  const [invitingPactId, setInvitingPactId] = useState<string | null>(null)
+  const [availableFriends, setAvailableFriends] = useState<MemberInfo[]>([])
+  const [selectedInvites, setSelectedInvites] = useState<Set<string>>(new Set())
+  const [loadingInviteFriends, setLoadingInviteFriends] = useState(false)
 
   // Hold-to-break pact
   const [breakPactId, setBreakPactId] = useState<string | null>(null)
@@ -194,12 +200,11 @@ export default function PlansPage() {
   }
 
   const onRefresh = useCallback(async () => {
-    if (circles.length > 0) await loadPacts()
+    await loadPacts()
   }, [circleFilter, circles.length]) // eslint-disable-line react-hooks/exhaustive-deps
   const { containerRef: pullRef, refreshing: pullRefreshing, pullY, indicatorText, touchHandlers } = usePullToRefresh(onRefresh)
 
   useEffect(() => {
-    if (circles.length === 0) { setLoading(false); return }
     loadPacts()
   }, [circleFilter, circles.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -222,11 +227,8 @@ export default function PlansPage() {
     if (circleFilter) {
       upcomingQuery = upcomingQuery.eq('circle_id', circleFilter)
       pastQuery = pastQuery.eq('circle_id', circleFilter)
-    } else {
-      const circleIds = circles.map(c => c.id)
-      upcomingQuery = upcomingQuery.in('circle_id', circleIds)
-      pastQuery = pastQuery.in('circle_id', circleIds)
     }
+    // No else — RLS already restricts to plans in user's circles OR plans they're a member of
 
     // Fetch upcoming + today
     const { data: upcoming } = await upcomingQuery
@@ -393,6 +395,69 @@ export default function PlansPage() {
 
   function canEdit(pact: Pact): boolean {
     return pact.created_by === user.id
+  }
+
+  async function openInviteMore(pact: Pact) {
+    setInvitingPactId(pact.id)
+    setSelectedInvites(new Set())
+    setLoadingInviteFriends(true)
+    // Load all friends, filter out those already in the pact
+    const existingIds = new Set(pact.members.map(m => m.user_id))
+    const friends: MemberInfo[] = []
+    const seen = new Set<string>()
+    // From circles
+    const cIds = circles.map(c => c.id)
+    if (cIds.length > 0) {
+      const { data: cms } = await supabase
+        .from('circle_members').select('user_id, users!user_id(id, name, color, avatar_url)').in('circle_id', cIds)
+      if (cms) cms.forEach((cm: any) => {
+        if (cm.users && cm.users.id !== user.id && !existingIds.has(cm.users.id) && !seen.has(cm.users.id)) {
+          seen.add(cm.users.id); friends.push(cm.users)
+        }
+      })
+    }
+    // From friendships
+    const { data: fships } = await supabase
+      .from('friendships').select('requester_id, addressee_id')
+      .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`).eq('status', 'accepted')
+    if (fships) {
+      const fIds = fships.map(f => f.requester_id === user.id ? f.addressee_id : f.requester_id)
+        .filter(id => !seen.has(id) && !existingIds.has(id))
+      if (fIds.length > 0) {
+        const { data: profiles } = await supabase.from('users').select('id, name, color, avatar_url').in('id', fIds)
+        if (profiles) profiles.forEach((p: any) => { if (!seen.has(p.id)) { seen.add(p.id); friends.push(p) } })
+      }
+    }
+    setAvailableFriends(friends.sort((a, b) => a.name.localeCompare(b.name)))
+    setLoadingInviteFriends(false)
+  }
+
+  async function sendInvites(pactId: string) {
+    if (selectedInvites.size === 0) return
+    const pact = pacts.find(p => p.id === pactId)
+    const pactTitle = pact?.occasion || (pact ? fmtDate(pact.date) : 'a plan')
+    const targets = Array.from(selectedInvites)
+    // Add as pact members
+    for (const uid of targets) {
+      await supabase.from('pact_members').upsert(
+        { pact_id: pactId, user_id: uid },
+        { onConflict: 'pact_id,user_id' }
+      )
+      await supabase.from('notifications').insert({
+        user_id: uid, type: 'pact_new', title: 'You\'ve been invited',
+        body: `${user.name?.split(' ')[0] || 'Someone'} invited you to: ${pactTitle}`,
+        link: `/plans?pact=${pactId}`,
+      })
+    }
+    sendPushNotification({
+      userIds: targets, title: 'You\'ve been invited',
+      body: `${user.name?.split(' ')[0] || 'Someone'} invited you to: ${pactTitle}`,
+      url: `/plans?pact=${pactId}`,
+    }).catch(() => {})
+    setInvitingPactId(null)
+    setSelectedInvites(new Set())
+    showToast(`Invited ${targets.length} friend${targets.length === 1 ? '' : 's'}`)
+    loadPacts()
   }
 
   async function joinPact(pactId: string) {
@@ -1040,6 +1105,70 @@ export default function PlansPage() {
                     opacity: addingToCalendar === p.id ? 0.6 : 1,
                   }}>{addingToCalendar === p.id ? 'Adding...' : 'Add to calendar'}</button>
                 )}
+                <button onClick={() => openInviteMore(p)} style={{
+                  width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
+                  background: 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                  Invite friends
+                </button>
+                {/* Inline invite flow */}
+                {invitingPactId === p.id && (
+                  <div style={{
+                    padding: 12, borderRadius: 12, background: 'var(--surface2)',
+                    border: '1px solid var(--border)',
+                  }}>
+                    {loadingInviteFriends ? (
+                      <div style={{ textAlign: 'center', padding: 12 }}><div className="spinner" style={{ width: 18, height: 18, borderWidth: 2, margin: '0 auto' }} /></div>
+                    ) : availableFriends.length === 0 ? (
+                      <p style={{ fontSize: 12, color: 'var(--text2)', textAlign: 'center', padding: 8 }}>All your friends are already in this plan</p>
+                    ) : (
+                      <>
+                        <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 8 }}>
+                          Add to this plan
+                        </p>
+                        <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {availableFriends.map(f => {
+                            const isSel = selectedInvites.has(f.id)
+                            return (
+                              <button key={f.id} onClick={() => {
+                                setSelectedInvites(prev => { const n = new Set(prev); n.has(f.id) ? n.delete(f.id) : n.add(f.id); return n })
+                              }} style={{
+                                display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0',
+                                background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', width: '100%', textAlign: 'left',
+                              }}>
+                                <div className="avatar" style={{ background: f.color, color: '#fff', width: 26, height: 26, fontSize: 10, position: 'relative', overflow: 'hidden' }}>
+                                  {f.name[0]}
+                                  {(f as any).avatar_url && <img src={(f as any).avatar_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />}
+                                </div>
+                                <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{f.name}</span>
+                                <div style={{
+                                  width: 20, height: 20, borderRadius: 6,
+                                  border: isSel ? '2px solid var(--accent)' : '2px solid var(--border)',
+                                  background: isSel ? 'var(--accent)' : 'transparent',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  color: isSel ? '#fff' : 'transparent', fontSize: 11,
+                                }}>✓</div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                          <button onClick={() => setInvitingPactId(null)} style={{
+                            flex: 1, padding: 8, borderRadius: 10, border: '1px solid var(--border)',
+                            background: 'var(--surface)', color: 'var(--text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                          }}>Cancel</button>
+                          <button onClick={() => sendInvites(p.id)} disabled={selectedInvites.size === 0} style={{
+                            flex: 1, padding: 8, borderRadius: 10, border: 'none',
+                            background: selectedInvites.size ? 'var(--accent)' : 'var(--surface3)',
+                            color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                          }}>Invite {selectedInvites.size || ''}</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
                 <button onClick={() => {
                   const pactTitle = p.occasion || fmtDate(p.date)
                   const shareUrl = `${window.location.origin}/plans/invite/${p.id}`
@@ -1049,8 +1178,8 @@ export default function PlansPage() {
                   } else { navigator.clipboard.writeText(`${shareText}\n${shareUrl}`); showToast('Copied to clipboard') }
                 }} style={{
                   width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
-                  background: 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                }}>Share with more people</button>
+                  background: 'var(--surface)', color: 'var(--text2)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}>Share link</button>
                 {editable && (
                   <button onClick={() => { setExpandedPactId(null); startEditing(p) }} style={{
                     width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',

@@ -2,11 +2,25 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '9.1'
+export const CURRENT_VERSION = '9.2'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '9.2',
+    date: 'August 9, 2026',
+    title: 'Plans, refined',
+    subtitle: 'Better invites, smarter calendar bars, no forced circles',
+    items: [
+      { icon: '👥', text: 'Invite friends directly to an existing plan — no need to share a link' },
+      { icon: '🚫', text: 'Plans no longer auto-assign a circle — two people making a plan stays simple' },
+      { icon: '📌', text: 'Pact events on your calendar bar now show as teal "pact" blocks instead of red busy' },
+      { icon: '🔒', text: 'Creator\'s proposed time is locked on the group bar — no accidental re-selection' },
+      { icon: '📋', text: 'Proposed time summary now always shows the creator\'s time with a "(proposed)" label' },
+      { icon: '📊', text: 'Group bar no longer counts this pact\'s own calendar event as "busy"' },
+    ],
+  },
   {
     version: '9.1',
     date: 'August 9, 2026',

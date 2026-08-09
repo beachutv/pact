@@ -9,6 +9,8 @@ type BusyBlock = {
   start_hour: number
   end_hour: number
   flexibility: string | null
+  source: string | null
+  pact_id: string | null
 }
 
 type TimeProposal = {
@@ -66,7 +68,7 @@ export default function CalendarBars({
     setLocalOverrides(new Map())
     supabase
       .from('busy_blocks')
-      .select('user_id, start_hour, end_hour, flexibility')
+      .select('user_id, start_hour, end_hour, flexibility, source, pact_id')
       .in('user_id', memberIds)
       .eq('date', dateStr)
       .then(({ data }) => {
@@ -119,8 +121,31 @@ export default function CalendarBars({
     return hit.flexibility === 'soft' ? 1 : 2
   }
 
+  // Check if a user's busy block at hour h is from a pact
+  function isPactBlockAt(uid: string, h: number): boolean {
+    if (uid === userId && localOverrides.has(h)) return false
+    const hit = blocks.find(b =>
+      b.user_id === uid && b.start_hour <= h && b.end_hour > h
+    )
+    return hit?.source === 'pact'
+  }
+
+  // Check if a specific pact owns the busy block at this hour
+  function isThisPactBlockAt(uid: string, h: number): boolean {
+    if (!pactId) return false
+    const hit = blocks.find(b =>
+      b.user_id === uid && b.start_hour <= h && b.end_hour > h
+    )
+    return hit?.pact_id === pactId
+  }
+
   function groupAt(h: number): 'free' | 'soft' | 'busy' {
-    const states = memberIds.map(id => userStatusAt(id, h))
+    const states = memberIds.map(id => {
+      // If a member's busy block at this hour is from THIS pact, treat as free
+      // (pact's own time shouldn't show as busy on the group bar)
+      if (isThisPactBlockAt(id, h)) return 0
+      return userStatusAt(id, h)
+    })
     if (states.every(s => s === 0)) return 'free'
     if (states.some(s => s === 2)) return 'busy'
     return 'soft'
@@ -134,6 +159,10 @@ export default function CalendarBars({
   // Toggle time proposal on group bar
   async function tapGroupSlot(h: number) {
     if (!pactId || !editable) return
+    // If this is within the pact's set time and user is the creator, don't allow toggling
+    // (the creator already proposed this time by creating the plan)
+    if (pactStart !== undefined && pactEnd !== undefined && h >= pactStart && h < pactEnd && createdBy === userId) return
+
     const existing = proposals.find(p => p.user_id === userId && p.hour === h)
     if (existing) {
       // Remove proposal
@@ -371,28 +400,36 @@ export default function CalendarBars({
       <div style={{ display: 'flex', gap: 2 }}>
         {hours.map(h => {
           const st = userStatusAt(userId, h)
+          const isPact = isPactBlockAt(userId, h)
+          const isThisPact = isThisPactBlockAt(userId, h)
           return (
             <div
               key={h}
-              onClick={() => editable && tapMySlot(h)}
+              onClick={() => editable && !isThisPact && tapMySlot(h)}
               style={{
                 flex: 1, height: barHeight, borderRadius: 4,
-                background: st === 0 ? 'var(--green-soft)' : st === 1 ? 'var(--amber-soft)' : 'var(--red-soft)',
-                border: st === 0 ? '1px solid rgba(139,176,126,0.3)'
+                background: isThisPact ? 'var(--accent-soft)'
+                  : isPact ? 'var(--accent-soft)'
+                  : st === 0 ? 'var(--green-soft)' : st === 1 ? 'var(--amber-soft)' : 'var(--red-soft)',
+                border: isThisPact ? '1.5px solid var(--accent)'
+                  : isPact ? '1px solid rgba(118,172,179,0.4)'
+                  : st === 0 ? '1px solid rgba(139,176,126,0.3)'
                   : st === 1 ? '1px solid rgba(255,184,84,0.35)'
                   : '1px solid rgba(231,118,93,0.3)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 7, fontWeight: 800,
-                color: st === 1 ? 'var(--amber)' : st === 2 ? 'var(--red)' : 'transparent',
-                cursor: editable ? 'pointer' : 'default',
+                color: isThisPact ? 'var(--accent)'
+                  : isPact ? 'var(--accent)'
+                  : st === 1 ? 'var(--amber)' : st === 2 ? 'var(--red)' : 'transparent',
+                cursor: isThisPact ? 'default' : editable ? 'pointer' : 'default',
                 userSelect: 'none',
                 transition: 'transform 0.1s',
               }}
-              onPointerDown={e => { if (editable) (e.target as HTMLElement).style.transform = 'scale(0.88)' }}
+              onPointerDown={e => { if (editable && !isThisPact) (e.target as HTMLElement).style.transform = 'scale(0.88)' }}
               onPointerUp={e => { (e.target as HTMLElement).style.transform = '' }}
               onPointerLeave={e => { (e.target as HTMLElement).style.transform = '' }}
             >
-              {st === 1 ? '~' : st === 2 ? '✕' : ''}
+              {(isThisPact || isPact) ? '📌' : st === 1 ? '~' : st === 2 ? '✕' : ''}
             </div>
           )
         })}
@@ -413,9 +450,9 @@ export default function CalendarBars({
           { bg: 'var(--green-soft)', border: 'rgba(139,176,126,0.3)', label: 'free' },
           { bg: 'var(--amber-soft)', border: 'rgba(255,184,84,0.35)', label: 'flexible' },
           { bg: 'var(--red-soft)', border: 'rgba(231,118,93,0.3)', label: 'busy' },
+          { bg: 'var(--accent-soft)', border: 'var(--accent)', label: 'pact' },
           ...(pactId ? [{ bg: 'var(--accent-soft)', border: 'var(--accent)', label: 'proposed' }] : []),
           ...(onGroupTap && selectedStart !== undefined ? [{ bg: 'var(--accent-soft)', border: 'var(--accent)', label: 'selected' }] : []),
-          ...(pactStart !== undefined && !pactId && !onGroupTap ? [{ bg: 'var(--accent-soft)', border: 'var(--accent)', label: 'locked' }] : []),
         ].map(l => (
           <span key={l.label} style={{ fontSize: 10, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{
@@ -428,7 +465,7 @@ export default function CalendarBars({
       </div>
 
       {/* Proposal summaries per user */}
-      {pactId && proposals.length > 0 && (() => {
+      {pactId && (() => {
         // Group proposals by user and find their contiguous time ranges
         const byUser = new Map<string, number[]>()
         proposals.forEach(p => {
@@ -436,7 +473,17 @@ export default function CalendarBars({
           byUser.get(p.user_id)!.push(p.hour)
         })
 
-        const summaries: { uid: string; name: string; color: string; avatar_url?: string | null; ranges: string }[] = []
+        // Include creator's set time (win_start–win_end) as their "proposal"
+        // even if they haven't added explicit time_proposals
+        if (createdBy && pactStart !== undefined && pactEnd !== undefined) {
+          if (!byUser.has(createdBy)) byUser.set(createdBy, [])
+          const creatorHours = byUser.get(createdBy)!
+          for (let h = pactStart; h < pactEnd; h++) {
+            if (!creatorHours.includes(h)) creatorHours.push(h)
+          }
+        }
+
+        const summaries: { uid: string; name: string; color: string; avatar_url?: string | null; ranges: string; isCreator: boolean }[] = []
         byUser.forEach((hours, uid) => {
           const m = getMemberInfo(uid)
           if (!m) return
@@ -454,8 +501,11 @@ export default function CalendarBars({
           }
           ranges.push([rStart, rEnd + 1])
           const rangeStr = ranges.map(([s, e]) => `${fmtTiny(s)}–${fmtTiny(e)}`).join(', ')
-          summaries.push({ uid, name: m.name.split(' ')[0], color: m.color, avatar_url: m.avatar_url, ranges: rangeStr })
+          summaries.push({ uid, name: m.name.split(' ')[0], color: m.color, avatar_url: m.avatar_url, ranges: rangeStr, isCreator: uid === createdBy })
         })
+
+        // Sort: creator first
+        summaries.sort((a, b) => (a.isCreator ? -1 : 0) - (b.isCreator ? -1 : 0))
 
         if (summaries.length === 0) return null
 
@@ -481,6 +531,7 @@ export default function CalendarBars({
                   )}
                 </div>
                 <span style={{ fontWeight: 700, color: 'var(--text)' }}>{s.name}</span>
+                {s.isCreator && <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 600 }}>(proposed)</span>}
                 <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{s.ranges}</span>
               </div>
             ))}

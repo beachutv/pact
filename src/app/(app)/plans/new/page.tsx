@@ -179,8 +179,8 @@ function NewPlanContent() {
   async function createPlan() {
     const date = viewingDate || effectiveDate()
     if (!date) return
-    const circleId = selectedCircleId || circles[0]?.id
-    if (!circleId) { setError('Join or create a circle first'); return }
+    // Circle is optional — only assigned if user explicitly selected one
+    const circleId = selectedCircleId || null
     setSending(true); setError('')
 
     try {
