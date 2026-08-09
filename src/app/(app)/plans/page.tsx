@@ -642,13 +642,6 @@ export default function PlansPage() {
     setSaving(false)
   }
 
-  if (loading) {
-    return <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
-      <div style={{ textAlign: 'center', padding: 30 }}><div className="spinner" /></div>
-    </div>
-  }
-  }
-
   if (loading) return <div style={{ padding: 20 }}><div className="spinner" /></div>
 
   return (

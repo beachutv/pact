@@ -40,6 +40,9 @@ function NewPlanContent() {
   // Invite
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set())
 
+  // Circle membership map: userId -> set of circleIds
+  const [friendCircles, setFriendCircles] = useState<Map<string, Set<string>>>(new Map())
+
   // Circle matching — auto-detect when invited set matches a circle
   const [matchedCircle, setMatchedCircle] = useState<{ id: string; name: string; emoji: string } | null>(null)
   const [circleTagged, setCircleTagged] = useState(false)
@@ -81,8 +84,6 @@ function NewPlanContent() {
 
   const titleSuggestions = ['Dinner', 'Lunch', 'Coffee', 'Drinks', 'Catch up', 'Movie night', 'Brunch', 'Study session']
 
-  // Circle membership map: userId -> set of circleIds
-  const [friendCircles, setFriendCircles] = useState<Map<string, Set<string>>>(new Map())
   // Busy block counts for availability signals
   const [friendBusy, setFriendBusy] = useState<Map<string, number>>(new Map())
 
