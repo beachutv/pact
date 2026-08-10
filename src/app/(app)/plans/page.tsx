@@ -26,7 +26,7 @@ type Pact = {
   declines: { user_id: string }[]
 }
 
-type MemberInfo = { id: string; name: string; color: string }
+type MemberInfo = { id: string; name: string; color: string; avatar_url?: string | null }
 
 type PactComment = {
   id: string
@@ -262,7 +262,7 @@ export default function PlansPage() {
         if (profiles) {
           setAllMembersCache(prev => {
             const next = new Map(prev)
-            profiles.forEach((p: any) => next.set(p.id, { id: p.id, name: p.name, color: p.color }))
+            profiles.forEach((p: any) => next.set(p.id, { id: p.id, name: p.name, color: p.color, avatar_url: p.avatar_url }))
             return next
           })
         }
@@ -413,7 +413,7 @@ export default function PlansPage() {
   }
 
   function getMember(uid: string): MemberInfo | undefined {
-    return circleMembers.find(m => m.id === uid) || allMembersCache.get(uid) || (uid === user.id ? { id: user.id, name: user.name, color: user.color } : undefined)
+    return circleMembers.find(m => m.id === uid) || allMembersCache.get(uid) || (uid === user.id ? { id: user.id, name: user.name, color: user.color, avatar_url: user.avatar_url } : undefined)
   }
 
   function canEdit(pact: Pact): boolean {
@@ -860,9 +860,21 @@ export default function PlansPage() {
                             📍 {p.spot_name}{p.spot_area ? ` — ${p.spot_area}` : ''}
                           </p>
                         )}
-                        <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
-                          Created by {getMember(p.created_by || '')?.name?.split(' ')[0] || 'someone'}
-                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                          <p style={{ fontSize: 11, color: 'var(--text2)' }}>
+                            Created by {getMember(p.created_by || '')?.name?.split(' ')[0] || 'someone'}
+                          </p>
+                          {p.circle_id && (() => {
+                            const c = circles.find(x => x.id === p.circle_id)
+                            return c ? (
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 8,
+                                background: 'var(--accent-soft)', color: 'var(--accent)',
+                                whiteSpace: 'nowrap',
+                              }}>{c.emoji} {c.name}</span>
+                            ) : null
+                          })()}
+                        </div>
                       </div>
                       <span style={{
                         fontSize: 10, fontWeight: 800, padding: '4px 10px', borderRadius: 12,
@@ -884,8 +896,15 @@ export default function PlansPage() {
                             width: 26, height: 26, borderRadius: '50%', background: m.color,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: 10, fontWeight: 800, color: txtOn(m.color),
+                            position: 'relative', overflow: 'hidden',
                           }}>
                             {m.name[0]}
+                            {(m as any).avatar_url && (
+                              <img src={(m as any).avatar_url} alt="" style={{
+                                position: 'absolute', inset: 0, width: '100%', height: '100%',
+                                objectFit: 'cover', borderRadius: '50%',
+                              }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                            )}
                           </div>
                         )
                       })}
@@ -898,8 +917,15 @@ export default function PlansPage() {
                               width: 26, height: 26, borderRadius: '50%', background: m.color,
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               fontSize: 10, fontWeight: 800, color: txtOn(m.color), opacity: 0.4,
+                              position: 'relative', overflow: 'hidden',
                             }}>
                               {m.name[0]}
+                              {m.avatar_url && (
+                                <img src={m.avatar_url} alt="" style={{
+                                  position: 'absolute', inset: 0, width: '100%', height: '100%',
+                                  objectFit: 'cover', borderRadius: '50%',
+                                }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                              )}
                             </div>
                             <span style={{
                               position: 'absolute', top: -3, right: -3,
@@ -981,9 +1007,21 @@ export default function PlansPage() {
                     📍 {p.spot_name}{p.spot_area ? ` — ${p.spot_area}` : ''}
                   </p>
                 )}
-                <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
-                  Created by {getMember(p.created_by || '')?.name?.split(' ')[0] || 'someone'}
-                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <p style={{ fontSize: 12, color: 'var(--text2)' }}>
+                    Created by {getMember(p.created_by || '')?.name?.split(' ')[0] || 'someone'}
+                  </p>
+                  {p.circle_id && (() => {
+                    const c = circles.find(x => x.id === p.circle_id)
+                    return c ? (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 8,
+                        background: 'var(--accent-soft)', color: 'var(--accent)',
+                        whiteSpace: 'nowrap',
+                      }}>{c.emoji} {c.name}</span>
+                    ) : null
+                  })()}
+                </div>
               </div>
 
               {/* Who's in */}
@@ -999,7 +1037,16 @@ export default function PlansPage() {
                       width: 28, height: 28, borderRadius: '50%', background: m.color,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 10, fontWeight: 800, color: txtOn(m.color),
-                    }}>{m.name[0]}</div>
+                      position: 'relative', overflow: 'hidden',
+                    }}>
+                      {m.name[0]}
+                      {m.avatar_url && (
+                        <img src={m.avatar_url} alt="" style={{
+                          position: 'absolute', inset: 0, width: '100%', height: '100%',
+                          objectFit: 'cover', borderRadius: '50%',
+                        }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      )}
+                    </div>
                   )
                 })}
                 <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 8 }}>

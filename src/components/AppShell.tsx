@@ -970,7 +970,7 @@ export default function AppShell({
               >
                 + Join or create a circle
               </button>
-              <span style={{ fontSize: 11, color: 'var(--text2)' }}>to plan with friends</span>
+              <span style={{ fontSize: 11, color: 'var(--text2)' }}>to organize your groups</span>
             </div>
           ) : null}
           </div>
