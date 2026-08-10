@@ -387,39 +387,37 @@ export default function CalendarBars({
         {!pactId && !onGroupTap && pactStart !== undefined && <span style={{ fontSize: 10 }}> — set time highlighted</span>}
       </div>
 
-      {/* Group bar with proposal avatars */}
-      {(() => {
-        // Check if creator has explicit proposal records (vs just relying on set time)
+      {/* Proposal avatar indicators — fixed height row, same flex layout as bar */}
+      {pactId && (() => {
         const creatorHasExplicitProposals = createdBy ? proposals.some(p => p.user_id === createdBy) : false
-        return null
-      })()}
-      <div style={{ display: 'flex', gap: 2, borderRadius: 8, overflow: 'visible', position: 'relative' }}>
-        {hours.map(h => {
-          const st = groupAt(h)
-          // inPact = within the original set time. But once creator has explicit proposals,
-          // only show as "pact highlighted" if this hour is still proposed
-          const inOriginalPact = pactStart !== undefined && pactEnd !== undefined && h >= pactStart && h < pactEnd
-          const creatorHasExplicitProposals = createdBy ? proposals.some(p => p.user_id === createdBy) : false
-          const inPact = inOriginalPact && (!creatorHasExplicitProposals || proposals.some(p => p.user_id === createdBy && p.hour === h))
-          const inSelected = selectedStart !== undefined && selectedEnd !== undefined && h >= selectedStart && h < selectedEnd
-          const blocked = st === 'busy' && !inPact && !inSelected
-          const hourProposals = proposalsAt(h)
-          // If user is busy at a proposed hour, show busy instead of proposed
-          const userBusy = userStatusAt(userId, h) === 2 && !isThisPactBlockAt(userId, h)
-          const iProposed = hourProposals.some(p => p.user_id === userId) && !userBusy
-          const hasProposals = hourProposals.length > 0 && !userBusy
-
-          return (
-            <div key={h} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-              {/* Mini avatars above the slot */}
-              {hasProposals && (
-                <div style={{
-                  display: 'flex', justifyContent: 'center', minHeight: 14,
-                  flexWrap: 'wrap', gap: 0,
-                }}>
-                  {hourProposals.slice(0, 3).map((pr, i) => {
+        // Collect unique proposers across all hours
+        const proposerIds = new Set<string>()
+        proposals.forEach(p => proposerIds.add(p.user_id))
+        // Include creator if they have set time but no explicit proposals
+        if (createdBy && pactStart !== undefined && pactEnd !== undefined && !creatorHasExplicitProposals) {
+          proposerIds.add(createdBy)
+        }
+        if (proposerIds.size === 0) return null
+        // Build proposer list with info
+        const proposers = [...proposerIds].map(uid => getMemberInfo(uid)).filter(Boolean) as MemberInfo[]
+        return (
+          <div style={{ display: 'flex', gap: 2, height: 18, alignItems: 'flex-end' }}>
+            {hours.map(h => {
+              const hourProposals = proposalsAt(h)
+              const userBusy = userStatusAt(userId, h) === 2 && !isThisPactBlockAt(userId, h)
+              // Creator's set time counts as proposal if no explicit proposals
+              const inOriginalPact = pactStart !== undefined && pactEnd !== undefined && h >= pactStart && h < pactEnd
+              const isCreatorImplicit = !creatorHasExplicitProposals && inOriginalPact && createdBy
+              const effectiveProposals = userBusy ? [] : [
+                ...hourProposals,
+                ...(isCreatorImplicit && !hourProposals.some(p => p.user_id === createdBy) ? [{ id: 'creator', pact_id: pactId!, user_id: createdBy!, hour: h }] : []),
+              ]
+              if (effectiveProposals.length === 0) return <div key={h} style={{ flex: 1 }} />
+              return (
+                <div key={h} style={{ flex: 1, display: 'flex', justifyContent: 'center', overflow: 'visible' }}>
+                  {effectiveProposals.slice(0, 3).map((pr, i) => {
                     const m = getMemberInfo(pr.user_id)
-                    if (!m) return <div key={pr.id} style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--surface3)', marginLeft: i > 0 ? -4 : 0, border: '1px solid var(--surface)' }} />
+                    if (!m) return <div key={pr.id} style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--surface3)', marginLeft: i > 0 ? -4 : 0, border: '1px solid var(--surface)', flexShrink: 0 }} />
                     return (
                       <div key={pr.id} style={{
                         width: 14, height: 14, borderRadius: '50%', background: m.color,
@@ -438,82 +436,70 @@ export default function CalendarBars({
                       </div>
                     )
                   })}
-                  {hourProposals.length > 3 && (
-                    <span style={{ fontSize: 6, color: 'var(--text2)', marginLeft: 1 }}>+{hourProposals.length - 3}</span>
-                  )}
                 </div>
-              )}
-              {/* Creator avatar on set time blocks (when no proposals yet) */}
-              {!hasProposals && inPact && createdBy && !creatorHasExplicitProposals && (() => {
-                const creator = getMemberInfo(createdBy)
-                if (!creator) return <div style={{ minHeight: 14 }} />
-                return (
-                  <div style={{ display: 'flex', justifyContent: 'center', minHeight: 14 }}>
-                    <div style={{
-                      width: 14, height: 14, borderRadius: '50%', background: creator.color,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 6, fontWeight: 800, color: '#fff',
-                      border: '1.5px solid var(--accent)', position: 'relative', overflow: 'hidden',
-                    }}>
-                      {creator.name[0]}
-                      {creator.avatar_url && (
-                        <img src={creator.avatar_url} alt="" style={{
-                          position: 'absolute', inset: 0, width: '100%', height: '100%',
-                          objectFit: 'cover', borderRadius: '50%',
-                        }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                      )}
-                    </div>
-                  </div>
-                )
-              })()}
-              {!hasProposals && !inPact && pactId && <div style={{ minHeight: 14 }} />}
+              )
+            })}
+          </div>
+        )
+      })()}
 
-              {/* The slot itself */}
-              <div
-                onClick={() => {
-                  // Don't allow selecting past hours
-                  if (isPastHour(h)) return
-                  // Don't allow selecting hard busy hours (except this pact's own blocks)
-                  if (userStatusAt(userId, h) === 2 && !isThisPactBlockAt(userId, h)) return
-                  // Also block when any group member is hard busy (group status = 'busy')
-                  if (st === 'busy' && !inPact && !inSelected) return
-                  if (pactId) tapGroupSlot(h)
-                  else if (onGroupTap) onGroupTap(h, groupAt)
-                }}
-                style={{
-                  width: '100%', height: barHeight, borderRadius: 4,
-                  background: isPastHour(h) ? 'var(--surface2)'
-                    : userBusy && (hasProposals || hourProposals.length > 0) ? 'var(--red-soft)'
-                    : iProposed ? 'var(--accent-soft)'
-                    : inSelected ? 'var(--accent-soft)'
-                    : inPact ? 'var(--accent-soft)'
-                    : st === 'free' ? 'var(--green-soft)'
-                    : st === 'soft' ? 'var(--amber-soft)'
-                    : 'var(--red-soft)',
-                  border: isPastHour(h) ? '1px solid var(--border)'
-                    : userBusy && (hasProposals || hourProposals.length > 0) ? '1.5px solid rgba(231,118,93,0.5)'
-                    : iProposed ? '2px solid var(--accent)'
-                    : inSelected ? '2px solid var(--accent)'
-                    : inPact ? '1.5px solid var(--accent)'
-                    : st === 'free' ? '1px solid rgba(139,176,126,0.3)'
-                    : st === 'soft' ? '1px solid rgba(255,184,84,0.35)'
-                    : '1px solid rgba(231,118,93,0.3)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 7, fontWeight: 800,
-                  color: isPastHour(h) ? 'var(--text2)'
-                    : userBusy && hourProposals.length > 0 ? 'var(--red)'
-                    : iProposed ? 'var(--accent)' : inSelected ? 'var(--accent)' : inPact ? 'var(--accent)' : blocked ? 'var(--red)' : st === 'soft' ? 'var(--amber)' : 'transparent',
-                  opacity: isPastHour(h) ? 0.35 : blocked ? 0.5 : 1,
-                  cursor: isPastHour(h) || blocked ? 'not-allowed' : (pactId || onGroupTap) && editable ? 'pointer' : 'default',
-                  userSelect: 'none',
-                  transition: 'transform 0.1s',
-                }}
-                onPointerDown={e => { if ((pactId || onGroupTap) && editable) (e.target as HTMLElement).style.transform = 'scale(0.88)' }}
-                onPointerUp={e => { (e.target as HTMLElement).style.transform = '' }}
-                onPointerLeave={e => { (e.target as HTMLElement).style.transform = '' }}
-              >
-                {userBusy && hourProposals.length > 0 ? '✕' : hasProposals ? '▼' : inSelected ? '▼' : inPact ? '▼' : blocked ? '✕' : st === 'soft' ? '~' : ''}
-              </div>
+      {/* Group bar — flat row, never shifts */}
+      <div style={{ display: 'flex', gap: 2 }}>
+        {hours.map(h => {
+          const st = groupAt(h)
+          const inOriginalPact = pactStart !== undefined && pactEnd !== undefined && h >= pactStart && h < pactEnd
+          const creatorHasExplicitProposals = createdBy ? proposals.some(p => p.user_id === createdBy) : false
+          const inPact = inOriginalPact && (!creatorHasExplicitProposals || proposals.some(p => p.user_id === createdBy && p.hour === h))
+          const inSelected = selectedStart !== undefined && selectedEnd !== undefined && h >= selectedStart && h < selectedEnd
+          const blocked = st === 'busy' && !inPact && !inSelected
+          const hourProposals = proposalsAt(h)
+          const userBusy = userStatusAt(userId, h) === 2 && !isThisPactBlockAt(userId, h)
+          const iProposed = hourProposals.some(p => p.user_id === userId) && !userBusy
+          const hasProposals = hourProposals.length > 0 && !userBusy
+
+          return (
+            <div
+              key={h}
+              onClick={() => {
+                if (isPastHour(h)) return
+                if (userStatusAt(userId, h) === 2 && !isThisPactBlockAt(userId, h)) return
+                if (st === 'busy' && !inPact && !inSelected) return
+                if (pactId) tapGroupSlot(h)
+                else if (onGroupTap) onGroupTap(h, groupAt)
+              }}
+              style={{
+                flex: 1, height: barHeight, borderRadius: 4,
+                background: isPastHour(h) ? 'var(--surface2)'
+                  : userBusy && (hasProposals || hourProposals.length > 0) ? 'var(--red-soft)'
+                  : iProposed ? 'var(--accent-soft)'
+                  : inSelected ? 'var(--accent-soft)'
+                  : inPact ? 'var(--accent-soft)'
+                  : st === 'free' ? 'var(--green-soft)'
+                  : st === 'soft' ? 'var(--amber-soft)'
+                  : 'var(--red-soft)',
+                border: isPastHour(h) ? '1px solid var(--border)'
+                  : userBusy && (hasProposals || hourProposals.length > 0) ? '1.5px solid rgba(231,118,93,0.5)'
+                  : iProposed ? '2px solid var(--accent)'
+                  : inSelected ? '2px solid var(--accent)'
+                  : inPact ? '1.5px solid var(--accent)'
+                  : st === 'free' ? '1px solid rgba(139,176,126,0.3)'
+                  : st === 'soft' ? '1px solid rgba(255,184,84,0.35)'
+                  : '1px solid rgba(231,118,93,0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 7, fontWeight: 800,
+                color: isPastHour(h) ? 'var(--text2)'
+                  : userBusy && hourProposals.length > 0 ? 'var(--red)'
+                  : iProposed ? 'var(--accent)' : inSelected ? 'var(--accent)' : inPact ? 'var(--accent)' : blocked ? 'var(--red)' : st === 'soft' ? 'var(--amber)' : 'transparent',
+                opacity: isPastHour(h) ? 0.35 : blocked ? 0.5 : 1,
+                cursor: isPastHour(h) || blocked ? 'not-allowed' : (pactId || onGroupTap) && editable ? 'pointer' : 'default',
+                userSelect: 'none',
+                transition: 'transform 0.1s',
+              }}
+              onPointerDown={e => { if ((pactId || onGroupTap) && editable) (e.target as HTMLElement).style.transform = 'scale(0.88)' }}
+              onPointerUp={e => { (e.target as HTMLElement).style.transform = '' }}
+              onPointerLeave={e => { (e.target as HTMLElement).style.transform = '' }}
+            >
+              {userBusy && hourProposals.length > 0 ? '✕' : hasProposals ? '▼' : inSelected ? '▼' : inPact ? '▼' : blocked ? '✕' : st === 'soft' ? '~' : ''}
             </div>
           )
         })}
