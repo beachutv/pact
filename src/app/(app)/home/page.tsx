@@ -112,21 +112,6 @@ export default function HomePage() {
     return c ? `${c.emoji} ${c.name}` : null
   }
 
-  if (!activeCircle) {
-    return (
-      <div style={{ padding: 20, textAlign: 'center', marginTop: 40 }}>
-        <p style={{ fontSize: 40, marginBottom: 12 }}>👋</p>
-        <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Welcome to Pact!</h2>
-        <p style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 20, lineHeight: 1.5 }}>
-          Create a circle for your friend group, or join one with an invite code.
-        </p>
-        <a href="/circles/new">
-          <button className="btn-primary">Get started</button>
-        </a>
-      </div>
-    )
-  }
-
   return (
     <div
       ref={mainRef}

@@ -67,6 +67,7 @@ export default function PlansPage() {
   const [editTitle, setEditTitle] = useState('')
   const [editSpot, setEditSpot] = useState('')
   const [editArea, setEditArea] = useState('')
+  const [editCircleId, setEditCircleId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   // Toast
@@ -607,6 +608,7 @@ export default function PlansPage() {
     setEditTitle(pact.occasion || '')
     setEditSpot(pact.spot_name === 'TBD' ? '' : pact.spot_name)
     setEditArea(pact.spot_area)
+    setEditCircleId(pact.circle_id)
   }
 
   async function saveEdit(pactId: string) {
@@ -618,6 +620,7 @@ export default function PlansPage() {
       occasion: editTitle || null,
       spot_name: editSpot || 'TBD',
       spot_area: editArea,
+      circle_id: editCircleId,
     }).eq('id', pactId)
 
     if (error) {
@@ -646,7 +649,7 @@ export default function PlansPage() {
             occasion: editTitle || null,
             spotName: editSpot || null,
             otherNames: otherMembers,
-            circleName: activeCircle?.name,
+            circleName: circles.find(c => c.id === editCircleId)?.name || '',
             date: editDate,
             startHour: editStart,
             endHour: editEnd,
@@ -795,6 +798,21 @@ export default function PlansPage() {
                     initialValue={editSpot}
                     placeholder="Add location"
                   />
+
+                  {/* Circle */}
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', marginBottom: 4, display: 'block' }}>Circle (optional)</label>
+                    <select
+                      value={editCircleId || ''}
+                      onChange={e => setEditCircleId(e.target.value || null)}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 10, background: 'var(--surface2)', border: 'none', color: 'var(--text)', fontSize: 13 }}
+                    >
+                      <option value="">No circle</option>
+                      {circles.map(c => (
+                        <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
+                      ))}
+                    </select>
+                  </div>
 
                   {/* Action buttons */}
                   <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>

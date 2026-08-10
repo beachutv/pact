@@ -11,16 +11,8 @@ function hourToISO(date: string, hour: number): string {
 /**
  * Build the Google Calendar event title.
  *
- * PROPOSED (not yet confirmed):
- *   "Proposed Pact: {occasion}" or "Proposed Pact with {names/circle}"
- *
- * CONFIRMED (pact made):
- *   "Pact Made: {occasion}" or "Pact Made with {names/circle}"
- *
- * "with" logic:
- *   - 1 other person → their name          ("Pact Made with Bea")
- *   - 2-3 other people → list names         ("Pact Made with Bea and Nicole")
- *   - 4+ people OR all circle members → circle name ("Pact Made with Sapact")
+ * If there's a pact title (occasion), use it directly as the calendar event title.
+ * Otherwise fall back to "Pact with {names}" for context.
  */
 function buildTitle(
   confirmed: boolean,
@@ -30,14 +22,12 @@ function buildTitle(
   totalCircleMembers: number,
   pactMemberCount: number,
 ): string {
-  const prefix = confirmed ? 'Pact Made' : 'Proposed Pact'
-
-  // If there's an occasion, use it
+  // Use the pact title directly as the calendar event title
   if (occasion) {
-    return `${prefix}: ${occasion}`
+    return occasion
   }
 
-  // Determine the "with" part
+  // Fallback: "Pact with {names/circle}"
   const allIn = totalCircleMembers >= 3 && pactMemberCount >= totalCircleMembers
   const otherCount = otherNames.length
 
@@ -53,11 +43,10 @@ function buildTitle(
     const rest = otherNames.slice(0, -1).join(', ')
     withPart = `${rest} and ${last}`
   } else {
-    // 4+ people → use circle name
     withPart = circleName || otherNames.slice(0, 3).join(', ') + ` +${otherCount - 3}`
   }
 
-  return withPart ? `${prefix} with ${withPart}` : prefix
+  return withPart ? `Pact with ${withPart}` : 'Pact'
 }
 
 export async function POST(request: Request) {

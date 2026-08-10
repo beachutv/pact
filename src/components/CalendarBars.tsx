@@ -405,7 +405,7 @@ export default function CalendarBars({
           const blocked = st === 'busy' && !inPact && !inSelected
           const hourProposals = proposalsAt(h)
           // If user is busy at a proposed hour, show busy instead of proposed
-          const userBusy = userStatusAt(userId, h) === 2
+          const userBusy = userStatusAt(userId, h) === 2 && !isThisPactBlockAt(userId, h)
           const iProposed = hourProposals.some(p => p.user_id === userId) && !userBusy
           const hasProposals = hourProposals.length > 0 && !userBusy
 
