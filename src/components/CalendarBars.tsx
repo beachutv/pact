@@ -641,26 +641,27 @@ export default function CalendarBars({
         const myHours = byUser.get(userId) || []
         const myKey = [...new Set(myHours)].sort((a, b) => a - b).join(',')
         const total = memberIds.length
+        const isCreator = userId === createdBy
+        const canConfirm = isCreator && onConfirmTime && editable
+
+        // Find the time range the creator has selected (for the separate confirm button)
+        const creatorSelectedEntry = canConfirm && myKey ? sorted.find(([key]) => key === myKey) : null
+        const creatorSelectedTop = creatorSelectedEntry ? (creatorSelectedEntry[1].find(v => v.uid === createdBy) || creatorSelectedEntry[1][0]) : null
 
         return (
           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.4px' }}>
-              Proposed times {sorted.length > 1 ? '— tap to vote' : ''}
+              Proposed times — tap to {canConfirm ? 'select' : 'vote'}
             </p>
             {sorted.map(([key, voters]) => {
               const mine = key === myKey && myKey !== ''
               const top = voters.find(v => v.uid === createdBy) || voters[0]
-              const sortedHours = top.hours.slice().sort((a: number, b: number) => a - b)
-              const rangeStart = sortedHours[0]
-              const rangeEnd = sortedHours[sortedHours.length - 1] + 1
-              const isCreator = userId === createdBy
-              const canConfirm = isCreator && onConfirmTime && editable
               return (
-                <div key={key} onClick={() => { if (!mine && editable && !canConfirm) voteForRange(top.hours) }} style={{
+                <div key={key} onClick={() => { if (!mine && editable) voteForRange(top.hours) }} style={{
                   display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
                   borderRadius: 12, border: mine ? '1.5px solid var(--accent)' : '1px solid var(--border)',
                   background: mine ? 'var(--accent-soft)' : 'var(--surface2)',
-                  cursor: mine || !editable || canConfirm ? 'default' : 'pointer', width: '100%', textAlign: 'left',
+                  cursor: mine || !editable ? 'default' : 'pointer', width: '100%', textAlign: 'left',
                 }}>
                   <div style={{ display: 'flex', flexShrink: 0 }}>
                     {voters.slice(0, 4).map((v, i) => (
@@ -683,16 +684,7 @@ export default function CalendarBars({
                       {voters.length === total ? '✓ everyone' : `${voters.length}/${total}`}
                     </span>
                   </div>
-                  {canConfirm ? (
-                    <button onClick={(e) => { e.stopPropagation(); onConfirmTime!(rangeStart, rangeEnd) }} style={{
-                      fontSize: 10, fontWeight: 800, padding: '5px 12px', borderRadius: 8,
-                      background: 'var(--green)', color: '#fff', border: 'none',
-                      cursor: 'pointer', flexShrink: 0, letterSpacing: '.3px',
-                      textTransform: 'uppercase',
-                    }}>
-                      Confirm ✓
-                    </button>
-                  ) : mine ? (
+                  {mine ? (
                     <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, flexShrink: 0 }}>your pick</span>
                   ) : editable ? (
                     <span style={{ fontSize: 10, color: 'var(--text2)', fontWeight: 600, flexShrink: 0 }}>tap to agree</span>
@@ -700,6 +692,31 @@ export default function CalendarBars({
                 </div>
               )
             })}
+            {/* Separate confirm button — only for creator, only when they've selected a time */}
+            {canConfirm && creatorSelectedTop && (() => {
+              const sortedHours = creatorSelectedTop.hours.slice().sort((a: number, b: number) => a - b)
+              const rangeStart = sortedHours[0]
+              const rangeEnd = sortedHours[sortedHours.length - 1] + 1
+              return (
+                <button
+                  onClick={() => onConfirmTime!(rangeStart, rangeEnd)}
+                  style={{
+                    width: '100%', padding: '10px 0', borderRadius: 12, border: 'none',
+                    background: 'var(--green)', color: '#fff',
+                    fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    marginTop: 4,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  Lock in {creatorSelectedTop.rangeStr}
+                </button>
+              )
+            })()}
+            {canConfirm && !creatorSelectedTop && (
+              <p style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'center', marginTop: 2 }}>
+                Tap a time above to select, then lock it in
+              </p>
+            )}
           </div>
         )
       })()}
