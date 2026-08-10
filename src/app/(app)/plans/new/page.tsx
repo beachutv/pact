@@ -222,7 +222,12 @@ function NewPlanContent() {
       })
       if (pactErr) { setError(pactErr.message); throw pactErr }
 
-      await supabase.from('pact_members').insert({ pact_id: pactId, user_id: user.id })
+      // Add creator + all invited friends as pact members so they can see the plan via RLS
+      const memberInserts = [{ pact_id: pactId, user_id: user.id }]
+      for (const fid of invitedIds) {
+        memberInserts.push({ pact_id: pactId, user_id: fid })
+      }
+      await supabase.from('pact_members').insert(memberInserts)
 
       const pushTargets = allFriends.filter(m => m.id !== user.id && invitedIds.has(m.id)).map(m => m.id)
       const pactTitle = title.trim() || `Pact on ${fmtDate(date)}`

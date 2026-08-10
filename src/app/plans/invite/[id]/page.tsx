@@ -84,7 +84,18 @@ export default function PlanInvitePage() {
 
       setUserId(session.user.id)
 
-      // 3) Check if user is in the circle
+      // 3) If plan has no circle, just join and redirect
+      if (!preview.circle_id) {
+        setFlowState('redirecting')
+        await supabase.from('pact_members').upsert(
+          { pact_id: id, user_id: session.user.id },
+          { onConflict: 'pact_id,user_id' }
+        )
+        router.replace(`/plans?pact=${id}`)
+        return
+      }
+
+      // 4) Check if user is in the circle
       const { data: membership } = await supabase
         .from('circle_members')
         .select('user_id')
