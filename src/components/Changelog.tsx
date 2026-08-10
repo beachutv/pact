@@ -2,11 +2,25 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '9.4'
+export const CURRENT_VERSION = '9.5'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '9.5',
+    date: 'August 10, 2026',
+    title: 'Plan anywhere, with anyone',
+    subtitle: 'Plans no longer require circles — plan with any friend',
+    items: [
+      { icon: '🤝', text: 'Plans now work without circles — make plans with any friend, even if you don\'t share a group' },
+      { icon: '🏷️', text: 'Circle association is now optional and editable — add, change, or remove a circle from any plan' },
+      { icon: '📅', text: 'Calendar event titles now use your plan name directly — no more "Proposed Pact:" prefix' },
+      { icon: '🔧', text: 'Fixed group availability bar showing pact time blocks as busy instead of highlighted' },
+      { icon: '🖼️', text: 'Profile photos now appear on plan cards and detail views' },
+      { icon: '🏷️', text: 'Circle tags now shown on plan cards so you can see which group a plan belongs to' },
+    ],
+  },
   {
     version: '9.4',
     date: 'August 9, 2026',
