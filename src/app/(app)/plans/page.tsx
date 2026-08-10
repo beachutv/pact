@@ -1000,7 +1000,7 @@ export default function PlansPage() {
                 ].filter((v, i, a) => a.indexOf(v) === i)}
                 dateStr={p.date}
                 userId={user.id}
-                editable={true}
+                editable={p.status !== 'confirmed'}
                 pactStart={p.win_start}
                 pactEnd={p.win_end}
                 compact={true}
@@ -1013,6 +1013,39 @@ export default function PlansPage() {
                   const m = getMember(uid)
                   return m ? { id: m.id, name: m.name, color: m.color, avatar_url: (m as any).avatar_url } : { id: uid, name: '?', color: '#999' }
                 })}
+                onConfirmTime={p.created_by === user.id && p.status === 'pending' ? async (startHour, endHour) => {
+                  // Update pact time and status
+                  await supabase.from('pacts').update({
+                    win_start: startHour,
+                    win_end: endHour,
+                    status: 'confirmed',
+                  }).eq('id', p.id)
+
+                  // Notify all other pact members
+                  const pactTitle = p.occasion || fmtDate(p.date)
+                  const otherIds = p.members.filter(m => m.user_id !== user.id).map(m => m.user_id)
+                  if (otherIds.length > 0) {
+                    for (const uid of otherIds) {
+                      await supabase.from('notifications').insert({
+                        user_id: uid,
+                        type: 'pact_change',
+                        title: 'Time confirmed! 📌',
+                        body: `${user.name?.split(' ')[0] || 'Someone'} locked ${pactTitle} for ${fmtWin(startHour, endHour)}`,
+                        link: `/plans?pact=${p.id}`,
+                      })
+                    }
+                    sendPushNotification({
+                      userIds: otherIds,
+                      title: 'Time confirmed! 📌',
+                      body: `${user.name?.split(' ')[0] || 'Someone'} locked ${pactTitle} for ${fmtWin(startHour, endHour)}`,
+                      url: `/plans?pact=${p.id}`,
+                      tag: `confirm-${p.id}`,
+                    })
+                  }
+
+                  showToast('Time confirmed!')
+                  await loadPacts()
+                } : undefined}
               />
 
               {/* Voting buttons — for pending plans where user hasn't committed */}

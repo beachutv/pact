@@ -44,6 +44,7 @@ type Props = {
   selectedStart?: number  // highlight selected range on group bar
   selectedEnd?: number
   memberVisibility?: Map<string, number>  // per-member visibility window (days) — members beyond their window are excluded from group bar
+  onConfirmTime?: (startHour: number, endHour: number) => void  // creator confirms a proposed time range
 }
 
 const VIS_START = 8
@@ -52,7 +53,7 @@ const VIS_END = 23
 export default function CalendarBars({
   memberIds, dateStr, userId, editable = true, pactStart, pactEnd, compact = false,
   pactId, members = [], onDateChange, visibilityDays = 7, createdBy,
-  onGroupTap, selectedStart, selectedEnd, memberVisibility,
+  onGroupTap, selectedStart, selectedEnd, memberVisibility, onConfirmTime,
 }: Props) {
   const supabase = createClient()
   const [blocks, setBlocks] = useState<BusyBlock[]>([])
@@ -649,12 +650,17 @@ export default function CalendarBars({
             {sorted.map(([key, voters]) => {
               const mine = key === myKey && myKey !== ''
               const top = voters.find(v => v.uid === createdBy) || voters[0]
+              const sortedHours = top.hours.slice().sort((a: number, b: number) => a - b)
+              const rangeStart = sortedHours[0]
+              const rangeEnd = sortedHours[sortedHours.length - 1] + 1
+              const isCreator = userId === createdBy
+              const canConfirm = isCreator && onConfirmTime && editable
               return (
-                <button key={key} onClick={() => { if (!mine && editable) voteForRange(top.hours) }} style={{
+                <div key={key} onClick={() => { if (!mine && editable && !canConfirm) voteForRange(top.hours) }} style={{
                   display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
                   borderRadius: 12, border: mine ? '1.5px solid var(--accent)' : '1px solid var(--border)',
                   background: mine ? 'var(--accent-soft)' : 'var(--surface2)',
-                  cursor: mine || !editable ? 'default' : 'pointer', width: '100%', textAlign: 'left',
+                  cursor: mine || !editable || canConfirm ? 'default' : 'pointer', width: '100%', textAlign: 'left',
                 }}>
                   <div style={{ display: 'flex', flexShrink: 0 }}>
                     {voters.slice(0, 4).map((v, i) => (
@@ -677,12 +683,21 @@ export default function CalendarBars({
                       {voters.length === total ? '✓ everyone' : `${voters.length}/${total}`}
                     </span>
                   </div>
-                  {mine ? (
+                  {canConfirm ? (
+                    <button onClick={(e) => { e.stopPropagation(); onConfirmTime!(rangeStart, rangeEnd) }} style={{
+                      fontSize: 10, fontWeight: 800, padding: '5px 12px', borderRadius: 8,
+                      background: 'var(--green)', color: '#fff', border: 'none',
+                      cursor: 'pointer', flexShrink: 0, letterSpacing: '.3px',
+                      textTransform: 'uppercase',
+                    }}>
+                      Confirm ✓
+                    </button>
+                  ) : mine ? (
                     <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, flexShrink: 0 }}>your pick</span>
                   ) : editable ? (
                     <span style={{ fontSize: 10, color: 'var(--text2)', fontWeight: 600, flexShrink: 0 }}>tap to agree</span>
                   ) : null}
-                </button>
+                </div>
               )
             })}
           </div>
