@@ -1299,35 +1299,17 @@ export default function PlansPage() {
                     )}
                   </div>
                 )}
-                {isPastPact(p) && (
+                {isPastPact(p) ? (
                   <div style={{ textAlign: 'center', padding: '12px 0' }}>
                     <p style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600, fontStyle: 'italic' }}>This plan has passed</p>
                   </div>
-                )}
-                {!isPastPact(p) && <button onClick={() => {
-                  const pactTitle = p.occasion || fmtDateRange(p.date, p.end_date)
-                  const shareUrl = `${window.location.origin}/plans/invite/${p.id}`
-                  const shareText = `${pactTitle} — ${fmtDateRange(p.date, p.end_date)}, ${fmtWin(p.win_start, p.win_end)}`
-                  if (navigator.share) {
-                    navigator.share({ title: pactTitle, text: shareText, url: shareUrl }).catch(() => {})
-                  } else { navigator.clipboard.writeText(`${shareText}\n${shareUrl}`); showToast('Copied to clipboard') }
-                }} style={{
-                  width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
-                  background: 'var(--surface)', color: 'var(--text2)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                }}>Share link</button>}
-                {editable && !isPastPact(p) && (
-                  <button onClick={() => { setExpandedPactId(null); startEditing(p) }} style={{
-                    width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
-                    background: 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                  }}>Edit plan</button>
-                )}
-                {!isPastPact(p) && (isIn ? (
+                ) : isIn ? (
                   <button onClick={() => { setExpandedPactId(null); startHoldBreak(p.id) }} style={{
                     width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
                     background: 'var(--surface)', color: 'var(--red)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                   }}>Opt out</button>
                 ) : !declinedPacts.has(p.id) && !p.declines?.some(d => d.user_id === user.id) ? (
-                  <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <button onClick={async () => { await joinPact(p.id); showToast("You're in!") }} style={{
                       width: '100%', padding: 12, borderRadius: 12, border: 'none',
                       background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
@@ -1347,7 +1329,7 @@ export default function PlansPage() {
                       width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
                       background: 'var(--surface)', color: 'var(--red)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                     }}>Opt out</button>
-                  </>
+                  </div>
                 ) : (
                   <div style={{ textAlign: 'center', padding: '8px 0' }}>
                     <p style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600 }}>You declined this pact</p>
@@ -1360,7 +1342,7 @@ export default function PlansPage() {
                       background: 'transparent', color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
                     }}>Changed my mind</button>
                   </div>
-                ) : null)}
+                )}
 
               {/* Close button */}
               <button onClick={() => setExpandedPactId(null)} style={{
