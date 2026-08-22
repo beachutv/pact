@@ -1299,12 +1299,12 @@ export default function PlansPage() {
                     )}
                   </div>
                 )}
-                {isPastPact(p) ? (
+                {isPastPact(p) && (
                   <div style={{ textAlign: 'center', padding: '12px 0' }}>
                     <p style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600, fontStyle: 'italic' }}>This plan has passed</p>
                   </div>
-                ) : (<>
-                <button onClick={() => {
+                )}
+                {!isPastPact(p) && <button onClick={() => {
                   const pactTitle = p.occasion || fmtDateRange(p.date, p.end_date)
                   const shareUrl = `${window.location.origin}/plans/invite/${p.id}`
                   const shareText = `${pactTitle} — ${fmtDateRange(p.date, p.end_date)}, ${fmtWin(p.win_start, p.win_end)}`
@@ -1314,14 +1314,14 @@ export default function PlansPage() {
                 }} style={{
                   width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
                   background: 'var(--surface)', color: 'var(--text2)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                }}>Share link</button>
-                {editable && (
+                }}>Share link</button>}
+                {editable && !isPastPact(p) && (
                   <button onClick={() => { setExpandedPactId(null); startEditing(p) }} style={{
                     width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
                     background: 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                   }}>Edit plan</button>
                 )}
-                {isIn ? (
+                {!isPastPact(p) && isIn ? (
                   <button onClick={() => { setExpandedPactId(null); startHoldBreak(p.id) }} style={{
                     width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
                     background: 'var(--surface)', color: 'var(--red)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
@@ -1360,8 +1360,7 @@ export default function PlansPage() {
                       background: 'transparent', color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
                     }}>Changed my mind</button>
                   </div>
-                )}
-              </>)}
+                ) : null}
 
               {/* Close button */}
               <button onClick={() => setExpandedPactId(null)} style={{
