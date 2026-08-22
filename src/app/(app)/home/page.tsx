@@ -9,6 +9,7 @@ import { daysUntil, fmtDate, fmtDateRange, fmtHour, bdaySoon, toStr, txtOn } fro
 type Pact = {
   id: string
   date: string
+  end_date: string | null
   win_start: number
   win_end: number
   spot_name: string
