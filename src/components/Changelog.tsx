@@ -2,11 +2,25 @@
 
 import { useState, useEffect } from 'react'
 
-export const CURRENT_VERSION = '9.5'
+export const CURRENT_VERSION = '10.0'
 
 type ChangeItem = { icon: string; text: string }
 
 const CHANGELOG: { version: string; date: string; title: string; subtitle: string; items: ChangeItem[] }[] = [
+  {
+    version: '10.0',
+    date: 'August 22, 2026',
+    title: 'Introvert mode, multi-day plans & conflict alerts',
+    subtitle: 'Major update — go quiet, plan trips, and see who\'s busy',
+    items: [
+      { icon: '🌙', text: 'Introvert mode — single toggle to go off the grid across all circles, replacing the old break system' },
+      { icon: '📅', text: 'Multi-day plans — select a date range for trips, getaways, and multi-day events' },
+      { icon: '⚠️', text: 'Conflict indicators — amber and red dots on calendar dates show which friends have busy blocks' },
+      { icon: '👤', text: 'Conflict callout — tapping a date with conflicts shows exactly who is busy, with names and colors' },
+      { icon: '🏕️', text: 'Smart title suggestions — multi-day plans suggest trip-related titles (weekend trip, getaway, etc.)' },
+      { icon: '🔗', text: 'Plan cards and share text now show date ranges for multi-day plans' },
+    ],
+  },
   {
     version: '9.5',
     date: 'August 10, 2026',

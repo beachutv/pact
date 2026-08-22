@@ -588,58 +588,64 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Global break — applies to everything */}
+        {/* Introvert Mode — single toggle */}
         <div style={{ padding: '10px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-            <span style={{ flexShrink: 0, display: 'flex' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
-            </span>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: 14, fontWeight: 700 }}>Take a break</p>
-              <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2, lineHeight: 1.5 }}>
-                Hides you from all circles and plans. No one will see you as available.
-              </p>
-            </div>
-          </div>
-
-          {/* Global pause card */}
           {(() => {
-            const paused = user.sparks_paused_until && new Date(user.sparks_paused_until) > new Date()
-            const pausedUntil = paused ? new Date(user.sparks_paused_until!) : null
-            const isIndefinite = pausedUntil && pausedUntil.getFullYear() >= 2099
-            const pauseLabel = paused
-              ? isIndefinite ? 'Paused indefinitely'
-                : `Until ${pausedUntil!.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${pausedUntil!.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
-              : null
+            const isIntrovert = !!(user.sparks_paused_until && new Date(user.sparks_paused_until) > new Date())
             return (
               <div style={{
-                padding: '12px 14px',
-                borderRadius: 14, background: paused ? 'var(--red-soft)' : 'var(--surface2)',
-                border: paused ? '1px solid rgba(248,113,113,0.3)' : '1px solid var(--border)',
+                padding: '14px 16px', borderRadius: 14,
+                background: isIntrovert ? 'rgba(118,172,179,0.1)' : 'var(--surface2)',
+                border: isIntrovert ? '1px solid rgba(118,172,179,0.3)' : '1px solid var(--border)',
+                transition: 'all 0.3s ease',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 20 }}>{paused ? '😴' : '👋'}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 12,
+                    background: isIntrovert ? 'rgba(118,172,179,0.2)' : 'var(--surface3)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    transition: 'background 0.3s ease',
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isIntrovert ? 'var(--accent)' : 'var(--text2)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'stroke 0.3s ease' }}>
+                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                  </div>
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 13, fontWeight: 700 }}>{paused ? 'You\'re on a break' : 'Active'}</p>
-                    <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 1 }}>
-                      {paused ? pauseLabel : 'Friends can see your availability'}
+                    <p style={{ fontSize: 14, fontWeight: 700 }}>Introvert mode</p>
+                    <p style={{ fontSize: 11.5, color: 'var(--text2)', marginTop: 2, lineHeight: 1.4 }}>
+                      {isIntrovert ? 'You\'re off the grid — friends can\'t see your availability' : 'Toggle on to go quiet across all circles'}
                     </p>
                   </div>
-                  {paused ? (
-                    <button onClick={async () => {
-                      await supabase.from('users').update({ sparks_paused_until: null }).eq('id', user.id)
-                      updateUser({ sparks_paused_until: null })
-                      showToast('Welcome back!')
-                    }} style={{
-                      padding: '6px 14px', borderRadius: 10, border: 'none',
-                      background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    }}>End break</button>
-                  ) : (
-                    <button onClick={() => setShowSparkPause(true)} style={{
-                      padding: '6px 14px', borderRadius: 10, border: '1px solid var(--border)',
-                      background: 'var(--surface)', color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    }}>Start break</button>
-                  )}
+                  <button
+                    onClick={async () => {
+                      if (isIntrovert) {
+                        await supabase.from('users').update({ sparks_paused_until: null }).eq('id', user.id)
+                        updateUser({ sparks_paused_until: null })
+                        showToast('Welcome back! 👋')
+                      } else {
+                        // Set to year 2099 — indefinite until manually toggled off
+                        const until = new Date('2099-12-31T23:59:59Z').toISOString()
+                        await supabase.from('users').update({ sparks_paused_until: until }).eq('id', user.id)
+                        updateUser({ sparks_paused_until: until })
+                        showToast('Introvert mode on 🌙')
+                      }
+                    }}
+                    style={{
+                      width: 48, height: 28, borderRadius: 14, border: 'none',
+                      cursor: 'pointer', position: 'relative', flexShrink: 0,
+                      background: isIntrovert ? 'var(--accent)' : 'var(--surface3)',
+                      transition: 'background 0.25s ease',
+                    }}
+                  >
+                    <div style={{
+                      width: 22, height: 22, borderRadius: '50%', background: '#fff',
+                      position: 'absolute', top: 3, left: isIntrovert ? 23 : 3,
+                      transition: 'left 0.25s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <span style={{ fontSize: 11, lineHeight: 1 }}>{isIntrovert ? '🌙' : ''}</span>
+                    </div>
+                  </button>
                 </div>
               </div>
             )
@@ -666,13 +672,13 @@ export default function SettingsPage() {
               <>
                 {globalBreakOn && (
                   <div style={{
-                    padding: '8px 12px', borderRadius: 10, background: 'var(--surface2)',
-                    border: '1px solid var(--border)', marginBottom: 8,
+                    padding: '8px 12px', borderRadius: 10, background: 'rgba(118,172,179,0.08)',
+                    border: '1px solid rgba(118,172,179,0.2)', marginBottom: 8,
                     display: 'flex', alignItems: 'center', gap: 8,
                   }}>
-                    <span style={{ fontSize: 12 }}>😴</span>
+                    <span style={{ fontSize: 12 }}>🌙</span>
                     <p style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>
-                      Global break is on — all circles are paused
+                      Introvert mode is on — all circles are quiet
                     </p>
                   </div>
                 )}
@@ -924,68 +930,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Spark pause picker */}
-      {showSparkPause && (
-        <div
-          onClick={e => { if (e.target === e.currentTarget) setShowSparkPause(false) }}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50,
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          }}
-        >
-          <div style={{
-            background: 'var(--surface2)', borderRadius: '20px 20px 0 0',
-            padding: '20px 20px calc(20px + env(safe-area-inset-bottom))',
-            width: '100%', maxWidth: 440,
-          }}>
-            <div style={{ width: 38, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 16px' }} />
-            <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>😴 Take a break</p>
-            <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.5 }}>
-              You won&apos;t appear as available to friends. Plans won&apos;t include you until you resume.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[
-                { label: '1 hour', hours: 1 },
-                { label: '4 hours', hours: 4 },
-                { label: 'Until tomorrow', hours: (() => { const tom = new Date(); tom.setDate(tom.getDate() + 1); tom.setHours(8, 0, 0, 0); return Math.max(1, (tom.getTime() - Date.now()) / 3600000) })() },
-                { label: '1 week', hours: 168 },
-                { label: 'Indefinitely', hours: 876000 },
-              ].map(opt => (
-                <button
-                  key={opt.label}
-                  onClick={async () => {
-                    const until = new Date(Date.now() + opt.hours * 3600000).toISOString()
-                    await supabase.from('users').update({ sparks_paused_until: until }).eq('id', user.id)
-                    updateUser({ sparks_paused_until: until })
-                    setShowSparkPause(false)
-                    showToast(`😴 Break active — ${opt.label.toLowerCase()}`)
-                  }}
-                  style={{
-                    padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border)',
-                    background: 'var(--surface)', color: 'var(--text)',
-                    fontSize: 14, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
-                  }}
-                >
-                  {opt.label}
-                  <span style={{ fontSize: 12, color: 'var(--text2)', marginLeft: 8 }}>
-                    {opt.hours >= 876000 ? 'until you turn it back on' : ''}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setShowSparkPause(false)}
-              style={{
-                marginTop: 12, width: '100%', padding: 12, borderRadius: 12,
-                border: '1px solid var(--border)', background: 'none',
-                color: 'var(--text2)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Spark pause picker removed — introvert mode is a simple toggle */}
 
       {/* Silence list picker */}
       {showSilencePicker && (

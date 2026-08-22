@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCircle, type UserProfile } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
-import { daysUntil, fmtDate, fmtHour, bdaySoon, toStr, txtOn } from '@/lib/utils'
+import { daysUntil, fmtDate, fmtDateRange, fmtHour, bdaySoon, toStr, txtOn } from '@/lib/utils'
 
 type Pact = {
   id: string
@@ -132,17 +132,17 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Break mode banner */}
+      {/* Introvert mode banner */}
       {user.sparks_paused_until && new Date(user.sparks_paused_until) > new Date() && (
         <div style={{
-          background: 'var(--amber-soft)', border: '1px solid rgba(255,184,84,0.35)',
+          background: 'rgba(118,172,179,0.1)', border: '1px solid rgba(118,172,179,0.25)',
           borderRadius: 12, padding: '10px 14px', marginBottom: 6,
-          fontSize: 12, fontWeight: 600, color: 'var(--amber)',
+          fontSize: 12, fontWeight: 600, color: 'var(--accent)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-            You are on a break
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            Introvert mode is on
           </span>
           <button
             onClick={async () => {
@@ -151,10 +151,10 @@ export default function HomePage() {
               window.location.reload()
             }}
             style={{
-              border: 'none', background: 'none', color: 'var(--amber)',
+              border: 'none', background: 'none', color: 'var(--accent)',
               fontWeight: 700, cursor: 'pointer', fontSize: 12, textDecoration: 'underline',
             }}
-          >End break</button>
+          >Turn off</button>
         </div>
       )}
 
@@ -304,7 +304,7 @@ export default function HomePage() {
             {/* Row 1: Title + circle tag + countdown */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <p style={{ fontSize: 14, fontWeight: 700, flex: 1, minWidth: 0 }} onClick={() => router.push(`/plans?pact=${p.id}`)}>
-                {p.occasion || fmtDate(p.date)}
+                {p.occasion || fmtDateRange(p.date, p.end_date)}
               </p>
               {circle && (
                 <span style={{

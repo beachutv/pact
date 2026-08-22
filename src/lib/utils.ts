@@ -27,6 +27,17 @@ export function fmtDate(ds: string): string {
   })
 }
 
+/** Format date range — shows "Mon, Jul 18" for single day or "Jul 18 → Jul 20 (3 days)" for range */
+export function fmtDateRange(start: string, end?: string | null): string {
+  if (!end || end === start) return fmtDate(start)
+  const s = new Date(start + 'T12:00:00')
+  const e = new Date(end + 'T12:00:00')
+  const days = Math.round((e.getTime() - s.getTime()) / 86400000) + 1
+  const sf = s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const ef = e.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${sf} → ${ef} (${days} days)`
+}
+
 /** Format date string to "Fri, Jul 18" */
 export function fmtShort(ds: string): string {
   return new Date(ds + 'T12:00:00').toLocaleDateString('en-US', {

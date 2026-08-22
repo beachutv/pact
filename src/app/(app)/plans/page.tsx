@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCircle } from '@/components/AppShell'
 import { createClient } from '@/lib/supabase/client'
-import { fmtDate, fmtHour, fmtWin, txtOn } from '@/lib/utils'
+import { fmtDate, fmtDateRange, fmtHour, fmtWin, txtOn } from '@/lib/utils'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { sendPushNotification } from '@/lib/push'
 import LocationPicker from '@/components/LocationPicker'
@@ -154,7 +154,7 @@ export default function PlansPage() {
 
     // Notify remaining members
     const otherMembers = pact.members.filter(m => m.user_id !== user.id)
-    const pactTitle = pact.occasion || fmtDate(pact.date)
+    const pactTitle = pact.occasion || fmtDateRange(pact.date, pact.end_date)
     for (const m of otherMembers) {
       await supabase.from('notifications').insert({
         user_id: m.user_id,
@@ -458,7 +458,7 @@ export default function PlansPage() {
   async function sendInvites(pactId: string) {
     if (selectedInvites.size === 0) return
     const pact = pacts.find(p => p.id === pactId)
-    const pactTitle = pact?.occasion || (pact ? fmtDate(pact.date) : 'a plan')
+    const pactTitle = pact?.occasion || (pact ? fmtDateRange(pact.date, pact.end_date) : 'a plan')
     const targets = Array.from(selectedInvites)
     // Add as pact members
     for (const uid of targets) {
@@ -502,7 +502,7 @@ export default function PlansPage() {
       }
 
       // Notify ALL existing pact members
-      const pactTitle = pact.occasion || fmtDate(pact.date)
+      const pactTitle = pact.occasion || fmtDateRange(pact.date, pact.end_date)
       const allOtherIds = pact.members.filter(m => m.user_id !== user.id).map(m => m.user_id)
       if (allOtherIds.length > 0) {
         const notifTitle = isNowConfirmed
@@ -569,7 +569,7 @@ export default function PlansPage() {
           user_id: m.user_id,
           type: 'pact_change',
           title: `${cancelTitle} cancelled`,
-          body: `${user.name?.split(' ')[0] || 'Someone'} cancelled the pact on ${fmtDate(pact.date)}`,
+          body: `${user.name?.split(' ')[0] || 'Someone'} cancelled: ${pact.occasion || fmtDateRange(pact.date, pact.end_date)}`,
           link: `/plans?pact=${pactId}`,
         })
       }
@@ -580,7 +580,7 @@ export default function PlansPage() {
       sendPushNotification({
         userIds: otherMembers.map(m => m.user_id),
         title: `${cancelTitle} cancelled`,
-        body: `${user.name?.split(' ')[0] || 'Someone'} cancelled the pact on ${fmtDate(pact.date)}`,
+        body: `${user.name?.split(' ')[0] || 'Someone'} cancelled: ${pact.occasion || fmtDateRange(pact.date, pact.end_date)}`,
         url: `/plans?pact=${pactId}`,
         tag: `pact-cancel-${pactId}`,
       })
@@ -853,7 +853,7 @@ export default function PlansPage() {
                           })()}
                         </p>
                         <p style={{ fontSize: 12, color: 'var(--text2)' }}>
-                          📅 {fmtDate(p.date)} · {fmtWin(p.win_start, p.win_end)}
+                          📅 {fmtDateRange(p.date, p.end_date)} · {fmtWin(p.win_start, p.win_end)}
                         </p>
                         {p.spot_name !== 'TBD' && (
                           <p style={{ fontSize: 12, color: 'var(--text2)' }}>
@@ -1001,7 +1001,7 @@ export default function PlansPage() {
 
               {/* When + where */}
               <div style={{ marginTop: 10 }}>
-                <p style={{ fontSize: 13, color: 'var(--text2)' }}>📅 {fmtDate(p.date)} · {fmtWin(p.win_start, p.win_end)}</p>
+                <p style={{ fontSize: 13, color: 'var(--text2)' }}>📅 {fmtDateRange(p.date, p.end_date)} · {fmtWin(p.win_start, p.win_end)}</p>
                 {p.spot_name !== 'TBD' && (
                   <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4 }}>
                     📍 {p.spot_name}{p.spot_area ? ` — ${p.spot_area}` : ''}
@@ -1087,7 +1087,7 @@ export default function PlansPage() {
                   }).eq('id', p.id)
 
                   // Notify all other pact members
-                  const pactTitle = p.occasion || fmtDate(p.date)
+                  const pactTitle = p.occasion || fmtDateRange(p.date, p.end_date)
                   const otherIds = p.members.filter(m => m.user_id !== user.id).map(m => m.user_id)
                   if (otherIds.length > 0) {
                     for (const uid of otherIds) {
@@ -1257,9 +1257,9 @@ export default function PlansPage() {
                   </div>
                 )}
                 <button onClick={() => {
-                  const pactTitle = p.occasion || fmtDate(p.date)
+                  const pactTitle = p.occasion || fmtDateRange(p.date, p.end_date)
                   const shareUrl = `${window.location.origin}/plans/invite/${p.id}`
-                  const shareText = `${pactTitle} — ${fmtDate(p.date)}, ${fmtWin(p.win_start, p.win_end)}`
+                  const shareText = `${pactTitle} — ${fmtDateRange(p.date, p.end_date)}, ${fmtWin(p.win_start, p.win_end)}`
                   if (navigator.share) {
                     navigator.share({ title: pactTitle, text: shareText, url: shareUrl }).catch(() => {})
                   } else { navigator.clipboard.writeText(`${shareText}\n${shareUrl}`); showToast('Copied to clipboard') }
@@ -1285,7 +1285,7 @@ export default function PlansPage() {
                       background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                     }}>I&apos;m in</button>
                     <button onClick={async () => {
-                      const pactTitle = p.occasion || fmtDate(p.date)
+                      const pactTitle = p.occasion || fmtDateRange(p.date, p.end_date)
                       const allOtherIds = p.members.map(m => m.user_id).filter(id => id !== user.id)
                       if (p.created_by && !allOtherIds.includes(p.created_by) && p.created_by !== user.id) allOtherIds.push(p.created_by)
                       await supabase.from('pact_declines').upsert({ pact_id: p.id, user_id: user.id }, { onConflict: 'pact_id,user_id' })

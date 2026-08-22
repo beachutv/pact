@@ -30,6 +30,7 @@ function NewPlanContent() {
 
   // Date
   const [selectedDate, setSelectedDate] = useState(preDate)
+  const [endDate, setEndDate] = useState('')  // For multi-day plans
   const [viewingDate, setViewingDate] = useState('')
   const [calMonth, setCalMonth] = useState(() => {
     const d = preDate ? new Date(preDate + 'T12:00:00') : new Date()
@@ -82,10 +83,14 @@ function NewPlanContent() {
   const [targetCalId, setTargetCalId] = useState('primary')
   const [groupFavs, setGroupFavs] = useState<{ name: string; emoji: string; area: string }[]>([])
 
-  const titleSuggestions = ['Dinner', 'Lunch', 'Coffee', 'Drinks', 'Catch up', 'Movie night', 'Brunch', 'Study session']
+  const titleSuggestions = endDate
+    ? ['Weekend trip', 'Getaway', 'Beach trip', 'Road trip', 'Staycation', 'Camping', 'Retreat']
+    : ['Dinner', 'Lunch', 'Coffee', 'Drinks', 'Catch up', 'Movie night', 'Brunch', 'Study session']
 
   // Busy block counts for availability signals
   const [friendBusy, setFriendBusy] = useState<Map<string, number>>(new Map())
+  // Per-date conflict tracking: date -> array of user IDs who are busy
+  const [dateConflicts, setDateConflicts] = useState<Map<string, string[]>>(new Map())
 
   // Load friends
   useEffect(() => {
@@ -173,6 +178,31 @@ function NewPlanContent() {
     if (step === 3 && !viewingDate) setViewingDate(effectiveDate())
   }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load per-date conflict data for invited friends (for calendar conflict indicators)
+  useEffect(() => {
+    if (invitedIds.size === 0) { setDateConflicts(new Map()); return }
+    const ids = Array.from(invitedIds)
+    const todayStr = toStr(new Date())
+    const futureEnd = new Date(); futureEnd.setDate(futureEnd.getDate() + 60)
+    const futureStr = toStr(futureEnd)
+    supabase.from('busy_blocks')
+      .select('user_id, date')
+      .in('user_id', ids)
+      .gte('date', todayStr)
+      .lte('date', futureStr)
+      .then(({ data: blocks }) => {
+        const conflicts = new Map<string, string[]>()
+        if (blocks) {
+          blocks.forEach((b: any) => {
+            const existing = conflicts.get(b.date) || []
+            if (!existing.includes(b.user_id)) existing.push(b.user_id)
+            conflicts.set(b.date, existing)
+          })
+        }
+        setDateConflicts(conflicts)
+      })
+  }, [invitedIds.size, step]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function toggleInvite(id: string) {
     setInvitedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
@@ -216,6 +246,7 @@ function NewPlanContent() {
       const pactId = crypto.randomUUID()
       const { error: pactErr } = await supabase.from('pacts').insert({
         id: pactId, date,
+        end_date: endDate || null,
         win_start: startHour, win_end: endHour,
         spot_name: spotName || 'TBD', spot_area: spotArea || '',
         circle_id: circleId, occasion: title || null, created_by: user.id,
@@ -249,7 +280,41 @@ function NewPlanContent() {
     }
   }
 
-  // Calendar grid
+  const [conflictCallout, setConflictCallout] = useState<{ date: string; conflicts: string[] } | null>(null)
+
+  // Calendar grid — supports single date + range selection
+  function handleDateTap(ds: string) {
+    if (!selectedDate || (selectedDate && endDate)) {
+      // Start fresh selection
+      setSelectedDate(ds)
+      setEndDate('')
+    } else if (ds === selectedDate) {
+      // Tapped same date — clear range, keep single
+      setEndDate('')
+    } else if (ds < selectedDate) {
+      // Tapped before start — move start
+      setSelectedDate(ds)
+      setEndDate('')
+    } else {
+      // Tapped after start — set end date for range
+      setEndDate(ds)
+    }
+    // Show conflict callout if there are conflicts on this date
+    const conflicts = dateConflicts.get(ds) || []
+    if (conflicts.length > 0 && invitedIds.size > 0) {
+      setConflictCallout({ date: ds, conflicts })
+    } else {
+      setConflictCallout(null)
+    }
+  }
+
+  function getDateConflictLevel(ds: string): 'clear' | 'some' | 'many' {
+    const conflicts = dateConflicts.get(ds) || []
+    if (conflicts.length === 0) return 'clear'
+    if (conflicts.length <= Math.floor(invitedIds.size / 2)) return 'some'
+    return 'many'
+  }
+
   function renderCalGrid() {
     const { year, month } = calMonth
     const first = new Date(year, month, 1)
@@ -268,18 +333,39 @@ function NewPlanContent() {
           {weekdays.map(w => <div key={w} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: 'var(--text2)', padding: '4px 0' }}>{w}</div>)}
           {Array.from({ length: first.getDay() }).map((_, i) => <div key={'b' + i} />)}
           {Array.from({ length: dim }).map((_, i) => {
-            const d = i + 1, ds = toStr(new Date(year, month, d)), isPast = ds < todayStr, isToday = ds === todayStr, isSel = ds === selectedDate
+            const d = i + 1, ds = toStr(new Date(year, month, d)), isPast = ds < todayStr, isToday = ds === todayStr
+            const isStart = ds === selectedDate
+            const isEnd = ds === endDate
+            const isInRange = selectedDate && endDate && ds > selectedDate && ds < endDate
+            const isSelected = isStart || isEnd
+            const conflictLevel = !isPast && invitedIds.size > 0 ? getDateConflictLevel(ds) : 'clear'
             return (
-              <button key={d} disabled={isPast} onClick={() => setSelectedDate(ds)} style={{
-                aspectRatio: '1', borderRadius: 11, border: 'none',
-                background: isSel ? 'var(--accent)' : 'var(--surface)', color: isSel ? '#fff' : isPast ? 'var(--text2)' : 'var(--text)',
-                opacity: isPast ? 0.3 : 1, fontSize: 13, fontWeight: 600, cursor: isPast ? 'default' : 'pointer',
-                outline: isToday && !isSel ? '1.5px solid var(--accent)' : 'none',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>{d}</button>
+              <button key={d} disabled={isPast} onClick={() => handleDateTap(ds)} style={{
+                aspectRatio: '1', borderRadius: isInRange ? 4 : 11, border: 'none',
+                background: isSelected ? 'var(--accent)' : isInRange ? 'rgba(118,172,179,0.2)' : 'var(--surface)',
+                color: isSelected ? '#fff' : isPast ? 'var(--text2)' : isInRange ? 'var(--accent)' : 'var(--text)',
+                opacity: isPast ? 0.3 : 1, fontSize: 13, fontWeight: isSelected || isInRange ? 700 : 600, cursor: isPast ? 'default' : 'pointer',
+                outline: isToday && !isSelected ? '1.5px solid var(--accent)' : 'none',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
+                transition: 'background 0.15s ease', position: 'relative',
+              }}>
+                {d}
+                {conflictLevel !== 'clear' && !isSelected && (
+                  <div style={{
+                    width: 5, height: 5, borderRadius: '50%',
+                    background: conflictLevel === 'some' ? 'var(--amber)' : '#ef4444',
+                    position: 'absolute', bottom: 3,
+                  }} />
+                )}
+              </button>
             )
           })}
         </div>
+        {selectedDate && !endDate && (
+          <p style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'center', marginTop: 8 }}>
+            Tap another date for a multi-day plan, or continue for a single day
+          </p>
+        )}
       </div>
     )
   }
@@ -322,8 +408,55 @@ function NewPlanContent() {
       {/* STEP 1: Date or Range */}
       {step === 1 && planType === 'date' && (<>
         <h2 style={{ fontSize: 20, fontWeight: 800 }}>Pick a date</h2>
+        {invitedIds.size > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 10 }}>💡</span>
+            <p style={{ fontSize: 11, color: 'var(--text2)' }}>
+              Dots show conflicts for your {invitedIds.size} invited friend{invitedIds.size > 1 ? 's' : ''}:
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 6 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)', display: 'inline-block' }}/> some busy
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444', display: 'inline-block', marginLeft: 4 }}/> most busy
+              </span>
+            </p>
+          </div>
+        )}
         {renderCalGrid()}
-        {selectedDate && <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', textAlign: 'center', marginTop: 8 }}>{fmtDate(selectedDate)}</p>}
+        {/* Conflict callout when selecting a date with conflicts */}
+        {conflictCallout && invitedIds.size > 0 && (
+          <div style={{
+            padding: '10px 14px', borderRadius: 12,
+            background: conflictCallout.conflicts.length > Math.floor(invitedIds.size / 2) ? 'rgba(239,68,68,0.08)' : 'rgba(255,184,84,0.1)',
+            border: conflictCallout.conflicts.length > Math.floor(invitedIds.size / 2) ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(255,184,84,0.25)',
+          }}>
+            <p style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+              ⚠️ {conflictCallout.conflicts.length} of {invitedIds.size} friend{invitedIds.size > 1 ? 's' : ''} {conflictCallout.conflicts.length === 1 ? 'has' : 'have'} conflicts on {fmtDate(conflictCallout.date)}
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+              {conflictCallout.conflicts.map(uid => {
+                const friend = allFriends.find(f => f.id === uid)
+                return friend ? (
+                  <span key={uid} style={{
+                    fontSize: 11, padding: '2px 8px', borderRadius: 8,
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: friend.color || '#666' }} />
+                    {friend.name.split(' ')[0]}
+                  </span>
+                ) : null
+              })}
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--text2)' }}>You can still propose this date — they may be able to adjust.</p>
+          </div>
+        )}
+        {selectedDate && (
+          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', textAlign: 'center', marginTop: 8 }}>
+            {endDate ? `${fmtDate(selectedDate)} → ${fmtDate(endDate)}` : fmtDate(selectedDate)}
+            {endDate && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginLeft: 6 }}>
+              ({Math.round((new Date(endDate).getTime() - new Date(selectedDate).getTime()) / 86400000) + 1} days)
+            </span>}
+          </p>
+        )}
         <button className="btn-primary" disabled={!selectedDate} onClick={() => setStep(2)}>Next →</button>
       </>)}
 
