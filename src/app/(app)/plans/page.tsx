@@ -1361,7 +1361,6 @@ export default function PlansPage() {
                     }}>Changed my mind</button>
                   </div>
                 )}
-              </div>
               </>)}
 
               {/* Close button */}
