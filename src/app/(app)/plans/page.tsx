@@ -1321,7 +1321,7 @@ export default function PlansPage() {
                     background: 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                   }}>Edit plan</button>
                 )}
-                {!isPastPact(p) && isIn ? (
+                {!isPastPact(p) && (isIn ? (
                   <button onClick={() => { setExpandedPactId(null); startHoldBreak(p.id) }} style={{
                     width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--border)',
                     background: 'var(--surface)', color: 'var(--red)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
@@ -1360,7 +1360,7 @@ export default function PlansPage() {
                       background: 'transparent', color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
                     }}>Changed my mind</button>
                   </div>
-                ) : null}
+                ) : null)}
 
               {/* Close button */}
               <button onClick={() => setExpandedPactId(null)} style={{
