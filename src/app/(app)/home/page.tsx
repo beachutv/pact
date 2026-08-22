@@ -95,11 +95,28 @@ export default function HomePage() {
     setPullY(0)
   }
 
-  // Upcoming birthdays
+  // Upcoming birthdays — filter out hidden birthdays + dismissed ones
+  const [dismissedBirthdays, setDismissedBirthdays] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    const year = new Date().getFullYear()
+    const stored = localStorage.getItem(`pact_bday_dismissed_${year}`)
+    return stored ? new Set(JSON.parse(stored)) : new Set()
+  })
+
+  function dismissBirthday(userId: string) {
+    const year = new Date().getFullYear()
+    setDismissedBirthdays(prev => {
+      const next = new Set(prev)
+      next.add(userId)
+      localStorage.setItem(`pact_bday_dismissed_${year}`, JSON.stringify([...next]))
+      return next
+    })
+  }
+
   const upcomingBirthdays = circleMembers
-    .filter(m => m.birthday)
+    .filter(m => m.birthday && m.birthday_visible !== false)
     .map(m => ({ ...m, daysAway: bdaySoon(m.birthday!, 30) }))
-    .filter(m => m.daysAway >= 0)
+    .filter(m => m.daysAway >= 0 && !dismissedBirthdays.has(m.id))
     .sort((a, b) => a.daysAway - b.daysAway)
 
   // Split pacts: active (pending) vs upcoming (confirmed/locked)
@@ -397,6 +414,14 @@ export default function HomePage() {
                     {m.daysAway === 0 ? 'Today!' : m.daysAway === 1 ? 'Tomorrow' : `in ${m.daysAway} days`}
                   </p>
                 </div>
+                <button
+                  onClick={() => dismissBirthday(m.id)}
+                  title="Dismiss"
+                  style={{
+                    background: 'none', border: 'none', color: 'var(--text2)',
+                    fontSize: 16, cursor: 'pointer', padding: '4px 8px', opacity: 0.5,
+                  }}
+                >✕</button>
               </div>
             ))}
           </div>

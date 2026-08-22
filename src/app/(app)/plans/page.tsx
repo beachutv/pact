@@ -419,7 +419,14 @@ export default function PlansPage() {
   }
 
   function canEdit(pact: Pact): boolean {
+    const today = new Date().toISOString().slice(0, 10)
+    if ((pact.end_date || pact.date) < today) return false // Past plans are read-only
     return pact.created_by === user.id
+  }
+
+  function isPastPact(pact: Pact): boolean {
+    const today = new Date().toISOString().slice(0, 10)
+    return (pact.end_date || pact.date) < today
   }
 
   async function openInviteMore(pact: Pact) {
@@ -1101,7 +1108,7 @@ export default function PlansPage() {
                 ].filter((v, i, a) => a.indexOf(v) === i)}
                 dateStr={p.date}
                 userId={user.id}
-                editable={p.status !== 'confirmed'}
+                editable={p.status !== 'confirmed' && !isPastPact(p)}
                 pactStart={p.win_start}
                 pactEnd={p.win_end}
                 compact={true}
@@ -1114,7 +1121,7 @@ export default function PlansPage() {
                   const m = getMember(uid)
                   return m ? { id: m.id, name: m.name, color: m.color, avatar_url: (m as any).avatar_url } : { id: uid, name: '?', color: '#999' }
                 })}
-                onConfirmTime={p.created_by === user.id && p.status === 'pending' ? async (startHour, endHour) => {
+                onConfirmTime={p.created_by === user.id && p.status === 'pending' && !isPastPact(p) ? async (startHour, endHour) => {
                   // Update pact time and status
                   await supabase.from('pacts').update({
                     win_start: startHour,
@@ -1292,6 +1299,11 @@ export default function PlansPage() {
                     )}
                   </div>
                 )}
+                {isPastPact(p) ? (
+                  <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                    <p style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600, fontStyle: 'italic' }}>This plan has passed</p>
+                  </div>
+                ) : (<>
                 <button onClick={() => {
                   const pactTitle = p.occasion || fmtDateRange(p.date, p.end_date)
                   const shareUrl = `${window.location.origin}/plans/invite/${p.id}`
@@ -1350,6 +1362,7 @@ export default function PlansPage() {
                   </div>
                 )}
               </div>
+              </>)}
 
               {/* Close button */}
               <button onClick={() => setExpandedPactId(null)} style={{

@@ -18,7 +18,10 @@ const CHANGELOG: { version: string; date: string; title: string; subtitle: strin
       { icon: '⚠️', text: 'Conflict indicators — amber and red dots on calendar dates show which friends have busy blocks' },
       { icon: '👤', text: 'Conflict callout — tapping a date with conflicts shows exactly who is busy, with names and colors' },
       { icon: '🏕️', text: 'Smart title suggestions — multi-day plans suggest trip-related titles (weekend trip, getaway, etc.)' },
-      { icon: '🔗', text: 'Plan cards and share text now show date ranges for multi-day plans' },
+      { icon: '🔒', text: 'Past plans are now read-only — you can view and comment but not edit hours or opt in/out' },
+      { icon: '📋', text: 'Past tab shows dimmed cards with a PAST badge, limited to 10 with Show more' },
+      { icon: '🎂', text: 'Birthday reminders persist until you dismiss them — no more disappearing on navigation' },
+      { icon: '🎂', text: 'New toggle in settings to show or hide your birthday from friends' },
     ],
   },
   {

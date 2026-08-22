@@ -53,7 +53,6 @@ export default function SettingsPage() {
   })
 
   // Sparks pause
-  const [showSparkPause, setShowSparkPause] = useState(false)
   const [sparkCircleStates, setSparkCircleStates] = useState<Record<string, boolean>>({})
   const [silencedUsers, setSilencedUsers] = useState<{ id: string; name: string; color: string; avatar_url: string | null }[]>([])
   const [showSilencePicker, setShowSilencePicker] = useState(false)
@@ -585,6 +584,50 @@ export default function SettingsPage() {
                 {days} days
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Birthday visibility toggle */}
+        <div style={{ padding: '10px 0' }}>
+          <div style={{
+            padding: '14px 16px', borderRadius: 14,
+            background: 'var(--surface2)', border: '1px solid var(--border)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 12,
+                background: 'var(--surface3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <span style={{ fontSize: 18 }}>🎂</span>
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 14, fontWeight: 700 }}>Show my birthday</p>
+                <p style={{ fontSize: 11.5, color: 'var(--text2)', marginTop: 2, lineHeight: 1.4 }}>
+                  {user.birthday_visible !== false ? 'Friends in your circles can see your birthday' : 'Your birthday is hidden from friends'}
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  const newVal = user.birthday_visible === false
+                  await supabase.from('users').update({ birthday_visible: newVal }).eq('id', user.id)
+                  updateUser({ birthday_visible: newVal })
+                  showToast(newVal ? 'Birthday visible 🎂' : 'Birthday hidden')
+                }}
+                style={{
+                  width: 48, height: 28, borderRadius: 14, border: 'none',
+                  cursor: 'pointer', position: 'relative', flexShrink: 0,
+                  background: user.birthday_visible !== false ? 'var(--accent)' : 'var(--surface3)',
+                  transition: 'background 0.25s ease',
+                }}
+              >
+                <div style={{
+                  width: 22, height: 22, borderRadius: '50%', background: '#fff',
+                  position: 'absolute', top: 3, left: user.birthday_visible !== false ? 23 : 3,
+                  transition: 'left 0.25s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                }} />
+              </button>
+            </div>
           </div>
         </div>
 

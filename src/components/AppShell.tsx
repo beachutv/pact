@@ -18,6 +18,7 @@ export type UserProfile = {
   home_x: number
   home_y: number
   birthday: string | null
+  birthday_visible: boolean
   theme: string
   precise_loc: boolean
   live_lat: number | null
@@ -352,11 +353,12 @@ export default function AppShell({
       allMembers?.forEach(m => { if (m.user_id !== user!.id) allMemberIds.add(m.user_id) })
       if (allMemberIds.size === 0) return
 
-      const { data: mates } = await s.from('users').select('id, name, birthday').in('id', [...allMemberIds])
+      const { data: mates } = await s.from('users').select('id, name, birthday, birthday_visible').in('id', [...allMemberIds])
       if (!mates) return
 
       for (const mate of mates) {
         if (!mate.birthday) continue
+        if (mate.birthday_visible === false) continue
         const days = bdaySoon(mate.birthday, 14)
         if (days < 0) continue
 
