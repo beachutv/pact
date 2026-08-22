@@ -89,6 +89,7 @@ export default function PlansPage() {
 
   // Plan tabs
   const [planTab, setPlanTab] = useState<'active' | 'upcoming' | 'past'>('active')
+  const [showAllPast, setShowAllPast] = useState(false)
   
   // Track locally declined pacts (user tapped "Can't make it")
   const [declinedPacts, setDeclinedPacts] = useState<Set<string>>(new Set())
@@ -702,7 +703,7 @@ export default function PlansPage() {
         {(['active', 'upcoming', 'past'] as const).map(tab => (
           <button
             key={tab}
-            onClick={() => setPlanTab(tab)}
+            onClick={() => { setPlanTab(tab); if (tab !== 'past') setShowAllPast(false) }}
             style={{
               padding: '7px 14px', borderRadius: 18, fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
               border: planTab === tab ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
@@ -718,10 +719,15 @@ export default function PlansPage() {
       {(() => {
         const today = new Date().toISOString().slice(0, 10)
         const filtered = pacts.filter(p => {
-          if (planTab === 'active') return p.date >= today && p.status === 'pending'
-          if (planTab === 'upcoming') return p.date >= today && p.status === 'confirmed'
-          return p.date < today // past
+          if (planTab === 'active') return (p.end_date || p.date) >= today && p.status === 'pending'
+          if (planTab === 'upcoming') return (p.end_date || p.date) >= today && p.status === 'confirmed'
+          return (p.end_date || p.date) < today // past
         })
+
+        // Sort past plans by date descending (most recent first)
+        if (planTab === 'past') {
+          filtered.sort((a, b) => b.date.localeCompare(a.date))
+        }
 
         if (filtered.length === 0) return (
           <div style={{ textAlign: 'center', marginTop: 30, color: 'var(--text2)' }}>
@@ -733,7 +739,13 @@ export default function PlansPage() {
           </div>
         )
 
-        return filtered.map(p => {
+        // Past tab: limit to 10 initially, expandable
+        const isPast = planTab === 'past'
+        const visible = isPast && !showAllPast ? filtered.slice(0, 10) : filtered
+        const hasMore = isPast && !showAllPast && filtered.length > 10
+
+        return (<>
+        {visible.map(p => {
           const isIn = p.members.some(m => m.user_id === user.id)
           const isEditing = editingId === p.id
           const editable = canEdit(p)
@@ -744,6 +756,7 @@ export default function PlansPage() {
                 className="card" style={{
                   display: 'flex', flexDirection: 'column', gap: 8,
                   position: 'relative',
+                  opacity: isPast ? 0.6 : 1,
                 }}>
               {isEditing ? (
                 /* ─── Edit mode ─── */
@@ -879,10 +892,10 @@ export default function PlansPage() {
                       <span style={{
                         fontSize: 10, fontWeight: 800, padding: '4px 10px', borderRadius: 12,
                         textTransform: 'uppercase', letterSpacing: '.4px',
-                        background: p.status === 'confirmed' ? 'var(--green-soft)' : 'var(--amber-soft)',
-                        color: p.status === 'confirmed' ? 'var(--green)' : 'var(--amber)',
+                        background: isPast ? 'var(--surface3)' : p.status === 'confirmed' ? 'var(--green-soft)' : 'var(--amber-soft)',
+                        color: isPast ? 'var(--text2)' : p.status === 'confirmed' ? 'var(--green)' : 'var(--amber)',
                       }}>
-                        {p.status === 'confirmed' ? 'locked' : 'open'}
+                        {isPast ? 'past' : p.status === 'confirmed' ? 'locked' : 'open'}
                       </span>
                     </div>
 
@@ -951,7 +964,21 @@ export default function PlansPage() {
             </div>
             </div>
           )
-        })
+        })}
+        {hasMore && (
+          <button
+            onClick={() => setShowAllPast(true)}
+            style={{
+              width: '100%', padding: '12px 16px', borderRadius: 12,
+              border: '1px solid var(--border)', background: 'var(--surface)',
+              color: 'var(--text2)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              marginTop: 4,
+            }}
+          >
+            Show {filtered.length - 10} more past plan{filtered.length - 10 > 1 ? 's' : ''}
+          </button>
+        )}
+        </>)
       })()}
 
       {/* ─── Plan Detail Modal ─── */}
@@ -989,13 +1016,21 @@ export default function PlansPage() {
                     return others.length > 0 ? `Pact with ${others.join(', ')}` : 'Pact'
                   })()}
                 </h3>
-                <span style={{
-                  fontSize: 10, fontWeight: 800, padding: '4px 10px', borderRadius: 12,
-                  textTransform: 'uppercase', letterSpacing: '.4px',
-                  background: p.status === 'confirmed' ? 'var(--green-soft)' : 'var(--amber-soft)',
-                  color: p.status === 'confirmed' ? 'var(--green)' : 'var(--amber)',
-                }}>
-                  {p.status === 'confirmed' ? 'locked' : p.status === 'cancelled' ? 'cancelled' : 'scheduling'}
+                <span style={(() => {
+                  const today = new Date().toISOString().slice(0, 10)
+                  const planIsPast = (p.end_date || p.date) < today
+                  return {
+                    fontSize: 10, fontWeight: 800, padding: '4px 10px', borderRadius: 12,
+                    textTransform: 'uppercase' as const, letterSpacing: '.4px',
+                    background: planIsPast ? 'var(--surface3)' : p.status === 'confirmed' ? 'var(--green-soft)' : 'var(--amber-soft)',
+                    color: planIsPast ? 'var(--text2)' : p.status === 'confirmed' ? 'var(--green)' : 'var(--amber)',
+                  }
+                })()}>
+                  {(() => {
+                    const today = new Date().toISOString().slice(0, 10)
+                    if ((p.end_date || p.date) < today) return 'past'
+                    return p.status === 'confirmed' ? 'locked' : p.status === 'cancelled' ? 'cancelled' : 'scheduling'
+                  })()}
                 </span>
               </div>
 
