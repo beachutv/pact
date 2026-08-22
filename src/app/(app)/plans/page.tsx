@@ -1344,6 +1344,8 @@ export default function PlansPage() {
                   </div>
                 )}
 
+              </div>
+
               {/* Close button */}
               <button onClick={() => setExpandedPactId(null)} style={{
                 marginTop: 16, width: '100%', padding: 12, borderRadius: 12,
