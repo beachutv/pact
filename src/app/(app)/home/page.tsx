@@ -41,6 +41,15 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [expandedCard, setExpandedCard] = useState<string | null>(null)
 
+  // Personal calendar month view
+  const [myBusyDates, setMyBusyDates] = useState<Map<string, number>>(new Map())
+  const [calViewMonth, setCalViewMonth] = useState(() => {
+    const d = new Date()
+    return { year: d.getFullYear(), month: d.getMonth() }
+  })
+  const [calShowDetails, setCalShowDetails] = useState(false)
+  const [myPactDates, setMyPactDates] = useState<Map<string, string[]>>(new Map())
+
   // Pull-down refresh
   const [refreshing, setRefreshing] = useState(false)
   const [pullY, setPullY] = useState(0)
@@ -66,6 +75,30 @@ export default function HomePage() {
     }
     fetchPacts()
   }, [])
+
+  // Load personal busy blocks + pact dates for calendar view
+  useEffect(() => {
+    async function loadMyCalendar() {
+      const start = toStr(new Date(calViewMonth.year, calViewMonth.month, 1))
+      const end = toStr(new Date(calViewMonth.year, calViewMonth.month + 1, 0))
+      const [busyRes, pactRes] = await Promise.all([
+        supabase.from('busy_blocks').select('date, start_hour, end_hour, source').eq('user_id', user.id).gte('date', start).lte('date', end),
+        supabase.from('pacts').select('id, date, end_date, occasion, win_start, win_end, members:pact_members(user_id)').gte('date', start).lte('date', end),
+      ])
+      const busyMap = new Map<string, number>()
+      busyRes.data?.forEach((b: any) => busyMap.set(b.date, (busyMap.get(b.date) || 0) + 1))
+      setMyBusyDates(busyMap)
+      const pactMap = new Map<string, string[]>()
+      pactRes.data?.filter((p: any) => p.members?.some((m: any) => m.user_id === user.id)).forEach((p: any) => {
+        const label = p.occasion || `Plan ${fmtHour(p.win_start)}-${fmtHour(p.win_end)}`
+        const existing = pactMap.get(p.date) || []
+        existing.push(label)
+        pactMap.set(p.date, existing)
+      })
+      setMyPactDates(pactMap)
+    }
+    loadMyCalendar()
+  }, [calViewMonth.year, calViewMonth.month]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pull-down refresh
   async function doRefresh() {
@@ -381,6 +414,110 @@ export default function HomePage() {
           </p>
         </div>
       )}
+
+      {/* Personal calendar — your availability at a glance */}
+      <div style={{ marginTop: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.5px' }}>
+            📅 My calendar
+          </p>
+          <button
+            onClick={() => setCalShowDetails(!calShowDetails)}
+            style={{
+              fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 8,
+              border: '1px solid var(--border)', background: calShowDetails ? 'var(--accent)' : 'var(--surface)',
+              color: calShowDetails ? '#fff' : 'var(--text2)', cursor: 'pointer',
+            }}
+          >{calShowDetails ? 'Details' : 'Availability'}</button>
+        </div>
+        <div className="card" style={{ padding: 12 }}>
+          {/* Month nav */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <button onClick={() => setCalViewMonth(prev => { let m = prev.month - 1, y = prev.year; if (m < 0) { m = 11; y-- } return { year: y, month: m } })} style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>{new Date(calViewMonth.year, calViewMonth.month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+            <button onClick={() => setCalViewMonth(prev => { let m = prev.month + 1, y = prev.year; if (m > 11) { m = 0; y++ } return { year: y, month: m } })} style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+          </div>
+          {/* Weekday headers */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+            {['S','M','T','W','T','F','S'].map(w => <div key={w} style={{ textAlign: 'center', fontSize: 9, fontWeight: 700, color: 'var(--text2)', padding: '2px 0' }}>{w}</div>)}
+            {/* Blank days */}
+            {Array.from({ length: new Date(calViewMonth.year, calViewMonth.month, 1).getDay() }).map((_, i) => <div key={'b'+i} />)}
+            {/* Days */}
+            {Array.from({ length: new Date(calViewMonth.year, calViewMonth.month + 1, 0).getDate() }).map((_, i) => {
+              const d = i + 1
+              const ds = toStr(new Date(calViewMonth.year, calViewMonth.month, d))
+              const todayStr = toStr(new Date())
+              const isPast = ds < todayStr
+              const isToday = ds === todayStr
+              const busyCount = myBusyDates.get(ds) || 0
+              const pactList = myPactDates.get(ds) || []
+              const hasPlan = pactList.length > 0
+              const isBusy = busyCount > 0
+              const isFree = !isBusy && !hasPlan && !isPast
+              return (
+                <div key={d} style={{
+                  aspectRatio: '1', borderRadius: 8, position: 'relative',
+                  background: isToday ? 'rgba(118,172,179,0.12)' : 'transparent',
+                  opacity: isPast ? 0.35 : 1,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
+                  border: isToday ? '1.5px solid var(--accent)' : '1px solid transparent',
+                }}>
+                  <span style={{ fontSize: 11, fontWeight: isToday ? 800 : 500, color: isToday ? 'var(--accent)' : 'var(--text)' }}>{d}</span>
+                  {!isPast && (
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      {isFree && <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--green)' }} />}
+                      {isBusy && <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--red)' }} />}
+                      {hasPlan && <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--accent)' }} />}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {/* Legend */}
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8 }}>
+            {[
+              { color: 'var(--green)', label: 'Free' },
+              { color: 'var(--red)', label: 'Busy' },
+              { color: 'var(--accent)', label: 'Plans' },
+            ].map(l => (
+              <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text2)' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: l.color }} /> {l.label}
+              </span>
+            ))}
+          </div>
+          {/* Details view — show what's on each day this month */}
+          {calShowDetails && (() => {
+            const days = Array.from({ length: new Date(calViewMonth.year, calViewMonth.month + 1, 0).getDate() }).map((_, i) => {
+              const d = i + 1
+              const ds = toStr(new Date(calViewMonth.year, calViewMonth.month, d))
+              const pacts = myPactDates.get(ds) || []
+              const busy = myBusyDates.get(ds) || 0
+              if (pacts.length === 0 && busy === 0) return null
+              if (ds < toStr(new Date())) return null
+              return { d, ds, pacts, busy }
+            }).filter(Boolean)
+            if (days.length === 0) return <p style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'center', marginTop: 8 }}>Nothing scheduled this month</p>
+            return (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {days.map((day: any) => (
+                  <div key={day.d} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '4px 0', borderTop: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', minWidth: 28 }}>
+                      {new Date(calViewMonth.year, calViewMonth.month, day.d).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      {day.pacts.map((label: string, i: number) => (
+                        <p key={i} style={{ fontSize: 11, fontWeight: 600 }}>📋 {label}</p>
+                      ))}
+                      {day.busy > 0 && <p style={{ fontSize: 11, color: 'var(--text2)' }}>🔴 {day.busy} busy block{day.busy > 1 ? 's' : ''}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </div>
+      </div>
 
       {/* Birthday reminders */}
       {upcomingBirthdays.length > 0 && (

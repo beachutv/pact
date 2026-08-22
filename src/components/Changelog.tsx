@@ -22,6 +22,8 @@ const CHANGELOG: { version: string; date: string; title: string; subtitle: strin
       { icon: '📋', text: 'Past tab shows dimmed cards with a PAST badge, limited to 10 with Show more' },
       { icon: '🎂', text: 'Birthday reminders persist until you dismiss them — no more disappearing on navigation' },
       { icon: '🎂', text: 'New toggle in settings to show or hide your birthday from friends' },
+      { icon: '📅', text: 'Personal calendar month view on Home — see your availability at a glance with busy/free/plan dots' },
+      { icon: '🔍', text: 'Toggle between availability dots and details view showing what\'s scheduled each day' },
     ],
   },
   {
